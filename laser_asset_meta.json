@@ -1,0 +1,44 @@
+{
+  "LaserHull": {
+    "exists": true,
+    "class": "StaticMesh",
+    "source_files": [
+      "/Users/leovonschwind/sailing/LaserBoat.fbx"
+    ]
+  },
+  "LaserMast": {
+    "exists": true,
+    "class": "StaticMesh",
+    "source_files": [
+      "/Users/leovonschwind/sailing/LaserBoat.fbx"
+    ]
+  },
+  "LaserBoom": {
+    "exists": true,
+    "class": "StaticMesh",
+    "source_files": [
+      "/Users/leovonschwind/sailing/LaserBoat.fbx"
+    ]
+  },
+  "LaserSail": {
+    "exists": true,
+    "class": "StaticMesh",
+    "source_files": [
+      "/Users/leovonschwind/sailing/LaserBoat.fbx"
+    ]
+  },
+  "LaserRudder": {
+    "exists": true,
+    "class": "StaticMesh",
+    "source_files": [
+      "/Users/leovonschwind/sailing/LaserBoat.fbx"
+    ]
+  },
+  "LaserTiller": {
+    "exists": true,
+    "class": "StaticMesh",
+    "source_files": [
+      "/Users/leovonschwind/sailing/LaserBoat.fbx"
+    ]
+  }
+}

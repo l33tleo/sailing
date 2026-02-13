@@ -1,0 +1,22 @@
+# Unreal Engine
+Binaries/
+Intermediate/
+Saved/
+DerivedDataCache/
+*.sln
+*.xcworkspace
+*.xcodeproj
+.vs/
+*.VC.db
+*.VC.VC.opendb
+
+# Compiled
+*.o
+*.obj
+*.so
+*.dylib
+*.dll
+*.exe
+
+# macOS
+.DS_Store

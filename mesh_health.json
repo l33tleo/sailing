@@ -1,0 +1,24 @@
+{
+  "/Game/ModelsV2/LaserHull.LaserHull": {
+    "loaded": true,
+    "extent": [
+      211.5,
+      70.99999618530273,
+      19.74376106262207
+    ],
+    "num_lods": 1,
+    "num_sections_lod0": 1,
+    "num_materials": 1
+  },
+  "/Game/ModelsV2/LaserBoatCombined.LaserBoatCombined": {
+    "loaded": true,
+    "extent": [
+      5e-324,
+      2.2458697779e-313,
+      5e-324
+    ],
+    "num_lods": 0,
+    "num_sections_lod0": 0,
+    "num_materials": 0
+  }
+}

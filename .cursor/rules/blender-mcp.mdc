@@ -1,0 +1,22 @@
+---
+description: Blender MCP connection and usage for Sailing asset pipeline
+alwaysApply: false
+---
+# Blender MCP
+
+## Connect to Blender (before using Blender tools)
+
+1. Open **Blender** with the scene you want to work on.
+2. Open the **3D View sidebar** (press **N** if hidden).
+3. Go to the **BlenderMCP** tab.
+4. Click **Connect to Claude** (Blender listens on port 9876).
+5. Leave Blender open. Cursor’s MCP server (`uvx blender-mcp`) will connect when you use Blender tools.
+
+## Cursor setup
+
+- Blender must be listed and enabled under **Cursor Settings → MCP** Config i **`.cursor/mcp.json`** og `.mcp.json`; `BLENDER_HOST`/`BLENDER_PORT` (default localhost:9876) kan overstyres.
+- If Blender tools don’t appear, last Cursor på nytt eller start en ny chat etter at Blender er koblet til.
+
+## Use
+
+Use Blender MCP tools (e.g. `get_scene_info`, `execute_blender_code`, `get_viewport_screenshot`) for boat/island meshes and export to FBX for Unreal. See CLAUDE.md “Blender → Unreal Asset Pipeline” for FBX import via Unreal MCP.

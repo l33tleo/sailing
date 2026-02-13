@@ -1,0 +1,77 @@
+{
+  "model_assets": [
+    {
+      "asset_name": "LaserHull",
+      "package_name": "/Game/Models/LaserHull",
+      "class": "StaticMesh"
+    },
+    {
+      "asset_name": "LaserMast",
+      "package_name": "/Game/Models/LaserMast",
+      "class": "StaticMesh"
+    },
+    {
+      "asset_name": "LaserBoom",
+      "package_name": "/Game/Models/LaserBoom",
+      "class": "StaticMesh"
+    },
+    {
+      "asset_name": "LaserSail",
+      "package_name": "/Game/Models/LaserSail",
+      "class": "StaticMesh"
+    },
+    {
+      "asset_name": "LaserRudder",
+      "package_name": "/Game/Models/LaserRudder",
+      "class": "StaticMesh"
+    },
+    {
+      "asset_name": "LaserTiller",
+      "package_name": "/Game/Models/LaserTiller",
+      "class": "StaticMesh"
+    },
+    {
+      "asset_name": "Cylinder",
+      "package_name": "/Game/Models/Cylinder",
+      "class": "StaticMesh"
+    },
+    {
+      "asset_name": "Cube_001",
+      "package_name": "/Game/Models/Cube_001",
+      "class": "StaticMesh"
+    },
+    {
+      "asset_name": "Mesh",
+      "package_name": "/Game/Models/Mesh",
+      "class": "StaticMesh"
+    },
+    {
+      "asset_name": "Sail_001",
+      "package_name": "/Game/Models/Sail_001",
+      "class": "StaticMesh"
+    },
+    {
+      "asset_name": "Cube_002",
+      "package_name": "/Game/Models/Cube_002",
+      "class": "StaticMesh"
+    }
+  ],
+  "pawn_class_loaded": true,
+  "cdo_meshes": {
+    "BoatMesh": "/Game/Models/LaserHull.LaserHull",
+    "MastMesh": "/Game/Models/LaserMast.LaserMast",
+    "BoomMesh": "/Game/Models/LaserBoom.LaserBoom",
+    "MainSailMesh": "/Game/Models/LaserSail.LaserSail",
+    "RudderMesh": "/Game/Models/LaserRudder.LaserRudder",
+    "TillerMesh": "/Game/Models/LaserTiller.LaserTiller"
+  },
+  "maps_settings": {
+    "editor_startup_map": "<Struct 'SoftObjectPath' (0x40c2e3930) {}>",
+    "game_default_map": "<Struct 'SoftObjectPath' (0x40c2e39d0) {}>",
+    "global_default_game_mode": "<Struct 'SoftClassPath' (0x40c2e3a20) {}>"
+  },
+  "world": {
+    "name": "MainOcean",
+    "default_game_mode_override": "<Object '/Script/Sailing.SailingGameMode' (0x42e1a7400) Class 'Class'>"
+  }
+}

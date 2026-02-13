@@ -1,0 +1,219 @@
+{
+  "pawns": [
+    {
+      "name": "SailboatPawn_0",
+      "class": "SailboatPawn",
+      "components": [
+        {
+          "comp": "BoatMesh",
+          "mesh": "/Game/Models/LaserHull.LaserHull",
+          "rel_loc": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rel_rot": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rel_scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "comp": "BowMesh",
+          "mesh": null,
+          "rel_loc": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rel_rot": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rel_scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "comp": "MastMesh",
+          "mesh": "/Game/Models/LaserMast.LaserMast",
+          "rel_loc": [
+            120.0,
+            0.0,
+            25.0
+          ],
+          "rel_rot": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rel_scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "comp": "BoomMesh",
+          "mesh": "/Game/Models/LaserBoom.LaserBoom",
+          "rel_loc": [
+            120.0,
+            0.0,
+            280.0
+          ],
+          "rel_rot": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rel_scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "comp": "MainSailMesh",
+          "mesh": "/Game/Models/LaserSail.LaserSail",
+          "rel_loc": [
+            120.0,
+            37.0,
+            313.0
+          ],
+          "rel_rot": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rel_scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "comp": "SpritMesh",
+          "mesh": null,
+          "rel_loc": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rel_rot": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rel_scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "comp": "KeelMesh",
+          "mesh": null,
+          "rel_loc": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rel_rot": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rel_scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "comp": "RudderMesh",
+          "mesh": "/Game/Models/LaserRudder.LaserRudder",
+          "rel_loc": [
+            -200.0,
+            0.0,
+            -20.0
+          ],
+          "rel_rot": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rel_scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "comp": "TillerMesh",
+          "mesh": "/Game/Models/LaserTiller.LaserTiller",
+          "rel_loc": [
+            -160.0,
+            35.0,
+            15.0
+          ],
+          "rel_rot": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rel_scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "comp": "SailNumberMesh",
+          "mesh": null,
+          "rel_loc": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rel_rot": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rel_scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        },
+        {
+          "comp": "CameraProxyMeshComponent_0",
+          "mesh": "/Engine/EditorMeshes/MatineeCam_SM.MatineeCam_SM",
+          "rel_loc": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rel_rot": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "rel_scale": [
+            1.0,
+            1.0,
+            1.0
+          ]
+        }
+      ]
+    }
+  ]
+}

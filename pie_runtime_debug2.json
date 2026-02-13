@@ -1,0 +1,10 @@
+{
+  "world_name": "MainOcean",
+  "player_controller_count": 1,
+  "all_pawns": [
+    {
+      "name": "SailboatPawn_0",
+      "class": "SailboatPawn"
+    }
+  ]
+}

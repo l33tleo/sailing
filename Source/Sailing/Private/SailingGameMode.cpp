@@ -1,0 +1,123 @@
+#include "SailingGameMode.h"
+#include "SailboatPawn.h"
+#include "SailingPlayerController.h"
+#include "SailingHUD.h"
+#include "SailingGameInstance.h"
+#include "WindActor.h"
+#include "ChunkManager.h"
+#include "OceanPlaneActor.h"
+#include "SaveGameSailing.h"
+#include "Kismet/GameplayStatics.h"
+#include "TimerManager.h"
+
+ASailingGameMode::ASailingGameMode()
+{
+	DefaultPawnClass = ASailboatPawn::StaticClass();
+	PlayerControllerClass = ASailingPlayerController::StaticClass();
+	HUDClass = ASailingHUD::StaticClass();
+}
+
+void ASailingGameMode::BeginPlay()
+{
+	Super::BeginPlay();
+
+	USailingGameInstance* GI = Cast<USailingGameInstance>(GetGameInstance());
+	if (GI && GI->bRequestNewGame)
+	{
+		GI->bRequestNewGame = false;
+		SaveGame = Cast<USaveGameSailing>(
+			UGameplayStatics::CreateSaveGameObject(USaveGameSailing::StaticClass()));
+		UE_LOG(LogTemp, Log, TEXT("SailingGameMode: Nytt spill"));
+	}
+	else
+	{
+		LoadOrCreateSaveGame();
+	}
+
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+	// Spawn wind actor
+	SpawnedWind = GetWorld()->SpawnActor<AWindActor>(
+		AWindActor::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Params);
+
+	// Spawn chunk manager for procedural islands
+	SpawnedChunkManager = GetWorld()->SpawnActor<AChunkManager>(
+		AChunkManager::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Params);
+
+	// Pass save game to chunk manager
+	if (AChunkManager* CM = Cast<AChunkManager>(SpawnedChunkManager))
+	{
+		CM->SetSaveGame(SaveGame);
+	}
+
+	// Spawn ocean plane
+	SpawnedOcean = GetWorld()->SpawnActor<AOceanPlaneActor>(
+		AOceanPlaneActor::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Params);
+
+	// Teleporter pawn til siste posisjon ved Fortsett (etter at pawn er spawnet)
+	if (SaveGame && SaveGame->LastPlayerLocation != FVector::ZeroVector)
+	{
+		GetWorld()->GetTimerManager().SetTimerForNextTick([this]()
+		{
+			if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+			{
+				if (APawn* Pawn = PC->GetPawn())
+				{
+					Pawn->SetActorLocation(SaveGame->LastPlayerLocation);
+					UE_LOG(LogTemp, Log, TEXT("SailingGameMode: Spiller flyttet til lagret posisjon"));
+				}
+			}
+		});
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("SailingGameMode: Spill lastet. Øyer oppdaget: %d"),
+		SaveGame ? SaveGame->TotalIslandsDiscovered : 0);
+}
+
+void ASailingGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	SaveGame_();
+	Super::EndPlay(EndPlayReason);
+}
+
+void ASailingGameMode::LoadOrCreateSaveGame()
+{
+	if (UGameplayStatics::DoesSaveGameExist(USaveGameSailing::SaveSlotName, 0))
+	{
+		SaveGame = Cast<USaveGameSailing>(
+			UGameplayStatics::LoadGameFromSlot(USaveGameSailing::SaveSlotName, 0));
+		UE_LOG(LogTemp, Log, TEXT("Lastet eksisterende lagringsfil med %d øyer"),
+			SaveGame ? SaveGame->TotalIslandsDiscovered : 0);
+	}
+
+	if (!SaveGame)
+	{
+		SaveGame = Cast<USaveGameSailing>(
+			UGameplayStatics::CreateSaveGameObject(USaveGameSailing::StaticClass()));
+		UE_LOG(LogTemp, Log, TEXT("Opprettet ny lagringsfil"));
+	}
+}
+
+AChunkManager* ASailingGameMode::GetChunkManager() const
+{
+	return Cast<AChunkManager>(SpawnedChunkManager);
+}
+
+void ASailingGameMode::SaveGame_()
+{
+	if (SaveGame)
+	{
+		// Update player location
+		if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+		{
+			if (APawn* Pawn = PC->GetPawn())
+			{
+				SaveGame->LastPlayerLocation = Pawn->GetActorLocation();
+			}
+		}
+
+		UGameplayStatics::SaveGameToSlot(SaveGame, USaveGameSailing::SaveSlotName, 0);
+		UE_LOG(LogTemp, Log, TEXT("Spill lagret"));
+	}
+}

@@ -1,0 +1,77 @@
+{
+  "world_name": "MainOcean",
+  "pawns": [
+    {
+      "name": "SailboatPawn_0",
+      "class": "SailboatPawn",
+      "components": [
+        {
+          "comp": "BoatMesh",
+          "mesh": "/Game/Models/LaserHull.LaserHull",
+          "rel_loc_err": "'StaticMeshComponent' object has no attribute 'get_relative_location'",
+          "rel_scale_err": "'StaticMeshComponent' object has no attribute 'get_relative_scale3d'"
+        },
+        {
+          "comp": "BowMesh",
+          "mesh": null,
+          "rel_loc_err": "'StaticMeshComponent' object has no attribute 'get_relative_location'",
+          "rel_scale_err": "'StaticMeshComponent' object has no attribute 'get_relative_scale3d'"
+        },
+        {
+          "comp": "MastMesh",
+          "mesh": "/Game/Models/LaserMast.LaserMast",
+          "rel_loc_err": "'StaticMeshComponent' object has no attribute 'get_relative_location'",
+          "rel_scale_err": "'StaticMeshComponent' object has no attribute 'get_relative_scale3d'"
+        },
+        {
+          "comp": "BoomMesh",
+          "mesh": "/Game/Models/LaserBoom.LaserBoom",
+          "rel_loc_err": "'StaticMeshComponent' object has no attribute 'get_relative_location'",
+          "rel_scale_err": "'StaticMeshComponent' object has no attribute 'get_relative_scale3d'"
+        },
+        {
+          "comp": "MainSailMesh",
+          "mesh": "/Game/Models/LaserSail.LaserSail",
+          "rel_loc_err": "'StaticMeshComponent' object has no attribute 'get_relative_location'",
+          "rel_scale_err": "'StaticMeshComponent' object has no attribute 'get_relative_scale3d'"
+        },
+        {
+          "comp": "SpritMesh",
+          "mesh": null,
+          "rel_loc_err": "'StaticMeshComponent' object has no attribute 'get_relative_location'",
+          "rel_scale_err": "'StaticMeshComponent' object has no attribute 'get_relative_scale3d'"
+        },
+        {
+          "comp": "KeelMesh",
+          "mesh": null,
+          "rel_loc_err": "'StaticMeshComponent' object has no attribute 'get_relative_location'",
+          "rel_scale_err": "'StaticMeshComponent' object has no attribute 'get_relative_scale3d'"
+        },
+        {
+          "comp": "RudderMesh",
+          "mesh": "/Game/Models/LaserRudder.LaserRudder",
+          "rel_loc_err": "'StaticMeshComponent' object has no attribute 'get_relative_location'",
+          "rel_scale_err": "'StaticMeshComponent' object has no attribute 'get_relative_scale3d'"
+        },
+        {
+          "comp": "TillerMesh",
+          "mesh": "/Game/Models/LaserTiller.LaserTiller",
+          "rel_loc_err": "'StaticMeshComponent' object has no attribute 'get_relative_location'",
+          "rel_scale_err": "'StaticMeshComponent' object has no attribute 'get_relative_scale3d'"
+        },
+        {
+          "comp": "SailNumberMesh",
+          "mesh": null,
+          "rel_loc_err": "'StaticMeshComponent' object has no attribute 'get_relative_location'",
+          "rel_scale_err": "'StaticMeshComponent' object has no attribute 'get_relative_scale3d'"
+        },
+        {
+          "comp": "CameraProxyMeshComponent_0",
+          "mesh": "/Engine/EditorMeshes/MatineeCam_SM.MatineeCam_SM",
+          "rel_loc_err": "'CameraProxyMeshComponent' object has no attribute 'get_relative_location'",
+          "rel_scale_err": "'CameraProxyMeshComponent' object has no attribute 'get_relative_scale3d'"
+        }
+      ]
+    }
+  ]
+}

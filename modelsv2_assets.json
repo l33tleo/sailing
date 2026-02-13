@@ -1,0 +1,32 @@
+[
+  {
+    "name": "LaserTiller",
+    "pkg": "/Game/ModelsV2/LaserTiller",
+    "class": "StaticMesh"
+  },
+  {
+    "name": "LaserSail",
+    "pkg": "/Game/ModelsV2/LaserSail",
+    "class": "StaticMesh"
+  },
+  {
+    "name": "LaserRudder",
+    "pkg": "/Game/ModelsV2/LaserRudder",
+    "class": "StaticMesh"
+  },
+  {
+    "name": "LaserMast",
+    "pkg": "/Game/ModelsV2/LaserMast",
+    "class": "StaticMesh"
+  },
+  {
+    "name": "LaserHull",
+    "pkg": "/Game/ModelsV2/LaserHull",
+    "class": "StaticMesh"
+  },
+  {
+    "name": "LaserBoom",
+    "pkg": "/Game/ModelsV2/LaserBoom",
+    "class": "StaticMesh"
+  }
+]

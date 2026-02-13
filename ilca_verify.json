@@ -1,0 +1,46 @@
+{
+  "combined_exists": true,
+  "pawn_class_loaded": true,
+  "cdo_boat_mesh": "/Game/ModelsV2/LaserHull.LaserHull",
+  "cdo_boat_visual_z_offset": 28.0,
+  "pie_active": true,
+  "pawn_count": 1,
+  "runtime": [
+    {
+      "name": "SailboatPawn_0",
+      "class": "SailboatPawn",
+      "components": [
+        {
+          "comp": "BoatMesh",
+          "mesh": "/Game/ModelsV2/LaserHull.LaserHull",
+          "hidden": false
+        },
+        {
+          "comp": "MastMesh",
+          "mesh": "/Game/ModelsV2/LaserMast.LaserMast",
+          "hidden": false
+        },
+        {
+          "comp": "BoomMesh",
+          "mesh": "/Game/ModelsV2/LaserBoom.LaserBoom",
+          "hidden": false
+        },
+        {
+          "comp": "MainSailMesh",
+          "mesh": "/Game/ModelsV2/LaserSail.LaserSail",
+          "hidden": false
+        },
+        {
+          "comp": "RudderMesh",
+          "mesh": "/Game/ModelsV2/LaserRudder.LaserRudder",
+          "hidden": false
+        },
+        {
+          "comp": "TillerMesh",
+          "mesh": "/Game/ModelsV2/LaserTiller.LaserTiller",
+          "hidden": false
+        }
+      ]
+    }
+  ]
+}
