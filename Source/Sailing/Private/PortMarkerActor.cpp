@@ -105,6 +105,26 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 			{
 				TelemetrySubsystem->RecordCounterEvent(FName(*FString::Printf(TEXT("PortVisit_%s"), *PortId.ToString())), 1);
 			}
+			if (MissionSelectionResult.bUsedWeightedRules)
+			{
+				TelemetrySubsystem->RecordCounterEvent(TEXT("PortMissionOfferWeightedUsed"), 1);
+			}
+			else if (MissionSelectionResult.bUsedFallbackOffers)
+			{
+				TelemetrySubsystem->RecordCounterEvent(TEXT("PortMissionOfferFallbackUsed"), 1);
+			}
+			if (UpgradeSelectionResult.bUsedWeightedRules)
+			{
+				TelemetrySubsystem->RecordCounterEvent(TEXT("PortUpgradeOfferWeightedUsed"), 1);
+			}
+			else if (UpgradeSelectionResult.bUsedFallbackOffers)
+			{
+				TelemetrySubsystem->RecordCounterEvent(TEXT("PortUpgradeOfferFallbackUsed"), 1);
+			}
+			if (HiddenUnlockedUpgradeOfferCount > 0)
+			{
+				TelemetrySubsystem->RecordCounterEvent(TEXT("PortUpgradeOffersHiddenUnlocked"), HiddenUnlockedUpgradeOfferCount);
+			}
 		}
 
 		const bool bCanGrantBonus = (!bVisitedInSession || !bGrantOneTimeDockBonus) && DockBonusCredits > 0;
