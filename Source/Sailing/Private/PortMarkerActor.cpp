@@ -209,9 +209,19 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 
 			if (bOfferMissionBoard || bOfferUpgradeService)
 			{
+				EPortBoardRefreshContext RefreshContext = EPortBoardRefreshContext::DockArrival;
+				if (bMissionBoardOnCooldown)
+				{
+					RefreshContext = EPortBoardRefreshContext::CooldownBlocked;
+				}
+				else if (!bOfferMissionBoard && bOfferUpgradeService)
+				{
+					RefreshContext = EPortBoardRefreshContext::ServiceOnly;
+				}
+
 				HUD->ShowPortMissionBoard(PortId, PortDisplayName, bOfferMissionBoard,
 					EffectiveOfferedMissionIds, CurrentMissionId,
-					bMissionBoardOnCooldown, MissionBoardCooldownRemaining,
+					bMissionBoardOnCooldown, MissionBoardCooldownRemaining, RefreshContext,
 					bAutoRepairAtPort, RepairCostPerPercentPoint,
 					bOfferUpgradeService, EffectiveOfferedUpgradeIds,
 					UpgradeCostMultiplier, PortVisitCount, WeightedOfferedUpgrades,

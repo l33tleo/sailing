@@ -62,6 +62,7 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 	bool bOfferMissionBoard,
 	const TArray<FName>& OfferedMissionIds, FName CurrentMissionId,
 	bool bMissionBoardOnCooldown, float CooldownRemainingSeconds,
+	EPortBoardRefreshContext RefreshContext,
 	bool bAutoRepairAtPort, int32 RepairCostPerPercentPoint,
 	bool bOfferUpgradeService, const TArray<FName>& OfferedUpgradeIds,
 	float UpgradeCostMultiplier, int32 CurrentPortVisitCount,
@@ -120,6 +121,8 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 		Data.bSupportsMissionBoard, Data.bMissionBoardOnCooldown, Data.bHasAnyOffers);
 	Data.AvailabilityStatus = UPortMissionBoardWidget::BuildMissionAvailabilityStatusText(
 		Data.AvailabilityReason, Data.CooldownRemainingSeconds, Data.bSupportsUpgradeService);
+	Data.RefreshContext = RefreshContext;
+	Data.RefreshContextStatus = UPortMissionBoardWidget::BuildRefreshContextStatusText(RefreshContext);
 	if (UGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance() : nullptr)
 	{
 		if (UEconomySubsystem* EconomySubsystem = GI->GetSubsystem<UEconomySubsystem>())
@@ -292,6 +295,9 @@ bool ASailingHUD::AcceptMissionFromBoard(FName MissionId)
 
 		LastMissionBoardData.bAwaitingMissionSwitchConfirmation = true;
 		LastMissionBoardData.PendingMissionSwitchId = MissionId;
+		LastMissionBoardData.RefreshContext = EPortBoardRefreshContext::MissionSwitchConfirmation;
+		LastMissionBoardData.RefreshContextStatus = UPortMissionBoardWidget::BuildRefreshContextStatusText(
+			LastMissionBoardData.RefreshContext);
 		LastMissionBoardData.MissionSwitchConfirmationStatus = FText::FromString(
 			FString::Printf(TEXT("Bekreft bytte til '%s' ved å trykke oppdraget igjen."), *RequestedMissionTitle.ToString()));
 		LastMissionBoardData.AvailabilityStatus = LastMissionBoardData.MissionSwitchConfirmationStatus;
@@ -427,6 +433,9 @@ bool ASailingHUD::RequestUpgradePurchaseFromBoard(FName UpgradeId)
 			: UpgradeData->DisplayName;
 		LastMissionBoardData.bAwaitingUpgradePurchaseConfirmation = true;
 		LastMissionBoardData.PendingUpgradePurchaseId = UpgradeId;
+		LastMissionBoardData.RefreshContext = EPortBoardRefreshContext::UpgradePurchaseConfirmation;
+		LastMissionBoardData.RefreshContextStatus = UPortMissionBoardWidget::BuildRefreshContextStatusText(
+			LastMissionBoardData.RefreshContext);
 		LastMissionBoardData.UpgradePurchaseConfirmationStatus = FText::FromString(
 			FString::Printf(TEXT("Bekreft kjøp av '%s' ved å trykke oppgraderingen igjen."), *UpgradeTitle.ToString()));
 		LastMissionBoardData.UpgradeStatus = LastMissionBoardData.UpgradePurchaseConfirmationStatus;

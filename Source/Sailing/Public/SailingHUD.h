@@ -26,6 +26,7 @@ public:
 		bool bOfferMissionBoard,
 		const TArray<FName>& OfferedMissionIds, FName CurrentMissionId,
 		bool bMissionBoardOnCooldown, float CooldownRemainingSeconds,
+		EPortBoardRefreshContext RefreshContext,
 		bool bAutoRepairAtPort, int32 RepairCostPerPercentPoint,
 		bool bOfferUpgradeService, const TArray<FName>& OfferedUpgradeIds,
 		float UpgradeCostMultiplier, int32 CurrentPortVisitCount,

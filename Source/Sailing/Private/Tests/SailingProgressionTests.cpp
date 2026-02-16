@@ -552,6 +552,12 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 	TestEqual(TEXT("Upgrade visit status should indicate remaining visits"),
 		UPortMissionBoardWidget::BuildUpgradeVisitRequirementStatusText(5, 3).ToString(),
 		FString(TEXT("Krever 5 havnebesøk (mangler 2).")));
+	TestEqual(TEXT("Refresh context helper should map dock-arrival text"),
+		UPortMissionBoardWidget::BuildRefreshContextStatusText(EPortBoardRefreshContext::DockArrival).ToString(),
+		FString(TEXT("Tavle oppdatert ved anløp.")));
+	TestEqual(TEXT("Refresh context helper should map cooldown text"),
+		UPortMissionBoardWidget::BuildRefreshContextStatusText(EPortBoardRefreshContext::CooldownBlocked).ToString(),
+		FString(TEXT("Tavle oppdatert mens havnen er i nedkjøling.")));
 	return true;
 }
 

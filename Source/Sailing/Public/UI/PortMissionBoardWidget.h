@@ -36,6 +36,17 @@ enum class EPortUpgradeOfferSource : uint8
 	FallbackList
 };
 
+UENUM(BlueprintType)
+enum class EPortBoardRefreshContext : uint8
+{
+	DockArrival,
+	CooldownBlocked,
+	ServiceOnly,
+	MissionSwitchConfirmation,
+	UpgradePurchaseConfirmation,
+	ManualRefresh
+};
+
 USTRUCT(BlueprintType)
 struct SAILING_API FPortMissionOfferEntry
 {
@@ -124,6 +135,12 @@ struct SAILING_API FPortMissionBoardData
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
 	EPortMissionAvailabilityReason AvailabilityReason = EPortMissionAvailabilityReason::Ready;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	EPortBoardRefreshContext RefreshContext = EPortBoardRefreshContext::DockArrival;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	FText RefreshContextStatus;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
 	int32 PortVisitCount = 0;
@@ -268,6 +285,9 @@ public:
 	static FText BuildUpgradeVisitRequirementStatusText(
 		int32 MinPortVisits,
 		int32 CurrentPortVisitCount);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard")
+	static FText BuildRefreshContextStatusText(EPortBoardRefreshContext RefreshContext);
 
 	UFUNCTION(BlueprintCallable, Category = "MissionBoard")
 	void RequestCloseBoard();

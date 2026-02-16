@@ -244,6 +244,27 @@ FText UPortMissionBoardWidget::BuildUpgradeVisitRequirementStatusText(
 	return FText::FromString(FString::Printf(TEXT("Krever %d havnebesøk (mangler %d)."), SafeMinVisits, SafeMinVisits - SafeCurrentVisits));
 }
 
+FText UPortMissionBoardWidget::BuildRefreshContextStatusText(EPortBoardRefreshContext RefreshContext)
+{
+	switch (RefreshContext)
+	{
+	case EPortBoardRefreshContext::DockArrival:
+		return FText::FromString(TEXT("Tavle oppdatert ved anløp."));
+	case EPortBoardRefreshContext::CooldownBlocked:
+		return FText::FromString(TEXT("Tavle oppdatert mens havnen er i nedkjøling."));
+	case EPortBoardRefreshContext::ServiceOnly:
+		return FText::FromString(TEXT("Tavle viser kun havneservice."));
+	case EPortBoardRefreshContext::MissionSwitchConfirmation:
+		return FText::FromString(TEXT("Venter på bekreftelse av oppdragsbytte."));
+	case EPortBoardRefreshContext::UpgradePurchaseConfirmation:
+		return FText::FromString(TEXT("Venter på bekreftelse av oppgraderingskjøp."));
+	case EPortBoardRefreshContext::ManualRefresh:
+		return FText::FromString(TEXT("Tavle manuelt oppdatert."));
+	default:
+		return FText::FromString(TEXT("Tavle oppdatert."));
+	}
+}
+
 void UPortMissionBoardWidget::RequestCloseBoard()
 {
 	OnCloseRequested.Broadcast();
