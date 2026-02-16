@@ -130,7 +130,9 @@ def analyze_fundamental(ticker: str) -> FundamentalAnalysisResult:
         payout_ratio = info.get("payoutRatio")
 
         if div_yield is not None and div_yield > 0:
-            div_pct = div_yield * 100
+            # yfinance inconsistency: some tickers return 0.041 (=4.1%), others 5.6 (=5.6%)
+            # If the value is > 1, it's already a percentage; if < 1, multiply by 100
+            div_pct = div_yield if div_yield > 1 else div_yield * 100
             if div_pct > 5:
                 result.dividend_score = 18
                 result.dividend_detail = f"Utbytterate {div_pct:.1f}% — svært høyt utbytte"

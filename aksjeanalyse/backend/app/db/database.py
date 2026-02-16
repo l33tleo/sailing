@@ -7,10 +7,14 @@ from sqlalchemy.orm import DeclarativeBase
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql+asyncpg://aksjeanalyse:aksjeanalyse_dev@localhost:5432/aksjeanalyse",
+    "sqlite+aiosqlite:///./aksjeanalyse.db",
 )
 
-engine = create_async_engine(DATABASE_URL, echo=False, pool_size=20, max_overflow=10)
+# SQLite doesn't support pool_size/max_overflow
+if DATABASE_URL.startswith("sqlite"):
+    engine = create_async_engine(DATABASE_URL, echo=False)
+else:
+    engine = create_async_engine(DATABASE_URL, echo=False, pool_size=20, max_overflow=10)
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
