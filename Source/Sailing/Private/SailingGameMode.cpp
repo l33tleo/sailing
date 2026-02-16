@@ -8,10 +8,13 @@
 #include "OceanPlaneActor.h"
 #include "MissionObjectiveActor.h"
 #include "PortMarkerActor.h"
+#include "Data/PortDataAsset.h"
 #include "Data/SailingMissionDataAsset.h"
 #include "SaveGameSailing.h"
 #include "Systems/SailingCoreSubsystems.h"
+#include "AssetRegistry/AssetRegistryModule.h"
 #include "Kismet/GameplayStatics.h"
+#include "Modules/ModuleManager.h"
 #include "TimerManager.h"
 
 ASailingGameMode::ASailingGameMode()
@@ -155,31 +158,70 @@ void ASailingGameMode::BeginPlay()
 			WorldStreamingSubsystem->ClearPortPoints();
 			SpawnedPortMarkers.Empty();
 
-			struct FPortSeed
+			TArray<UPortDataAsset*> PortDefinitions;
 			{
-				FName PortId;
-				FVector Location;
-			};
+				FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry"));
+				FARFilter Filter;
+				Filter.PackagePaths.Add(FName(TEXT("/Game")));
+				Filter.ClassPaths.Add(UPortDataAsset::StaticClass()->GetClassPathName());
+				Filter.bRecursivePaths = true;
 
-			const TArray<FPortSeed> PortSeeds = {
-				{ TEXT("HavnNord"), FVector(2000.0f, -6000.0f, 100.0f) },
-				{ TEXT("HavnVest"), FVector(-7000.0f, 1500.0f, 100.0f) },
-				{ TEXT("HavnSor"), FVector(8500.0f, 4500.0f, 100.0f) }
-			};
+				TArray<FAssetData> PortAssets;
+				AssetRegistryModule.Get().GetAssets(Filter, PortAssets);
+				for (const FAssetData& AssetData : PortAssets)
+				{
+					if (UPortDataAsset* PortData = Cast<UPortDataAsset>(AssetData.GetAsset()))
+					{
+						if (!PortData->PortId.IsNone())
+						{
+							PortDefinitions.Add(PortData);
+						}
+					}
+				}
+			}
 
-			for (const FPortSeed& PortSeed : PortSeeds)
+			// Fallback defaults if no data assets exist yet
+			if (PortDefinitions.Num() == 0)
+			{
+				UPortDataAsset* PortNord = NewObject<UPortDataAsset>(this);
+				PortNord->PortId = TEXT("HavnNord");
+				PortNord->DisplayName = FText::FromString(TEXT("Nordhavn"));
+				PortNord->WorldLocation = FVector(2000.0f, -6000.0f, 100.0f);
+				PortDefinitions.Add(PortNord);
+
+				UPortDataAsset* PortVest = NewObject<UPortDataAsset>(this);
+				PortVest->PortId = TEXT("HavnVest");
+				PortVest->DisplayName = FText::FromString(TEXT("Vesthavn"));
+				PortVest->WorldLocation = FVector(-7000.0f, 1500.0f, 100.0f);
+				PortDefinitions.Add(PortVest);
+
+				UPortDataAsset* PortSor = NewObject<UPortDataAsset>(this);
+				PortSor->PortId = TEXT("HavnSor");
+				PortSor->DisplayName = FText::FromString(TEXT("Sorhavn"));
+				PortSor->WorldLocation = FVector(8500.0f, 4500.0f, 100.0f);
+				PortDefinitions.Add(PortSor);
+			}
+
+			for (const UPortDataAsset* PortData : PortDefinitions)
 			{
 				APortMarkerActor* PortMarker = GetWorld()->SpawnActor<APortMarkerActor>(
-					APortMarkerActor::StaticClass(), PortSeed.Location, FRotator::ZeroRotator, Params);
+					APortMarkerActor::StaticClass(), PortData->WorldLocation, FRotator::ZeroRotator, Params);
 				if (!PortMarker)
 				{
 					continue;
 				}
 
-				PortMarker->PortId = PortSeed.PortId;
+				PortMarker->PortId = PortData->PortId;
+				PortMarker->DockBonusCredits = PortData->DockBonusCredits;
+				PortMarker->bGrantOneTimeDockBonus = PortData->bGrantOneTimeDockBonus;
+				PortMarker->bAutoRepairAtPort = PortData->bAutoRepairAtPort;
+				PortMarker->RepairCostPerPercentPoint = PortData->RepairCostPerPercentPoint;
+
 				SpawnedPortMarkers.Add(PortMarker);
-				WorldStreamingSubsystem->RegisterPortPoint(PortSeed.PortId, PortSeed.Location);
+				WorldStreamingSubsystem->RegisterPortPoint(PortData->PortId, PortData->WorldLocation);
 			}
+
+			UE_LOG(LogTemp, Log, TEXT("SailingGameMode: Spawned %d harbor markers."), SpawnedPortMarkers.Num());
 		}
 	}
 
