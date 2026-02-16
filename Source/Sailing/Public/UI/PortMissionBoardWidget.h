@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Data/SailingProgressionTypes.h"
 #include "PortMissionBoardWidget.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPortMissionAcceptRequested, FName, MissionId);
@@ -44,6 +45,9 @@ struct SAILING_API FPortMissionBoardData
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
 	float CooldownRemainingSeconds = 0.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	TArray<FMissionBoardSelectionEntry> RecentSelections;
 };
 
 /**
