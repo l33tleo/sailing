@@ -814,17 +814,26 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 	FText BlockedReason;
 	TestFalse(TEXT("Mission accept helper should reject already-active mission"),
 		UPortMissionBoardWidget::CanRequestMissionAccept(MissionBoardData, TEXT("Mission_A"), BlockedReason));
+	TestEqual(TEXT("Mission accept block reason should classify already-active state"),
+		UPortMissionBoardWidget::DetermineMissionOfferActionBlockReason(MissionBoardData, TEXT("Mission_A")),
+		EPortMissionOfferActionBlockReason::AlreadyActiveMission);
 	TestEqual(TEXT("Mission accept helper should explain already-active rejection"),
 		BlockedReason.ToString(),
 		FString(TEXT("Oppdraget er allerede aktivt.")));
 	TestFalse(TEXT("Mission accept helper should reject non-offered mission"),
 		UPortMissionBoardWidget::CanRequestMissionAccept(MissionBoardData, TEXT("Mission_C"), BlockedReason));
+	TestEqual(TEXT("Mission accept block reason should classify non-offered state"),
+		UPortMissionBoardWidget::DetermineMissionOfferActionBlockReason(MissionBoardData, TEXT("Mission_C")),
+		EPortMissionOfferActionBlockReason::NotOfferedAtPort);
 	TestEqual(TEXT("Mission accept helper should explain non-offered mission"),
 		BlockedReason.ToString(),
 		FString(TEXT("Oppdraget tilbys ikke i denne havnen.")));
 	MissionBoardData.bSupportsMissionBoard = false;
 	TestFalse(TEXT("Mission accept helper should reject when board service disabled"),
 		UPortMissionBoardWidget::CanRequestMissionAccept(MissionBoardData, TEXT("Mission_B"), BlockedReason));
+	TestEqual(TEXT("Mission accept block reason should classify disabled board"),
+		UPortMissionBoardWidget::DetermineMissionOfferActionBlockReason(MissionBoardData, TEXT("Mission_B")),
+		EPortMissionOfferActionBlockReason::MissionBoardDisabled);
 	TestEqual(TEXT("Mission accept helper should expose disabled-board reason"),
 		BlockedReason.ToString(),
 		FString(TEXT("Ingen tavletjenester tilgjengelig i denne havnen.")));
@@ -833,12 +842,18 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 	MissionBoardData.CooldownRemainingSeconds = 9.0f;
 	TestFalse(TEXT("Mission accept helper should reject during cooldown"),
 		UPortMissionBoardWidget::CanRequestMissionAccept(MissionBoardData, TEXT("Mission_B"), BlockedReason));
+	TestEqual(TEXT("Mission accept block reason should classify cooldown"),
+		UPortMissionBoardWidget::DetermineMissionOfferActionBlockReason(MissionBoardData, TEXT("Mission_B")),
+		EPortMissionOfferActionBlockReason::MissionBoardCooldown);
 	TestEqual(TEXT("Mission accept helper should expose cooldown reason"),
 		BlockedReason.ToString(),
 		FString(TEXT("Tavlen oppdateres om 9 sekunder")));
 	MissionBoardData.bMissionBoardOnCooldown = false;
 	TestTrue(TEXT("Mission accept helper should allow offered mission switch"),
 		UPortMissionBoardWidget::CanRequestMissionAccept(MissionBoardData, TEXT("Mission_B"), BlockedReason));
+	TestEqual(TEXT("Mission accept block reason should classify selectable offer as none"),
+		UPortMissionBoardWidget::DetermineMissionOfferActionBlockReason(MissionBoardData, TEXT("Mission_B")),
+		EPortMissionOfferActionBlockReason::None);
 
 	FPortUpgradeOfferEntry UpgradeOffer;
 	UpgradeOffer.UpgradeId = TEXT("Upgrade_A");
@@ -854,10 +869,16 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 	UpgradeBoardData.UpgradeAvailabilityReason = EPortUpgradeAvailabilityReason::Ready;
 	TestTrue(TEXT("Upgrade helper should allow affordable offered upgrade"),
 		UPortMissionBoardWidget::CanRequestUpgradePurchase(UpgradeBoardData, UpgradeOffer.UpgradeId, BlockedReason));
+	TestEqual(TEXT("Upgrade helper should classify purchasable offer as unblocked"),
+		UPortMissionBoardWidget::DetermineUpgradeOfferActionBlockReason(UpgradeBoardData, UpgradeOffer.UpgradeId),
+		EPortUpgradeOfferActionBlockReason::None);
 
 	UpgradeBoardData.OfferedUpgrades[0].bAffordable = false;
 	TestFalse(TEXT("Upgrade helper should reject unaffordable upgrade"),
 		UPortMissionBoardWidget::CanRequestUpgradePurchase(UpgradeBoardData, UpgradeOffer.UpgradeId, BlockedReason));
+	TestEqual(TEXT("Upgrade helper should classify unaffordable state"),
+		UPortMissionBoardWidget::DetermineUpgradeOfferActionBlockReason(UpgradeBoardData, UpgradeOffer.UpgradeId),
+		EPortUpgradeOfferActionBlockReason::InsufficientCredits);
 	TestEqual(TEXT("Upgrade helper should explain unaffordable rejection"),
 		BlockedReason.ToString(),
 		FString(TEXT("Ikke nok kreditter (200 kreves).")));
@@ -866,6 +887,9 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 	UpgradeBoardData.OfferedUpgrades[0].bUnlocked = true;
 	TestFalse(TEXT("Upgrade helper should reject already unlocked upgrade"),
 		UPortMissionBoardWidget::CanRequestUpgradePurchase(UpgradeBoardData, UpgradeOffer.UpgradeId, BlockedReason));
+	TestEqual(TEXT("Upgrade helper should classify unlocked state"),
+		UPortMissionBoardWidget::DetermineUpgradeOfferActionBlockReason(UpgradeBoardData, UpgradeOffer.UpgradeId),
+		EPortUpgradeOfferActionBlockReason::AlreadyUnlocked);
 	TestEqual(TEXT("Upgrade helper should explain unlocked rejection"),
 		BlockedReason.ToString(),
 		FString(TEXT("Oppgraderingen er allerede opplåst.")));
@@ -874,6 +898,9 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 	UpgradeBoardData.OfferedUpgrades[0].VisitRequirementStatus = FText::FromString(TEXT("Krever 3 havnebesøk (mangler 2)."));
 	TestFalse(TEXT("Upgrade helper should reject visit-gated upgrades"),
 		UPortMissionBoardWidget::CanRequestUpgradePurchase(UpgradeBoardData, UpgradeOffer.UpgradeId, BlockedReason));
+	TestEqual(TEXT("Upgrade helper should classify visit-gated state"),
+		UPortMissionBoardWidget::DetermineUpgradeOfferActionBlockReason(UpgradeBoardData, UpgradeOffer.UpgradeId),
+		EPortUpgradeOfferActionBlockReason::VisitRequirementNotMet);
 	TestEqual(TEXT("Upgrade helper should expose visit-gate reason"),
 		BlockedReason.ToString(),
 		FString(TEXT("Krever 3 havnebesøk (mangler 2).")));
@@ -943,12 +970,18 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 	const FPortMissionBoardData AnnotatedResult = UPortMissionBoardWidget::BuildActionStateAnnotatedBoardData(AnnotatedBoardData);
 	TestEqual(TEXT("Annotated board should preserve mission offer count"), AnnotatedResult.OfferedMissions.Num(), 1);
 	TestFalse(TEXT("Annotated board should mark active mission as non-selectable"), AnnotatedResult.OfferedMissions[0].bSelectable);
+	TestEqual(TEXT("Annotated board should include mission blocked reason enum"),
+		AnnotatedResult.OfferedMissions[0].SelectionBlockedReasonType,
+		EPortMissionOfferActionBlockReason::AlreadyActiveMission);
 	TestEqual(TEXT("Annotated board should include mission blocked reason"), AnnotatedResult.OfferedMissions[0].SelectionBlockedReason.ToString(), FString(TEXT("Oppdraget er allerede aktivt.")));
 	TestEqual(TEXT("Annotated board should track selectable mission count"), AnnotatedResult.SelectableMissionOfferCount, 0);
 	TestEqual(TEXT("Annotated board should track blocked mission count"), AnnotatedResult.BlockedMissionOfferCount, 1);
 	TestFalse(TEXT("Annotated board should mark no selectable missions"), AnnotatedResult.bHasSelectableMissionOffers);
 	TestEqual(TEXT("Annotated board should preserve upgrade offer count"), AnnotatedResult.OfferedUpgrades.Num(), 1);
 	TestFalse(TEXT("Annotated board should mark unaffordable upgrade as non-purchasable"), AnnotatedResult.OfferedUpgrades[0].bPurchasable);
+	TestEqual(TEXT("Annotated board should include upgrade blocked reason enum"),
+		AnnotatedResult.OfferedUpgrades[0].PurchaseBlockedReasonType,
+		EPortUpgradeOfferActionBlockReason::InsufficientCredits);
 	TestEqual(TEXT("Annotated board should include upgrade blocked reason"), AnnotatedResult.OfferedUpgrades[0].PurchaseBlockedReason.ToString(), FString(TEXT("Ikke nok kreditter (300 kreves).")));
 	TestEqual(TEXT("Annotated board should track purchasable upgrade count"), AnnotatedResult.PurchasableUpgradeOfferCount, 0);
 	TestEqual(TEXT("Annotated board should track blocked upgrade count"), AnnotatedResult.BlockedUpgradeOfferCount, 1);
@@ -972,10 +1005,16 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 		const FPortMissionBoardData& LastData = Widget->GetLastData();
 		TestEqual(TEXT("PushMissionBoardData should preserve mission offer count"), LastData.OfferedMissions.Num(), 1);
 		TestFalse(TEXT("PushMissionBoardData should auto-annotate mission selection state"), LastData.OfferedMissions[0].bSelectable);
+		TestEqual(TEXT("PushMissionBoardData should include mission blocked reason enum"),
+			LastData.OfferedMissions[0].SelectionBlockedReasonType,
+			EPortMissionOfferActionBlockReason::AlreadyActiveMission);
 		TestEqual(TEXT("PushMissionBoardData should include mission blocked reason"), LastData.OfferedMissions[0].SelectionBlockedReason.ToString(), FString(TEXT("Oppdraget er allerede aktivt.")));
 		TestEqual(TEXT("PushMissionBoardData should track blocked mission count"), LastData.BlockedMissionOfferCount, 1);
 		TestEqual(TEXT("PushMissionBoardData should preserve upgrade offer count"), LastData.OfferedUpgrades.Num(), 1);
 		TestFalse(TEXT("PushMissionBoardData should auto-annotate upgrade purchase state"), LastData.OfferedUpgrades[0].bPurchasable);
+		TestEqual(TEXT("PushMissionBoardData should include upgrade blocked reason enum"),
+			LastData.OfferedUpgrades[0].PurchaseBlockedReasonType,
+			EPortUpgradeOfferActionBlockReason::InsufficientCredits);
 		TestEqual(TEXT("PushMissionBoardData should include upgrade blocked reason"), LastData.OfferedUpgrades[0].PurchaseBlockedReason.ToString(), FString(TEXT("Ikke nok kreditter (300 kreves).")));
 		TestEqual(TEXT("PushMissionBoardData should track blocked upgrade count"), LastData.BlockedUpgradeOfferCount, 1);
 	}

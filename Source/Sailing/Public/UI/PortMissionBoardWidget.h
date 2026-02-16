@@ -76,6 +76,30 @@ enum class EPortBoardPrimaryActionHint : uint8
 	SelectMissionOrBuyUpgrade
 };
 
+UENUM(BlueprintType)
+enum class EPortMissionOfferActionBlockReason : uint8
+{
+	None,
+	InvalidMission,
+	MissionBoardDisabled,
+	MissionBoardCooldown,
+	NotOfferedAtPort,
+	AlreadyActiveMission
+};
+
+UENUM(BlueprintType)
+enum class EPortUpgradeOfferActionBlockReason : uint8
+{
+	None,
+	InvalidUpgrade,
+	UpgradeServiceDisabled,
+	NotOfferedAtPort,
+	AlreadyUnlocked,
+	VisitRequirementNotMet,
+	InsufficientCredits,
+	UpgradeAvailabilityBlocked
+};
+
 USTRUCT(BlueprintType)
 struct SAILING_API FPortMissionOfferEntry
 {
@@ -101,6 +125,9 @@ struct SAILING_API FPortMissionOfferEntry
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
 	bool bSelectable = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	EPortMissionOfferActionBlockReason SelectionBlockedReasonType = EPortMissionOfferActionBlockReason::None;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
 	FText SelectionBlockedReason;
@@ -143,6 +170,9 @@ struct SAILING_API FPortUpgradeOfferEntry
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
 	bool bPurchasable = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	EPortUpgradeOfferActionBlockReason PurchaseBlockedReasonType = EPortUpgradeOfferActionBlockReason::None;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
 	FText PurchaseBlockedReason;
@@ -436,11 +466,33 @@ public:
 		FName RequestedMissionId,
 		FText& OutBlockedReason);
 
+	UFUNCTION(BlueprintPure, Category = "MissionBoard")
+	static EPortMissionOfferActionBlockReason DetermineMissionOfferActionBlockReason(
+		const FPortMissionBoardData& BoardData,
+		FName RequestedMissionId);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard")
+	static FText BuildMissionOfferActionBlockReasonText(
+		EPortMissionOfferActionBlockReason BlockReason,
+		const FPortMissionBoardData& BoardData,
+		FName RequestedMissionId);
+
 	UFUNCTION(BlueprintPure, Category = "MissionBoard|Service")
 	static bool CanRequestUpgradePurchase(
 		const FPortMissionBoardData& BoardData,
 		FName RequestedUpgradeId,
 		FText& OutBlockedReason);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard|Service")
+	static EPortUpgradeOfferActionBlockReason DetermineUpgradeOfferActionBlockReason(
+		const FPortMissionBoardData& BoardData,
+		FName RequestedUpgradeId);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard|Service")
+	static FText BuildUpgradeOfferActionBlockReasonText(
+		EPortUpgradeOfferActionBlockReason BlockReason,
+		const FPortMissionBoardData& BoardData,
+		FName RequestedUpgradeId);
 
 	UFUNCTION(BlueprintPure, Category = "MissionBoard|Service")
 	static bool CanRequestRepairService(

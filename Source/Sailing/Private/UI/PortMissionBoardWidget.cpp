@@ -376,44 +376,71 @@ bool UPortMissionBoardWidget::CanRequestMissionAccept(
 	FName RequestedMissionId,
 	FText& OutBlockedReason)
 {
+	const EPortMissionOfferActionBlockReason BlockReason = DetermineMissionOfferActionBlockReason(BoardData, RequestedMissionId);
+	OutBlockedReason = BuildMissionOfferActionBlockReasonText(BlockReason, BoardData, RequestedMissionId);
+	return BlockReason == EPortMissionOfferActionBlockReason::None;
+}
+
+EPortMissionOfferActionBlockReason UPortMissionBoardWidget::DetermineMissionOfferActionBlockReason(
+	const FPortMissionBoardData& BoardData,
+	FName RequestedMissionId)
+{
 	if (RequestedMissionId.IsNone())
 	{
-		OutBlockedReason = FText::FromString(TEXT("Ingen oppdrag valgt."));
-		return false;
+		return EPortMissionOfferActionBlockReason::InvalidMission;
 	}
 
 	if (!BoardData.bSupportsMissionBoard)
 	{
-		OutBlockedReason = BuildMissionAvailabilityStatusText(
-			EPortMissionAvailabilityReason::MissionBoardDisabled,
-			BoardData.CooldownRemainingSeconds,
-			BoardData.bSupportsUpgradeService);
-		return false;
+		return EPortMissionOfferActionBlockReason::MissionBoardDisabled;
 	}
 
 	if (BoardData.bMissionBoardOnCooldown)
 	{
-		OutBlockedReason = BuildMissionAvailabilityStatusText(
-			EPortMissionAvailabilityReason::CooldownActive,
-			BoardData.CooldownRemainingSeconds,
-			BoardData.bSupportsUpgradeService);
-		return false;
+		return EPortMissionOfferActionBlockReason::MissionBoardCooldown;
 	}
 
 	if (BoardData.OfferedMissionIds.Num() > 0 && !BoardData.OfferedMissionIds.Contains(RequestedMissionId))
 	{
-		OutBlockedReason = FText::FromString(TEXT("Oppdraget tilbys ikke i denne havnen."));
-		return false;
+		return EPortMissionOfferActionBlockReason::NotOfferedAtPort;
 	}
 
 	if (!BoardData.CurrentMissionId.IsNone() && BoardData.CurrentMissionId == RequestedMissionId)
 	{
-		OutBlockedReason = FText::FromString(TEXT("Oppdraget er allerede aktivt."));
-		return false;
+		return EPortMissionOfferActionBlockReason::AlreadyActiveMission;
 	}
 
-	OutBlockedReason = FText::GetEmpty();
-	return true;
+	return EPortMissionOfferActionBlockReason::None;
+}
+
+FText UPortMissionBoardWidget::BuildMissionOfferActionBlockReasonText(
+	EPortMissionOfferActionBlockReason BlockReason,
+	const FPortMissionBoardData& BoardData,
+	FName /*RequestedMissionId*/)
+{
+	switch (BlockReason)
+	{
+	case EPortMissionOfferActionBlockReason::None:
+		return FText::GetEmpty();
+	case EPortMissionOfferActionBlockReason::InvalidMission:
+		return FText::FromString(TEXT("Ingen oppdrag valgt."));
+	case EPortMissionOfferActionBlockReason::MissionBoardDisabled:
+		return BuildMissionAvailabilityStatusText(
+			EPortMissionAvailabilityReason::MissionBoardDisabled,
+			BoardData.CooldownRemainingSeconds,
+			BoardData.bSupportsUpgradeService);
+	case EPortMissionOfferActionBlockReason::MissionBoardCooldown:
+		return BuildMissionAvailabilityStatusText(
+			EPortMissionAvailabilityReason::CooldownActive,
+			BoardData.CooldownRemainingSeconds,
+			BoardData.bSupportsUpgradeService);
+	case EPortMissionOfferActionBlockReason::NotOfferedAtPort:
+		return FText::FromString(TEXT("Oppdraget tilbys ikke i denne havnen."));
+	case EPortMissionOfferActionBlockReason::AlreadyActiveMission:
+		return FText::FromString(TEXT("Oppdraget er allerede aktivt."));
+	default:
+		return FText::FromString(TEXT("Oppdraget kan ikke velges akkurat nå."));
+	}
 }
 
 bool UPortMissionBoardWidget::CanRequestUpgradePurchase(
@@ -421,24 +448,28 @@ bool UPortMissionBoardWidget::CanRequestUpgradePurchase(
 	FName RequestedUpgradeId,
 	FText& OutBlockedReason)
 {
-	if (!IsUpgradePurchaseRequestValid(
-		BoardData.bSupportsUpgradeService,
-		BoardData.OfferedUpgradeIds,
-		RequestedUpgradeId))
+	const EPortUpgradeOfferActionBlockReason BlockReason = DetermineUpgradeOfferActionBlockReason(BoardData, RequestedUpgradeId);
+	OutBlockedReason = BuildUpgradeOfferActionBlockReasonText(BlockReason, BoardData, RequestedUpgradeId);
+	return BlockReason == EPortUpgradeOfferActionBlockReason::None;
+}
+
+EPortUpgradeOfferActionBlockReason UPortMissionBoardWidget::DetermineUpgradeOfferActionBlockReason(
+	const FPortMissionBoardData& BoardData,
+	FName RequestedUpgradeId)
+{
+	if (!BoardData.bSupportsUpgradeService)
 	{
-		if (!BoardData.bSupportsUpgradeService)
-		{
-			OutBlockedReason = BuildUpgradeAvailabilityStatusText(EPortUpgradeAvailabilityReason::ServiceUnavailable, 0);
-		}
-		else if (RequestedUpgradeId.IsNone())
-		{
-			OutBlockedReason = FText::FromString(TEXT("Ingen oppgradering valgt."));
-		}
-		else
-		{
-			OutBlockedReason = FText::FromString(TEXT("Oppgraderingen tilbys ikke i denne havnen."));
-		}
-		return false;
+		return EPortUpgradeOfferActionBlockReason::UpgradeServiceDisabled;
+	}
+
+	if (RequestedUpgradeId.IsNone())
+	{
+		return EPortUpgradeOfferActionBlockReason::InvalidUpgrade;
+	}
+
+	if (BoardData.OfferedUpgradeIds.Num() > 0 && !BoardData.OfferedUpgradeIds.Contains(RequestedUpgradeId))
+	{
+		return EPortUpgradeOfferActionBlockReason::NotOfferedAtPort;
 	}
 
 	const FPortUpgradeOfferEntry* OfferEntry = BoardData.OfferedUpgrades.FindByPredicate(
@@ -450,31 +481,66 @@ bool UPortMissionBoardWidget::CanRequestUpgradePurchase(
 	{
 		if (OfferEntry->bUnlocked)
 		{
-			OutBlockedReason = FText::FromString(TEXT("Oppgraderingen er allerede opplåst."));
-			return false;
+			return EPortUpgradeOfferActionBlockReason::AlreadyUnlocked;
 		}
 
 		if (!OfferEntry->bVisitGateSatisfied)
 		{
-			OutBlockedReason = OfferEntry->VisitRequirementStatus;
-			return false;
+			return EPortUpgradeOfferActionBlockReason::VisitRequirementNotMet;
 		}
 
 		if (!OfferEntry->bAffordable)
 		{
-			OutBlockedReason = FText::FromString(FString::Printf(TEXT("Ikke nok kreditter (%d kreves)."), FMath::Max(0, OfferEntry->CreditCost)));
-			return false;
+			return EPortUpgradeOfferActionBlockReason::InsufficientCredits;
 		}
 	}
 
 	if (BoardData.UpgradeAvailabilityReason != EPortUpgradeAvailabilityReason::Ready)
 	{
-		OutBlockedReason = BuildUpgradeAvailabilityStatusText(BoardData.UpgradeAvailabilityReason, 0);
-		return false;
+		return EPortUpgradeOfferActionBlockReason::UpgradeAvailabilityBlocked;
 	}
 
-	OutBlockedReason = FText::GetEmpty();
-	return true;
+	return EPortUpgradeOfferActionBlockReason::None;
+}
+
+FText UPortMissionBoardWidget::BuildUpgradeOfferActionBlockReasonText(
+	EPortUpgradeOfferActionBlockReason BlockReason,
+	const FPortMissionBoardData& BoardData,
+	FName RequestedUpgradeId)
+{
+	const FPortUpgradeOfferEntry* OfferEntry = BoardData.OfferedUpgrades.FindByPredicate(
+		[RequestedUpgradeId](const FPortUpgradeOfferEntry& Entry)
+		{
+			return Entry.UpgradeId == RequestedUpgradeId;
+		});
+
+	switch (BlockReason)
+	{
+	case EPortUpgradeOfferActionBlockReason::None:
+		return FText::GetEmpty();
+	case EPortUpgradeOfferActionBlockReason::InvalidUpgrade:
+		return FText::FromString(TEXT("Ingen oppgradering valgt."));
+	case EPortUpgradeOfferActionBlockReason::UpgradeServiceDisabled:
+		return BuildUpgradeAvailabilityStatusText(EPortUpgradeAvailabilityReason::ServiceUnavailable, 0);
+	case EPortUpgradeOfferActionBlockReason::NotOfferedAtPort:
+		return FText::FromString(TEXT("Oppgraderingen tilbys ikke i denne havnen."));
+	case EPortUpgradeOfferActionBlockReason::AlreadyUnlocked:
+		return FText::FromString(TEXT("Oppgraderingen er allerede opplåst."));
+	case EPortUpgradeOfferActionBlockReason::VisitRequirementNotMet:
+		if (OfferEntry && !OfferEntry->VisitRequirementStatus.IsEmpty())
+		{
+			return OfferEntry->VisitRequirementStatus;
+		}
+		return FText::FromString(TEXT("Portbesøkskravet er ikke oppfylt ennå."));
+	case EPortUpgradeOfferActionBlockReason::InsufficientCredits:
+		return FText::FromString(FString::Printf(
+			TEXT("Ikke nok kreditter (%d kreves)."),
+			FMath::Max(0, OfferEntry ? OfferEntry->CreditCost : 0)));
+	case EPortUpgradeOfferActionBlockReason::UpgradeAvailabilityBlocked:
+		return BuildUpgradeAvailabilityStatusText(BoardData.UpgradeAvailabilityReason, 0);
+	default:
+		return FText::FromString(TEXT("Oppgraderingen kan ikke kjøpes akkurat nå."));
+	}
 }
 
 bool UPortMissionBoardWidget::CanRequestRepairService(
@@ -553,9 +619,12 @@ FPortMissionBoardData UPortMissionBoardWidget::BuildActionStateAnnotatedBoardDat
 
 	for (FPortMissionOfferEntry& OfferEntry : Result.OfferedMissions)
 	{
-		FText BlockedReason;
-		OfferEntry.bSelectable = CanRequestMissionAccept(Result, OfferEntry.MissionId, BlockedReason);
-		OfferEntry.SelectionBlockedReason = BlockedReason;
+		OfferEntry.SelectionBlockedReasonType = DetermineMissionOfferActionBlockReason(Result, OfferEntry.MissionId);
+		OfferEntry.bSelectable = OfferEntry.SelectionBlockedReasonType == EPortMissionOfferActionBlockReason::None;
+		OfferEntry.SelectionBlockedReason = BuildMissionOfferActionBlockReasonText(
+			OfferEntry.SelectionBlockedReasonType,
+			Result,
+			OfferEntry.MissionId);
 		if (OfferEntry.bSelectable)
 		{
 			Result.SelectableMissionOfferCount++;
@@ -568,9 +637,12 @@ FPortMissionBoardData UPortMissionBoardWidget::BuildActionStateAnnotatedBoardDat
 
 	for (FPortUpgradeOfferEntry& OfferEntry : Result.OfferedUpgrades)
 	{
-		FText BlockedReason;
-		OfferEntry.bPurchasable = CanRequestUpgradePurchase(Result, OfferEntry.UpgradeId, BlockedReason);
-		OfferEntry.PurchaseBlockedReason = BlockedReason;
+		OfferEntry.PurchaseBlockedReasonType = DetermineUpgradeOfferActionBlockReason(Result, OfferEntry.UpgradeId);
+		OfferEntry.bPurchasable = OfferEntry.PurchaseBlockedReasonType == EPortUpgradeOfferActionBlockReason::None;
+		OfferEntry.PurchaseBlockedReason = BuildUpgradeOfferActionBlockReasonText(
+			OfferEntry.PurchaseBlockedReasonType,
+			Result,
+			OfferEntry.UpgradeId);
 		if (OfferEntry.bPurchasable)
 		{
 			Result.PurchasableUpgradeOfferCount++;
