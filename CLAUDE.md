@@ -67,9 +67,14 @@ HUD shows Norwegian point-of-sail names: I JERN, BIDEVIND, SLOR, HALV VIND, ROMS
 ## Blender → Unreal Asset Pipeline
 
 ### MCP Servers
-Two MCP servers configured in `.cursor/mcp.json`:
+MCP servers configured in `.cursor/mcp.json`:
 - **unrealMCP**: Programmatic Unreal Editor control (`~/.claude/mcp-servers/unreal-mcp/Python/unreal_mcp_server.py`, timeout increased to 60s for import operations)
 - **blender**: Blender control via `uvx blender-mcp` (requires Blender addon running)
+- **kartverket**: Kartverket sjøkart WMS – `scripts/mcp-kartverket`, tools: get_chart_layers, get_chart_image, get_feature_info
+- **overpass**: OpenStreetMap Overpass API – `scripts/mcp-overpass`, tools: overpass_query_bbox, overpass_get_islands, overpass_run_query (for øyer/features i bbox, f.eks. FjordMapData)
+
+### Fjord map data (OSM)
+Fallback for 7 Oslofjord-øyene er hardkodet i `FjordMapManager.cpp`. For å synkronisere med OSM: kjør `scripts/fetch_oslofjord_islands_osm.py` (med `uv run --directory scripts/mcp-overpass -- python scripts/fetch_oslofjord_islands_osm.py`) og lim den utskrevne C++-blokken inn i `FjordMapManager.cpp`. Valgfritt: `scripts/fjord_data.json` inneholder samme data; `scripts/create_fjord_map_data_asset.py` kan kjøres i Unreal Editor (Python Console) for å opprette/oppdatere en UFjordMapData-asset på `/Game/Fjord/OslofjordMapData`. Sett FjordMapDataPath på FjordMapManager i nivået til den asseten for å bruke den i stedet for fallback.
 
 ### Start Blender MCP
 Blender MCP has two parts: (1) an addon inside Blender that runs a socket server, and (2) the MCP server in Cursor (`uvx blender-mcp`). Cursor starts the MCP server automatically; you only need to make Blender listen.

@@ -5,6 +5,9 @@
 #include "SailingGameInstance.h"
 #include "WindActor.h"
 #include "ChunkManager.h"
+#include "FjordMapManager.h"
+#include "FjordCoastlineActor.h"
+#include "FjordMapData.h"
 #include "OceanPlaneActor.h"
 #include "SaveGameSailing.h"
 #include "Kismet/GameplayStatics.h"
@@ -41,31 +44,56 @@ void ASailingGameMode::BeginPlay()
 	SpawnedWind = GetWorld()->SpawnActor<AWindActor>(
 		AWindActor::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Params);
 
-	// Spawn chunk manager for procedural islands
-	SpawnedChunkManager = GetWorld()->SpawnActor<AChunkManager>(
-		AChunkManager::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Params);
-
-	// Pass save game to chunk manager
-	if (AChunkManager* CM = Cast<AChunkManager>(SpawnedChunkManager))
+	if (bUseFjordMap)
 	{
-		CM->SetSaveGame(SaveGame);
+		// Fjord mode: spawn fjord map manager and coastline, no chunk manager
+		AFjordMapManager* FM = GetWorld()->SpawnActor<AFjordMapManager>(
+			AFjordMapManager::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Params);
+		SpawnedFjordMapManager = FM;
+		if (FM)
+		{
+			FM->SetSaveGame(SaveGame);
+		}
+
+		AFjordCoastlineActor* Coastline = GetWorld()->SpawnActor<AFjordCoastlineActor>(
+			AFjordCoastlineActor::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Params);
+		SpawnedFjordCoastline = Coastline;
+		if (Coastline && FM && FM->FjordMapData)
+		{
+			Coastline->FjordMapData = FM->FjordMapData;
+		}
+	}
+	else
+	{
+		// Procedural mode: spawn chunk manager for islands
+		SpawnedChunkManager = GetWorld()->SpawnActor<AChunkManager>(
+			AChunkManager::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Params);
+		if (AChunkManager* CM = Cast<AChunkManager>(SpawnedChunkManager))
+		{
+			CM->SetSaveGame(SaveGame);
+		}
 	}
 
 	// Spawn ocean plane
 	SpawnedOcean = GetWorld()->SpawnActor<AOceanPlaneActor>(
 		AOceanPlaneActor::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Params);
 
-	// Teleporter pawn til siste posisjon ved Fortsett (etter at pawn er spawnet)
-	if (SaveGame && SaveGame->LastPlayerLocation != FVector::ZeroVector)
+	// Teleport pawn: saved position (Fortsett) or fjord start (new game in fjord mode)
+	const bool bUseSavedPosition = SaveGame && SaveGame->LastPlayerLocation != FVector::ZeroVector;
+	const bool bUseFjordStart = bUseFjordMap && !bUseSavedPosition;
+
+	if (bUseSavedPosition || bUseFjordStart)
 	{
-		GetWorld()->GetTimerManager().SetTimerForNextTick([this]()
+		FVector TargetLoc = bUseSavedPosition ? SaveGame->LastPlayerLocation : FjordStartPosition;
+		GetWorld()->GetTimerManager().SetTimerForNextTick([this, TargetLoc, bUseSavedPosition]()
 		{
 			if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
 			{
 				if (APawn* Pawn = PC->GetPawn())
 				{
-					Pawn->SetActorLocation(SaveGame->LastPlayerLocation);
-					UE_LOG(LogTemp, Log, TEXT("SailingGameMode: Spiller flyttet til lagret posisjon"));
+					Pawn->SetActorLocation(TargetLoc);
+					UE_LOG(LogTemp, Log, TEXT("SailingGameMode: Spiller flyttet til %s"),
+						bUseSavedPosition ? TEXT("lagret posisjon") : TEXT("fjord start"));
 				}
 			}
 		});

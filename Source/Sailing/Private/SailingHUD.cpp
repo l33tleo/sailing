@@ -7,11 +7,43 @@
 #include "SaveGameSailing.h"
 #include "Engine/Canvas.h"
 #include "Engine/Font.h"
+#include "Engine/Texture2D.h"
 #include "Kismet/GameplayStatics.h"
+
+namespace
+{
+	// Oslo origin (same as fjord_data_from_geojson.py). World X = east (m), Y = north (m).
+	constexpr float OriginLat = 59.91f;
+	constexpr float OriginLon = 10.75f;
+	constexpr float MetersPerDegLat = 111320.0f;
+	inline float MetersPerDegLon() { return 111320.0f * FMath::Cos(FMath::DegreesToRadians(OriginLat)); }
+
+	void WorldToLonLat(float WorldX, float WorldY, float& OutLon, float& OutLat)
+	{
+		OutLon = OriginLon + WorldX / MetersPerDegLon();
+		OutLat = OriginLat + WorldY / MetersPerDegLat;
+	}
+}
 
 void ASailingHUD::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// Auto-load Kartverket chart texture in fjord mode when not set
+	if (!ChartTexture)
+	{
+		if (ASailingGameMode* GM = Cast<ASailingGameMode>(UGameplayStatics::GetGameMode(GetWorld())))
+		{
+			if (GM->bUseFjordMap)
+			{
+				ChartTexture = LoadObject<UTexture2D>(nullptr, TEXT("/Game/Charts/OslofjordChart"));
+				if (ChartTexture)
+				{
+					UE_LOG(LogTemp, Log, TEXT("SailingHUD: Loaded chart texture OslofjordChart for overview map."));
+				}
+			}
+		}
+	}
 
 	// Defer binding to allow islands to spawn
 	FTimerHandle TimerHandle;
@@ -27,7 +59,11 @@ void ASailingHUD::BindToIslandDiscoveries()
 	{
 		if (AIslandActor* Island = Cast<AIslandActor>(Actor))
 		{
-			Island->OnDiscovered.AddDynamic(this, &ASailingHUD::OnIslandDiscovered);
+			if (!BoundIslandDiscoveries.Contains(Island))
+			{
+				Island->OnDiscovered.AddDynamic(this, &ASailingHUD::OnIslandDiscovered);
+				BoundIslandDiscoveries.Add(Island);
+			}
 		}
 	}
 
@@ -60,10 +96,15 @@ void ASailingHUD::DrawHUD()
 		return;
 	}
 
+	if (PC && PC->IsMapViewShown())
+	{
+		DrawFullMap();
+		return;
+	}
+
 	DrawCompass();
 	DrawWindAndSpeed();
-	DrawOverviewMap();
-	DrawDiscoveryCounter();
+	DrawRadarMinimap();
 
 	float DeltaTime = GetWorld()->GetDeltaSeconds();
 	if (bShowingDiscoveryPopup)
@@ -85,9 +126,9 @@ void ASailingHUD::DrawCompass()
 		Wind = Cast<AWindActor>(Found[0]);
 	}
 
-	// Compass position and size - BIG and visible
-	float CenterX = Canvas->ClipX * 0.5f;
-	float CenterY = 90.0f;
+	// Compass position and size - bottom-left corner
+	float CenterX = 90.0f;
+	float CenterY = Canvas->ClipY - 170.0f;
 	float Radius = 65.0f;
 
 	// Dark background circle
@@ -247,9 +288,9 @@ void ASailingHUD::DrawWindAndSpeed()
 		Wind = Cast<AWindActor>(Found[0]);
 	}
 
-	// Info panel below compass
-	float PanelX = Canvas->ClipX * 0.5f - 100.0f;
-	float PanelY = 175.0f;
+	// Info panel below compass (bottom-left)
+	float PanelX = 90.0f - 100.0f;
+	float PanelY = Canvas->ClipY - 95.0f;
 	float PanelW = 200.0f;
 	float PanelH = 85.0f;
 
@@ -288,7 +329,7 @@ void ASailingHUD::DrawWindAndSpeed()
 			}
 			else if (Angle < 80.0f)
 			{
-				PointOfSail = TEXT("SLOR");
+				PointOfSail = TEXT("SL\u00D8R");
 				PointColor = FLinearColor(1.0f, 1.0f, 0.3f, 1.0f);
 			}
 			else if (Angle < 100.0f)
@@ -298,7 +339,7 @@ void ASailingHUD::DrawWindAndSpeed()
 			}
 			else if (Angle < 135.0f)
 			{
-				PointOfSail = TEXT("ROMSKJOETS");
+				PointOfSail = TEXT("ROMSKJ\u00D8TS");
 				PointColor = FLinearColor(1.0f, 1.0f, 0.3f, 1.0f);
 			}
 			else
@@ -378,47 +419,95 @@ void ASailingHUD::DrawDiscoveryPopup(float DeltaTime)
 		CenterX - NameOffset, CenterY + 5.0f, nullptr, 1.8f);
 }
 
-void ASailingHUD::DrawOverviewMap()
+void ASailingHUD::DrawCircleOutline(float CX, float CY, float R, FLinearColor Color, float Thickness, int32 Segments)
+{
+	for (int32 i = 0; i < Segments; ++i)
+	{
+		float A1 = (float)i / Segments * 2.0f * PI;
+		float A2 = (float)(i + 1) / Segments * 2.0f * PI;
+		for (float Off = -Thickness * 0.5f; Off <= Thickness * 0.5f; Off += 1.0f)
+		{
+			DrawLine(
+				CX + FMath::Cos(A1) * (R + Off), CY + FMath::Sin(A1) * (R + Off),
+				CX + FMath::Cos(A2) * (R + Off), CY + FMath::Sin(A2) * (R + Off),
+				Color, 1.0f);
+		}
+	}
+}
+
+void ASailingHUD::DrawRadarMinimap()
 {
 	APawn* Pawn = GetOwningPawn();
 	if (!Pawn || !Canvas) return;
 
 	ASailingGameMode* GM = Cast<ASailingGameMode>(UGameplayStatics::GetGameMode(GetWorld()));
 	if (!GM) return;
-	USaveGameSailing* SaveGame = GM->GetSaveGame();
-	if (!SaveGame) return;
 
 	FVector PlayerLoc = Pawn->GetActorLocation();
 	const float PlayerX = PlayerLoc.X;
 	const float PlayerY = PlayerLoc.Y;
 
-	// Kartpanel nederst til høyre
-	const float MapLeft = Canvas->ClipX - MapOffsetRight - MapSizePixels;
-	const float MapTop = Canvas->ClipY - MapOffsetBottom - MapSizePixels;
-	const float MapCenterX = MapLeft + MapSizePixels * 0.5f;
-	const float MapCenterY = MapTop + MapSizePixels * 0.5f;
-	const float Scale = (MapSizePixels * 0.5f) / FMath::Max(1.0f, MapWorldRadius);
+	// Radar-sirkel nederst til høyre
+	const float Diameter = RadarRadius * 2.0f;
+	const float MapCenterX = Canvas->ClipX - MapOffsetRight - RadarRadius;
+	const float MapCenterY = Canvas->ClipY - MapOffsetBottom - RadarRadius;
+	const float Scale = RadarRadius / FMath::Max(1.0f, MapWorldRadius);
 
-	// 1. Bakgrunn (hav)
-	DrawRect(MapSeaColor, MapLeft, MapTop, MapSizePixels, MapSizePixels);
-
-	// 2. Oppdagede øyer innenfor radius
-	for (const auto& Pair : SaveGame->DiscoveredIslands)
+	// 1. Rund bakgrunn
+	const bool bUseChart = GM->bUseFjordMap && ChartTexture;
+	if (bUseChart)
 	{
-		const FVector& Loc = Pair.Value.WorldLocation;
-		float Dx = Loc.X - PlayerX;
-		float Dy = Loc.Y - PlayerY;
-		if (FMath::Sqrt(Dx * Dx + Dy * Dy) > MapWorldRadius) continue;
-
-		float Px = MapCenterX + Dx * Scale;
-		float Py = MapCenterY - Dy * Scale; // nord = +Y i verden = opp på skjerm
-		const float DotSize = 4.0f;
-		DrawRect(MapIslandColor, Px - DotSize * 0.5f, Py - DotSize * 0.5f, DotSize, DotSize);
+		// Tegn chart som firkant, sirkel-ramme dekker hjørnene
+		float LonMin, LatMin, LonMax, LatMax;
+		WorldToLonLat(PlayerX - MapWorldRadius, PlayerY - MapWorldRadius, LonMin, LatMin);
+		WorldToLonLat(PlayerX + MapWorldRadius, PlayerY + MapWorldRadius, LonMax, LatMax);
+		const float ChartMinLon = ChartLonLatBox.X;
+		const float ChartMinLat = ChartLonLatBox.Y;
+		const float ChartMaxLon = ChartLonLatBox.Z;
+		const float ChartMaxLat = ChartLonLatBox.W;
+		const float ChartLonSpan = FMath::Max(ChartMaxLon - ChartMinLon, 0.0001f);
+		const float ChartLatSpan = FMath::Max(ChartMaxLat - ChartMinLat, 0.0001f);
+		const float U0 = FMath::Clamp((LonMin - ChartMinLon) / ChartLonSpan, 0.0f, 1.0f);
+		const float V0 = FMath::Clamp((ChartMaxLat - LatMax) / ChartLatSpan, 0.0f, 1.0f);
+		const float U1 = FMath::Clamp((LonMax - ChartMinLon) / ChartLonSpan, 0.0f, 1.0f);
+		const float V1 = FMath::Clamp((ChartMaxLat - LatMin) / ChartLatSpan, 0.0f, 1.0f);
+		DrawTexture(ChartTexture,
+			MapCenterX - RadarRadius, MapCenterY - RadarRadius, Diameter, Diameter,
+			U0, V0, U1 - U0, V1 - V0, FLinearColor::White, EBlendMode::BLEND_Translucent);
+	}
+	else
+	{
+		// Fylt sirkel-bakgrunn via konsentriske ringer
+		for (float R = RadarRadius; R > 0; R -= 1.0f)
+		{
+			DrawCircleOutline(MapCenterX, MapCenterY, R, MapSeaColor, 1.0f, 48);
+		}
 	}
 
-	// 3. Spiller som liten trekant (retning fra GetActorForwardVector)
+	// 2. Øyer (klippet til sirkel)
+	TArray<AActor*> AllIslands;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AIslandActor::StaticClass(), AllIslands);
+	for (AActor* Actor : AllIslands)
+	{
+		AIslandActor* Island = Cast<AIslandActor>(Actor);
+		if (!Island) continue;
+		FVector Loc = Island->GetActorLocation();
+		float Dx = Loc.X - PlayerX;
+		float Dy = Loc.Y - PlayerY;
+		float PixelDx = Dx * Scale;
+		float PixelDy = -Dy * Scale;
+		float PixelDist = FMath::Sqrt(PixelDx * PixelDx + PixelDy * PixelDy);
+		if (PixelDist > RadarRadius - 4.0f) continue; // Klipp til sirkel
+		float Px = MapCenterX + PixelDx;
+		float Py = MapCenterY + PixelDy;
+		const float DotSize = 5.0f;
+		FLinearColor Color = Island->bDiscovered ? MapIslandColor : MapUndiscoveredIslandColor;
+		DrawRect(Color, Px - DotSize * 0.5f, Py - DotSize * 0.5f, DotSize, DotSize);
+	}
+
+	// 3. Spiller-trekant i sentrum
 	FVector Forward = Pawn->GetActorForwardVector();
-	float Angle = FMath::Atan2(Forward.X, Forward.Y); // vinkel fra nord (verden +Y)
+	float Angle = FMath::Atan2(Forward.X, Forward.Y);
 	const float TriR = 8.0f;
 	const float TriW = 4.0f;
 	float TipX = MapCenterX + FMath::Sin(Angle) * TriR;
@@ -430,26 +519,227 @@ void ASailingHUD::DrawOverviewMap()
 	DrawLine(TipX, TipY, B1X, B1Y, MapPlayerColor, 2.0f);
 	DrawLine(TipX, TipY, B2X, B2Y, MapPlayerColor, 2.0f);
 	DrawLine(B1X, B1Y, B2X, B2Y, MapPlayerColor, 2.0f);
+
+	// 4. Sirkel-ramme
+	DrawCircleOutline(MapCenterX, MapCenterY, RadarRadius, FLinearColor(0.7f, 0.8f, 0.9f, 0.9f), 3.0f, 64);
+
+	// Svart ring utenfor for å maskere hjørnene av chart-texture
+	if (bUseChart)
+	{
+		for (float R = RadarRadius + 1.0f; R < RadarRadius + 20.0f; R += 1.0f)
+		{
+			DrawCircleOutline(MapCenterX, MapCenterY, R, FLinearColor(0.0f, 0.0f, 0.0f, 1.0f), 1.0f, 64);
+		}
+	}
 }
 
-void ASailingHUD::DrawDiscoveryCounter()
+// ---- Fullskjerm-kart ----
+
+void ASailingHUD::SetFullMapVisible(bool bVisible)
 {
+	bShowFullMap = bVisible;
+	if (!bVisible)
+	{
+		bIsDraggingMap = false;
+	}
+}
+
+void ASailingHUD::OnFullMapClick(float X, float Y)
+{
+	bIsDraggingMap = true;
+	DragStartMouse = FVector2D(X, Y);
+	DragStartPanPixels = FullMapPanPixels;
+}
+
+void ASailingHUD::OnFullMapDrag(float X, float Y)
+{
+	if (!bIsDraggingMap) return;
+	FullMapPanPixels = DragStartPanPixels + FVector2D(X, Y) - DragStartMouse;
+}
+
+void ASailingHUD::OnFullMapDragDelta(float DeltaX, float DeltaY)
+{
+	if (!bIsDraggingMap) return;
+	FullMapPanPixels.X += DeltaX;
+	FullMapPanPixels.Y -= DeltaY;
+}
+
+void ASailingHUD::OnFullMapRelease()
+{
+	bIsDraggingMap = false;
+}
+
+void ASailingHUD::OnFullMapScroll(float Delta)
+{
+	float OldZoom = FullMapZoom;
+	FullMapZoom = FMath::Clamp(FullMapZoom + Delta * 0.15f, 0.2f, 5.0f);
+	float Ratio = FullMapZoom / OldZoom;
+	FullMapPanPixels *= Ratio;
+	if (bIsDraggingMap) { DragStartPanPixels *= Ratio; }
+}
+
+void ASailingHUD::DrawFullMap()
+{
+	APawn* Pawn = GetOwningPawn();
+	if (!Pawn || !Canvas) return;
+
 	ASailingGameMode* GM = Cast<ASailingGameMode>(UGameplayStatics::GetGameMode(GetWorld()));
 	if (!GM) return;
 
-	USaveGameSailing* SaveGame = GM->GetSaveGame();
-	if (!SaveGame) return;
+	FVector PlayerLoc = Pawn->GetActorLocation();
 
-	// Top-left with background
-	float BoxX = 10.0f;
-	float BoxY = 10.0f;
-	float BoxW = 200.0f;
-	float BoxH = 35.0f;
-	DrawRect(FLinearColor(0.0f, 0.05f, 0.15f, 0.7f), BoxX, BoxY, BoxW, BoxH);
+	const float ScreenW = Canvas->ClipX;
+	const float ScreenH = Canvas->ClipY;
+	const float MapPixelRadius = FMath::Min(ScreenW, ScreenH) * 0.4f;
+	const float EffectiveWorldRadius = MapWorldRadius / FMath::Max(0.2f, FullMapZoom);
 
-	FString CounterText = FString::Printf(TEXT("OYER: %d oppdaget"), SaveGame->TotalIslandsDiscovered);
-	DrawText(CounterText, FLinearColor(0.5f, 0.9f, 1.0f, 1.0f),
-		BoxX + 10.0f, BoxY + 8.0f, nullptr, 1.2f);
+	// Konverter piksel-pan til world-offset via Canvas-dimensjoner
+	const float PixelToWorld = EffectiveWorldRadius / FMath::Max(1.0f, MapPixelRadius);
+	const float CenterWorldX = PlayerLoc.X - FullMapPanPixels.X * PixelToWorld;
+	const float CenterWorldY = PlayerLoc.Y + FullMapPanPixels.Y * PixelToWorld;
+	const float Scale = MapPixelRadius / FMath::Max(1.0f, EffectiveWorldRadius);
+	const float MapScreenCX = ScreenW * 0.5f;
+	const float MapScreenCY = ScreenH * 0.5f;
+
+	// 1. Halvtransparent bakgrunn
+	DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.75f), 0.0f, 0.0f, ScreenW, ScreenH);
+
+	// 2. Kartbakgrunn
+	const float MapLeft = MapScreenCX - MapPixelRadius;
+	const float MapTop = MapScreenCY - MapPixelRadius;
+	const float MapSize = MapPixelRadius * 2.0f;
+
+	const bool bUseChart = GM->bUseFjordMap && ChartTexture;
+	if (bUseChart)
+	{
+		float LonMin, LatMin, LonMax, LatMax;
+		WorldToLonLat(CenterWorldX - EffectiveWorldRadius, CenterWorldY - EffectiveWorldRadius, LonMin, LatMin);
+		WorldToLonLat(CenterWorldX + EffectiveWorldRadius, CenterWorldY + EffectiveWorldRadius, LonMax, LatMax);
+		const float ChartMinLon = ChartLonLatBox.X;
+		const float ChartMinLat = ChartLonLatBox.Y;
+		const float ChartMaxLon = ChartLonLatBox.Z;
+		const float ChartMaxLat = ChartLonLatBox.W;
+		const float ChartLonSpan = FMath::Max(ChartMaxLon - ChartMinLon, 0.0001f);
+		const float ChartLatSpan = FMath::Max(ChartMaxLat - ChartMinLat, 0.0001f);
+		const float U0 = FMath::Clamp((LonMin - ChartMinLon) / ChartLonSpan, 0.0f, 1.0f);
+		const float V0 = FMath::Clamp((ChartMaxLat - LatMax) / ChartLatSpan, 0.0f, 1.0f);
+		const float U1 = FMath::Clamp((LonMax - ChartMinLon) / ChartLonSpan, 0.0f, 1.0f);
+		const float V1 = FMath::Clamp((ChartMaxLat - LatMin) / ChartLatSpan, 0.0f, 1.0f);
+		DrawTexture(ChartTexture, MapLeft, MapTop, MapSize, MapSize,
+			U0, V0, U1 - U0, V1 - V0, FLinearColor::White, EBlendMode::BLEND_Translucent);
+	}
+	else
+	{
+		DrawRect(MapSeaColor, MapLeft, MapTop, MapSize, MapSize);
+	}
+
+	// Museposisjon for hover (kan feile på macOS i kartmodus)
+	float MouseX = 0.0f, MouseY = 0.0f;
+	const bool bHasMousePos = PlayerOwner && PlayerOwner->GetMousePosition(MouseX, MouseY);
+
+	constexpr float HoverThresholdPx = 18.0f;
+	const float HoverThresholdSq = HoverThresholdPx * HoverThresholdPx;
+	AIslandActor* HoveredIsland = nullptr;
+	float BestHoverDistSq = HoverThresholdSq;
+	float HoveredPx = 0.0f, HoveredPy = 0.0f;
+
+	// 3. Øyer
+	TArray<AActor*> AllIslands;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AIslandActor::StaticClass(), AllIslands);
+	for (AActor* Actor : AllIslands)
+	{
+		AIslandActor* Island = Cast<AIslandActor>(Actor);
+		if (!Island) continue;
+		FVector Loc = Island->GetActorLocation();
+		float Dx = Loc.X - CenterWorldX;
+		float Dy = Loc.Y - CenterWorldY;
+		float Px = MapScreenCX + Dx * Scale;
+		float Py = MapScreenCY - Dy * Scale;
+		// Klipp til kartområde
+		if (Px < MapLeft || Px > MapLeft + MapSize || Py < MapTop || Py > MapTop + MapSize) continue;
+
+		// Hover-hit: øy nærmest cursor innenfor terskel
+		if (bHasMousePos)
+		{
+			float DistSq = (Px - MouseX) * (Px - MouseX) + (Py - MouseY) * (Py - MouseY);
+			if (DistSq < BestHoverDistSq)
+			{
+				BestHoverDistSq = DistSq;
+				HoveredIsland = Island;
+				HoveredPx = Px;
+				HoveredPy = Py;
+			}
+		}
+
+		const float DotSize = 7.0f;
+		FLinearColor Color = Island->bDiscovered ? MapIslandColor : MapUndiscoveredIslandColor;
+		DrawRect(Color, Px - DotSize * 0.5f, Py - DotSize * 0.5f, DotSize, DotSize);
+
+		// Vis navn på oppdagede øyer (med lesbar bakgrunn)
+		if (Island->bDiscovered)
+		{
+			const float TextX = Px + DotSize;
+			const float TextY = Py - 6.0f;
+			const float EstCharW = 9.0f;
+			const float LabelW = FMath::Max(40.0f, Island->IslandName.Len() * EstCharW + 8.0f);
+			const float LabelH = 14.0f;
+			DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.75f), TextX, TextY - 2.0f, LabelW, LabelH);
+			DrawText(Island->IslandName, FLinearColor::White,
+				TextX + 4.0f, TextY, nullptr, 1.0f);
+		}
+	}
+
+	// Tooltip for hovered øy (alle øyer, også uoppdagede)
+	if (HoveredIsland)
+	{
+		const float TooltipPad = 6.0f;
+		const float EstCharW = 9.0f;
+		const float Tw = FMath::Max(60.0f, HoveredIsland->IslandName.Len() * EstCharW + TooltipPad * 2.0f);
+		const float Th = 18.0f;
+		const float Tx = HoveredPx - Tw * 0.5f;
+		const float Ty = HoveredPy - Th - 8.0f;
+		DrawRect(FLinearColor(0.05f, 0.1f, 0.2f, 0.9f), Tx, Ty, Tw, Th);
+		DrawText(HoveredIsland->IslandName, FLinearColor::White,
+			Tx + TooltipPad, Ty + 2.0f, nullptr, 1.1f);
+	}
+
+	// 4. Spiller-trekant
+	{
+		float Dx = PlayerLoc.X - CenterWorldX;
+		float Dy = PlayerLoc.Y - CenterWorldY;
+		float PlayerPx = MapScreenCX + Dx * Scale;
+		float PlayerPy = MapScreenCY - Dy * Scale;
+
+		FVector Forward = Pawn->GetActorForwardVector();
+		float Angle = FMath::Atan2(Forward.X, Forward.Y);
+		const float TriR = 10.0f;
+		const float TriW = 5.0f;
+		float TipX = PlayerPx + FMath::Sin(Angle) * TriR;
+		float TipY = PlayerPy - FMath::Cos(Angle) * TriR;
+		float B1X = PlayerPx - FMath::Sin(Angle) * TriR + FMath::Cos(Angle) * TriW;
+		float B1Y = PlayerPy + FMath::Cos(Angle) * TriR + FMath::Sin(Angle) * TriW;
+		float B2X = PlayerPx - FMath::Sin(Angle) * TriR - FMath::Cos(Angle) * TriW;
+		float B2Y = PlayerPy + FMath::Cos(Angle) * TriR - FMath::Sin(Angle) * TriW;
+		DrawLine(TipX, TipY, B1X, B1Y, MapPlayerColor, 2.5f);
+		DrawLine(TipX, TipY, B2X, B2Y, MapPlayerColor, 2.5f);
+		DrawLine(B1X, B1Y, B2X, B2Y, MapPlayerColor, 2.5f);
+	}
+
+	// 5. Ramme
+	DrawRect(FLinearColor(0.5f, 0.7f, 0.9f, 0.8f), MapLeft - 2, MapTop - 2, MapSize + 4, 2);
+	DrawRect(FLinearColor(0.5f, 0.7f, 0.9f, 0.8f), MapLeft - 2, MapTop + MapSize, MapSize + 4, 2);
+	DrawRect(FLinearColor(0.5f, 0.7f, 0.9f, 0.8f), MapLeft - 2, MapTop, 2, MapSize);
+	DrawRect(FLinearColor(0.5f, 0.7f, 0.9f, 0.8f), MapLeft + MapSize, MapTop, 2, MapSize);
+
+	// 6. Hint-tekst
+	FString HintText = TEXT("M / Esc: Lukk  |  Dra: Panorer  |  Scroll: Zoom");
+	DrawText(HintText, FLinearColor(0.7f, 0.8f, 0.9f, 0.8f),
+		MapScreenCX - 200.0f, MapTop + MapSize + 12.0f, nullptr, 1.2f);
+
+	// Zoom-indikator
+	FString ZoomText = FString::Printf(TEXT("Zoom: %.1fx"), FullMapZoom);
+	DrawText(ZoomText, FLinearColor(0.7f, 0.8f, 0.9f, 0.7f),
+		MapLeft + 8.0f, MapTop + 8.0f, nullptr, 1.1f);
 }
 
 bool ASailingHUD::PauseMenuButtonHit(float X, float Y, float Bx, float By, float Bw, float Bh) const

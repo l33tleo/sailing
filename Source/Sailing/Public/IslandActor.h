@@ -39,8 +39,11 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Island")
 	FOnIslandDiscovered OnDiscovered;
 
-	// Initialize island with chunk data
+	// Initialize island with chunk data (procedural world)
 	void InitializeIsland(FIntPoint InChunkCoord, int32 InIslandIndex, bool bWasDiscovered);
+
+	/** Initialize as fjord island with real name (no procedural name). ChunkCoord set to (-1,-1) for save key. */
+	void InitializeFjordIsland(const FString& InName, int32 InIndex, bool bWasDiscovered);
 
 	// Mark island as discovered (called from save system or overlap)
 	void SetDiscovered(bool bFromSaveGame = false);

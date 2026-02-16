@@ -1,0 +1,88 @@
+{
+  "unused": [
+    "/Game/Models/Cube_001",
+    "/Game/Models/Cube_002",
+    "/Game/Models/Cylinder",
+    "/Game/Models/Cylinder_003",
+    "/Game/Models/Cylinder_004",
+    "/Game/Models/Cylinder_005",
+    "/Game/Models/Island",
+    "/Game/Models/LaserBoatCombined",
+    "/Game/Models/LaserBoom",
+    "/Game/Models/LaserHull",
+    "/Game/Models/LaserMast",
+    "/Game/Models/LaserRudder",
+    "/Game/Models/LaserSail",
+    "/Game/Models/LaserTiller",
+    "/Game/Models/Mesh",
+    "/Game/Models/Sail_001",
+    "/Game/Models/SceneImport_Optimist3735",
+    "/Game/Models/Text"
+  ],
+  "used": [
+    {
+      "path": "/Game/Models/Island_Bush_Mat",
+      "refs": [
+        "/Game/Models/Island"
+      ]
+    },
+    {
+      "path": "/Game/Models/Island_Canopy",
+      "refs": [
+        "/Game/Models/Island"
+      ]
+    },
+    {
+      "path": "/Game/Models/Island_Grass",
+      "refs": [
+        "/Game/Models/Island"
+      ]
+    },
+    {
+      "path": "/Game/Models/Island_Rock",
+      "refs": [
+        "/Game/Models/Island"
+      ]
+    },
+    {
+      "path": "/Game/Models/Island_Trunk",
+      "refs": [
+        "/Game/Models/Island"
+      ]
+    },
+    {
+      "path": "/Game/Models/M_Board",
+      "refs": [
+        "/Game/Models/Cube_001",
+        "/Game/Models/Cube_002"
+      ]
+    },
+    {
+      "path": "/Game/Models/M_Hull",
+      "refs": [
+        "/Game/Models/Mesh"
+      ]
+    },
+    {
+      "path": "/Game/Models/M_Sail",
+      "refs": [
+        "/Game/Models/Sail_001"
+      ]
+    },
+    {
+      "path": "/Game/Models/M_SailNumber",
+      "refs": [
+        "/Game/Models/Text"
+      ]
+    },
+    {
+      "path": "/Game/Models/M_Wood",
+      "refs": [
+        "/Game/Models/Cylinder",
+        "/Game/Models/Cylinder_004",
+        "/Game/Models/Cylinder_003",
+        "/Game/Models/Cylinder_005"
+      ]
+    }
+  ]
+}

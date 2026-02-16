@@ -1,0 +1,10 @@
+[project]
+name = "mcp-overpass"
+version = "0.1.0"
+description = "MCP server wrapping OpenStreetMap Overpass API (query features, islands in bbox)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastmcp>=2.0",
+    "requests>=2.28",
+]

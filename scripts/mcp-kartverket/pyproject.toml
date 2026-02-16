@@ -1,0 +1,11 @@
+[project]
+name = "mcp-kartverket"
+version = "0.1.0"
+description = "MCP server wrapping Kartverket nautical chart WMS (sjøkart)"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastmcp>=2.0",
+    "requests>=2.28",
+]
+

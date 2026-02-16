@@ -69,7 +69,7 @@ void AChunkManager::LoadChunk(FIntPoint ChunkCoord)
 		float OffY = RNG.FRandRange(ChunkSize * 0.1f, ChunkSize * 0.9f);
 		FVector SpawnLoc = ChunkOrigin + FVector(OffX, OffY, 0.0f);
 
-		float Scale = RNG.FRandRange(0.5f, 3.0f);
+		float Scale = RNG.FRandRange(5.0f, 20.0f);
 
 		// Check if already discovered in save game
 		bool bWasDiscovered = false;
