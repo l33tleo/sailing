@@ -719,6 +719,9 @@ void ASailingGameMode::BeginPlay()
 			TelemetrySubsystem->SetCounterValue(TEXT("StartupRegisteredUpgrades"), FMath::Max(0, StartupRegisteredUpgradeCount));
 			TelemetrySubsystem->SetCounterValue(TEXT("StartupPortDefinitions"), FMath::Max(0, StartupPortDefinitionCount));
 			TelemetrySubsystem->SetCounterValue(TEXT("StartupSpawnedPorts"), FMath::Max(0, StartupSpawnedPortCount));
+			TelemetrySubsystem->SetCounterValue(TEXT("StartupRequiredMissionCount"), RequiredStartupMissionIds.Num());
+			TelemetrySubsystem->SetCounterValue(TEXT("StartupRequiredUpgradeCount"), RequiredStartupUpgradeIds.Num());
+			TelemetrySubsystem->SetCounterValue(TEXT("StartupRequiredPortCount"), RequiredStartupPortIds.Num());
 			TelemetrySubsystem->SetCounterValue(TEXT("StartupMissingRequiredMissions"), FMath::Max(0, MissingRequiredStartupMissionCount));
 			TelemetrySubsystem->SetCounterValue(TEXT("StartupMissingRequiredUpgrades"), FMath::Max(0, MissingRequiredStartupUpgradeCount));
 			TelemetrySubsystem->SetCounterValue(TEXT("StartupMissingRequiredPorts"), FMath::Max(0, MissingRequiredStartupPortCount));
