@@ -803,6 +803,11 @@ AChunkManager* ASailingGameMode::GetChunkManager() const
 
 bool ASailingGameMode::SyncActiveMissionObjectiveMarker()
 {
+	if (!GetWorld())
+	{
+		return false;
+	}
+
 	USailingGameInstance* GI = Cast<USailingGameInstance>(GetGameInstance());
 	UTelemetrySubsystem* TelemetrySubsystem = GI ? GI->GetSubsystem<UTelemetrySubsystem>() : nullptr;
 	UMissionSubsystem* MissionSubsystem = GI ? GI->GetSubsystem<UMissionSubsystem>() : nullptr;
