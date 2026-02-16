@@ -165,6 +165,21 @@ bool FSailingMissionLocationCompletionTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Correct location should pay reward"), CorrectLocationReward, 450);
 	TestEqual(TEXT("Mission should be cleared after completion"), MissionSubsystem->GetActiveMissionId(), NAME_None);
 
+	USailingMissionDataAsset* ZeroRewardMission = NewObject<USailingMissionDataAsset>();
+	ZeroRewardMission->MissionId = TEXT("Delivery_Zero");
+	ZeroRewardMission->MissionType = ESailingMissionType::Delivery;
+	ZeroRewardMission->RewardCredits = 0;
+	ZeroRewardMission->EndWorldLocation = FVector(3000.0f, 0.0f, 0.0f);
+	ZeroRewardMission->bRequireLocationMatch = true;
+	ZeroRewardMission->CompletionRadius = 400.0f;
+	TestTrue(TEXT("Zero reward mission registration should succeed"), MissionSubsystem->RegisterMissionAsset(ZeroRewardMission));
+	TestTrue(TEXT("Zero reward mission activation should succeed"), MissionSubsystem->ActivateMissionAsset(ZeroRewardMission));
+
+	const int32 ZeroRewardCompletion = MissionSubsystem->CompleteActiveMissionAtLocation(
+		ESailingMissionType::Delivery, FVector(3000.0f, 100.0f, 0.0f));
+	TestEqual(TEXT("Zero reward mission should complete with zero reward"), ZeroRewardCompletion, 0);
+	TestEqual(TEXT("Zero reward mission should still clear active mission"), MissionSubsystem->GetActiveMissionId(), NAME_None);
+
 	return true;
 }
 
