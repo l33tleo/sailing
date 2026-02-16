@@ -119,6 +119,9 @@ public:
 	FText GetActiveMissionDisplayName() const;
 
 	UFUNCTION(BlueprintPure, Category = "Sailing|Mission")
+	FText GetMissionDisplayNameById(FName MissionId) const;
+
+	UFUNCTION(BlueprintPure, Category = "Sailing|Mission")
 	bool GetActiveMissionObjectiveLocation(FVector& OutLocation) const;
 
 	UFUNCTION(BlueprintCallable, Category = "Sailing|Mission")

@@ -8,6 +8,18 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPortMissionAcceptRequested, FName
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPortMissionBoardCloseRequested);
 
 USTRUCT(BlueprintType)
+struct SAILING_API FPortMissionOfferEntry
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	FName MissionId = NAME_None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	FText MissionTitle;
+};
+
+USTRUCT(BlueprintType)
 struct SAILING_API FPortMissionBoardData
 {
 	GENERATED_BODY()
@@ -20,6 +32,9 @@ struct SAILING_API FPortMissionBoardData
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
 	TArray<FName> OfferedMissionIds;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	TArray<FPortMissionOfferEntry> OfferedMissions;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
 	FName CurrentMissionId = NAME_None;

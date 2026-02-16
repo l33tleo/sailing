@@ -68,6 +68,19 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 	Data.PortDisplayName = PortDisplayName;
 	Data.OfferedMissionIds = OfferedMissionIds;
 	Data.CurrentMissionId = CurrentMissionId;
+	if (UGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance() : nullptr)
+	{
+		if (UMissionSubsystem* MissionSubsystem = GI->GetSubsystem<UMissionSubsystem>())
+		{
+			for (const FName& MissionId : OfferedMissionIds)
+			{
+				FPortMissionOfferEntry Entry;
+				Entry.MissionId = MissionId;
+				Entry.MissionTitle = MissionSubsystem->GetMissionDisplayNameById(MissionId);
+				Data.OfferedMissions.Add(Entry);
+			}
+		}
+	}
 	PortMissionBoardWidget->PushMissionBoardData(Data);
 	PortMissionBoardWidget->SetVisibility(ESlateVisibility::Visible);
 

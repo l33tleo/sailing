@@ -181,6 +181,24 @@ FText UMissionSubsystem::GetActiveMissionDisplayName() const
 	return FText::GetEmpty();
 }
 
+FText UMissionSubsystem::GetMissionDisplayNameById(FName MissionId) const
+{
+	if (MissionId.IsNone())
+	{
+		return FText::GetEmpty();
+	}
+
+	if (const TObjectPtr<USailingMissionDataAsset>* MissionPtr = RegisteredMissions.Find(MissionId))
+	{
+		if (const USailingMissionDataAsset* MissionData = MissionPtr ? MissionPtr->Get() : nullptr)
+		{
+			return MissionData->DisplayName;
+		}
+	}
+
+	return FText::FromName(MissionId);
+}
+
 bool UMissionSubsystem::GetActiveMissionObjectiveLocation(FVector& OutLocation) const
 {
 	if (const USailingMissionDataAsset* ActiveMission = GetActiveMissionAsset())
