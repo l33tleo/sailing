@@ -371,6 +371,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FSailingMissionDisplayNameLookupTest::RunTest(const FString& Parameters)
 {
 	UMissionSubsystem* MissionSubsystem = NewObject<UMissionSubsystem>();
+	MissionSubsystem->SetMissionAssetPath(NAME_None);
+	TestEqual(TEXT("Mission asset scan path should normalize to /Game"), MissionSubsystem->GetMissionAssetPath(), FName(TEXT("/Game")));
 
 	USailingMissionDataAsset* Mission = NewObject<USailingMissionDataAsset>();
 	Mission->MissionId = TEXT("Mission_Display");
@@ -411,6 +413,8 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FSailingEconomyRepairFlowTest::RunTest(const FString& Parameters)
 {
 	UEconomySubsystem* Economy = NewObject<UEconomySubsystem>();
+	Economy->SetUpgradeAssetPath(NAME_None);
+	TestEqual(TEXT("Upgrade asset scan path should normalize to /Game"), Economy->GetUpgradeAssetPath(), FName(TEXT("/Game")));
 	Economy->SetCredits(1000);
 	Economy->SetBoatConditionPercent(70);
 	Economy->ApplyBoatWear(15);

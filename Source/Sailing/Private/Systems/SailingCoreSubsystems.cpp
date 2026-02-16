@@ -176,6 +176,18 @@ int32 UMissionSubsystem::ReloadMissionAssets()
 	return RegisteredCount;
 }
 
+void UMissionSubsystem::SetMissionAssetPath(FName InMissionAssetPath)
+{
+	const FName NormalizedPath = InMissionAssetPath.IsNone() ? FName(TEXT("/Game")) : InMissionAssetPath;
+	if (MissionAssetPath == NormalizedPath)
+	{
+		return;
+	}
+
+	MissionAssetPath = NormalizedPath;
+	ReloadMissionAssets();
+}
+
 TArray<FName> UMissionSubsystem::GetRegisteredMissionIds() const
 {
 	TArray<FName> MissionIds;
@@ -641,6 +653,18 @@ int32 UEconomySubsystem::ReloadUpgradeAssets()
 
 	UE_LOG(LogTemp, Log, TEXT("EconomySubsystem: Registered %d upgrade assets from %s"), RegisteredCount, *ScanPath.ToString());
 	return RegisteredCount;
+}
+
+void UEconomySubsystem::SetUpgradeAssetPath(FName InUpgradeAssetPath)
+{
+	const FName NormalizedPath = InUpgradeAssetPath.IsNone() ? FName(TEXT("/Game")) : InUpgradeAssetPath;
+	if (UpgradeAssetPath == NormalizedPath)
+	{
+		return;
+	}
+
+	UpgradeAssetPath = NormalizedPath;
+	ReloadUpgradeAssets();
 }
 
 TArray<FName> UEconomySubsystem::GetRegisteredUpgradeIds() const

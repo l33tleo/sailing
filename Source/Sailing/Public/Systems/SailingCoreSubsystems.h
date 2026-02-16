@@ -128,6 +128,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Sailing|Mission")
 	int32 ReloadMissionAssets();
 
+	UFUNCTION(BlueprintCallable, Category = "Sailing|Mission")
+	void SetMissionAssetPath(FName InMissionAssetPath);
+
+	UFUNCTION(BlueprintPure, Category = "Sailing|Mission")
+	FName GetMissionAssetPath() const { return MissionAssetPath; }
+
 	UFUNCTION(BlueprintPure, Category = "Sailing|Mission")
 	TArray<FName> GetRegisteredMissionIds() const;
 
@@ -237,6 +243,12 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Sailing|Economy")
 	int32 ReloadUpgradeAssets();
+
+	UFUNCTION(BlueprintCallable, Category = "Sailing|Economy")
+	void SetUpgradeAssetPath(FName InUpgradeAssetPath);
+
+	UFUNCTION(BlueprintPure, Category = "Sailing|Economy")
+	FName GetUpgradeAssetPath() const { return UpgradeAssetPath; }
 
 	UFUNCTION(BlueprintPure, Category = "Sailing|Economy")
 	TArray<FName> GetRegisteredUpgradeIds() const;

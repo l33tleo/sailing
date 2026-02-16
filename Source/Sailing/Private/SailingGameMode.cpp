@@ -58,6 +58,8 @@ void ASailingGameMode::BeginPlay()
 
 		if (UEconomySubsystem* EconomySubsystem = GI->GetSubsystem<UEconomySubsystem>())
 		{
+			EconomySubsystem->SetUpgradeAssetPath(UpgradeAssetScanPath);
+
 			auto EnsureUpgrade = [this, EconomySubsystem](
 				FName UpgradeId,
 				int32 CreditCost,
@@ -118,6 +120,8 @@ void ASailingGameMode::BeginPlay()
 
 		if (UMissionSubsystem* MissionSubsystem = GI->GetSubsystem<UMissionSubsystem>())
 		{
+			MissionSubsystem->SetMissionAssetPath(MissionAssetScanPath);
+
 			const FName DiscoveryMissionId(TEXT("OppdagForsteOy"));
 			const FName DeliveryMissionId(TEXT("LeveringTilBoye"));
 

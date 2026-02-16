@@ -32,6 +32,12 @@ public:
 	void SaveGame_();
 
 private:
+	UPROPERTY(EditAnywhere, Category = "World|Missions")
+	FName MissionAssetScanPath = TEXT("/Game");
+
+	UPROPERTY(EditAnywhere, Category = "World|Economy")
+	FName UpgradeAssetScanPath = TEXT("/Game");
+
 	UPROPERTY(EditAnywhere, Category = "World|Ports")
 	FName PortAssetScanPath = TEXT("/Game");
 
