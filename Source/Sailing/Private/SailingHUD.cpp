@@ -442,6 +442,9 @@ bool ASailingHUD::RequestUpgradePurchaseFromBoard(FName UpgradeId)
 	{
 		TelemetrySubsystem->RecordCounterEvent(TEXT("PortUpgradesPurchased"), 1);
 		TelemetrySubsystem->RecordCounterEvent(TEXT("PortUpgradeCreditsSpent"), AdjustedCost);
+		TelemetrySubsystem->RecordCounterEvent(
+			FName(*FString::Printf(TEXT("PortUpgradePurchased_%s"), *UpgradeId.ToString())),
+			1);
 	}
 
 	if (ASailingGameMode* GM = Cast<ASailingGameMode>(UGameplayStatics::GetGameMode(GetWorld())))
