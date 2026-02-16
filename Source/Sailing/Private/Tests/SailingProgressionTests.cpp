@@ -503,6 +503,12 @@ bool FSailingPortWeightedOffersTest::RunTest(const FString& Parameters)
 	TSet<FName> AllowedMissionIds;
 	AllowedMissionIds.Add(TEXT("Mission_A"));
 	AllowedMissionIds.Add(TEXT("Mission_C"));
+	const TArray<FName> MissingRequiredMissionIds = UPortDataAsset::FindMissingRequiredIds(
+		{ TEXT("Mission_A"), TEXT("Mission_B"), TEXT("Mission_B"), NAME_None },
+		AllowedMissionIds);
+	TestEqual(TEXT("Missing-required helper should return unique missing mission ids"), MissingRequiredMissionIds.Num(), 1);
+	TestEqual(TEXT("Missing-required helper should include expected missing mission id"), MissingRequiredMissionIds[0], FName(TEXT("Mission_B")));
+
 	const TArray<FName> FilteredMissionIds = UPortDataAsset::FilterIdsByAllowedSet(
 		{ NAME_None, TEXT("Mission_A"), TEXT("Mission_B"), TEXT("Mission_A"), TEXT("Mission_C") },
 		AllowedMissionIds,

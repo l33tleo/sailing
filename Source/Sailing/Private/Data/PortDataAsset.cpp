@@ -28,6 +28,25 @@ TArray<FName> UPortDataAsset::FilterIdsByAllowedSet(
 	return Result;
 }
 
+TArray<FName> UPortDataAsset::FindMissingRequiredIds(
+	const TArray<FName>& InRequiredIds,
+	const TSet<FName>& InAvailableIds)
+{
+	TArray<FName> MissingRequiredIds;
+	for (const FName& RequiredId : InRequiredIds)
+	{
+		if (RequiredId.IsNone() || InAvailableIds.Contains(RequiredId))
+		{
+			continue;
+		}
+
+		MissingRequiredIds.AddUnique(RequiredId);
+	}
+
+	MissingRequiredIds.Sort(FNameLexicalLess());
+	return MissingRequiredIds;
+}
+
 TArray<FPortMissionWeightedOffer> UPortDataAsset::FilterMissionWeightedOffersByAllowedSet(
 	const TArray<FPortMissionWeightedOffer>& InOffers,
 	const TSet<FName>& InAllowedMissionIds,

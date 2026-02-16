@@ -162,6 +162,10 @@ public:
 		const TSet<FName>& InAllowedIds,
 		int32& OutRejectedCount);
 
+	static TArray<FName> FindMissingRequiredIds(
+		const TArray<FName>& InRequiredIds,
+		const TSet<FName>& InAvailableIds);
+
 	static TArray<FPortMissionWeightedOffer> FilterMissionWeightedOffersByAllowedSet(
 		const TArray<FPortMissionWeightedOffer>& InOffers,
 		const TSet<FName>& InAllowedMissionIds,

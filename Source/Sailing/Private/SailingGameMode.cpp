@@ -165,20 +165,19 @@ void ASailingGameMode::BeginPlay()
 					}
 				}
 
-				TArray<FString> MissingRequiredUpgradeNames;
-				for (const FName& RequiredUpgradeId : RequiredStartupUpgradeIds)
+				const TArray<FName> MissingRequiredUpgradeIds = UPortDataAsset::FindMissingRequiredIds(
+					RequiredStartupUpgradeIds,
+					RegisteredUpgradeIdSet);
+				MissingRequiredStartupUpgradeCount = MissingRequiredUpgradeIds.Num();
+
+				if (MissingRequiredUpgradeIds.Num() > 0)
 				{
-					if (RequiredUpgradeId.IsNone() || RegisteredUpgradeIdSet.Contains(RequiredUpgradeId))
+					TArray<FString> MissingRequiredUpgradeNames;
+					for (const FName& MissingUpgradeId : MissingRequiredUpgradeIds)
 					{
-						continue;
+						MissingRequiredUpgradeNames.Add(MissingUpgradeId.ToString());
 					}
 
-					MissingRequiredStartupUpgradeCount++;
-					MissingRequiredUpgradeNames.Add(RequiredUpgradeId.ToString());
-				}
-
-				if (MissingRequiredUpgradeNames.Num() > 0)
-				{
 					UE_LOG(LogTemp, Warning,
 						TEXT("SailingGameMode: Mangler %d påkrevde startup-oppgraderinger: %s"),
 						MissingRequiredStartupUpgradeCount,
@@ -273,20 +272,19 @@ void ASailingGameMode::BeginPlay()
 					}
 				}
 
-				TArray<FString> MissingRequiredMissionNames;
-				for (const FName& RequiredMissionId : RequiredStartupMissionIds)
+				const TArray<FName> MissingRequiredMissionIds = UPortDataAsset::FindMissingRequiredIds(
+					RequiredStartupMissionIds,
+					RegisteredMissionIdSet);
+				MissingRequiredStartupMissionCount = MissingRequiredMissionIds.Num();
+
+				if (MissingRequiredMissionIds.Num() > 0)
 				{
-					if (RequiredMissionId.IsNone() || RegisteredMissionIdSet.Contains(RequiredMissionId))
+					TArray<FString> MissingRequiredMissionNames;
+					for (const FName& MissingMissionId : MissingRequiredMissionIds)
 					{
-						continue;
+						MissingRequiredMissionNames.Add(MissingMissionId.ToString());
 					}
 
-					MissingRequiredStartupMissionCount++;
-					MissingRequiredMissionNames.Add(RequiredMissionId.ToString());
-				}
-
-				if (MissingRequiredMissionNames.Num() > 0)
-				{
 					UE_LOG(LogTemp, Warning,
 						TEXT("SailingGameMode: Mangler %d påkrevde startup-oppdrag: %s"),
 						MissingRequiredStartupMissionCount,
@@ -665,20 +663,19 @@ void ASailingGameMode::BeginPlay()
 			}
 			if (RequiredStartupPortIds.Num() > 0)
 			{
-				TArray<FString> MissingRequiredPortNames;
-				for (const FName& RequiredPortId : RequiredStartupPortIds)
+				const TArray<FName> MissingRequiredPortIds = UPortDataAsset::FindMissingRequiredIds(
+					RequiredStartupPortIds,
+					SpawnedPortIds);
+				MissingRequiredStartupPortCount = MissingRequiredPortIds.Num();
+
+				if (MissingRequiredPortIds.Num() > 0)
 				{
-					if (RequiredPortId.IsNone() || SpawnedPortIds.Contains(RequiredPortId))
+					TArray<FString> MissingRequiredPortNames;
+					for (const FName& MissingPortId : MissingRequiredPortIds)
 					{
-						continue;
+						MissingRequiredPortNames.Add(MissingPortId.ToString());
 					}
 
-					MissingRequiredStartupPortCount++;
-					MissingRequiredPortNames.Add(RequiredPortId.ToString());
-				}
-
-				if (MissingRequiredPortNames.Num() > 0)
-				{
 					UE_LOG(LogTemp, Warning,
 						TEXT("SailingGameMode: Mangler %d påkrevde startup-havner: %s"),
 						MissingRequiredStartupPortCount,
