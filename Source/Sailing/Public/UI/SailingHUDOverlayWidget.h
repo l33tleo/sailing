@@ -17,6 +17,12 @@ struct SAILING_API FSailingHUDOverlayData
 
 	UPROPERTY(BlueprintReadOnly, Category = "HUD")
 	FName ActiveMissionId = NAME_None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "HUD")
+	FText ActiveMissionTitle;
+
+	UPROPERTY(BlueprintReadOnly, Category = "HUD")
+	float ObjectiveDistanceMeters = -1.0f;
 };
 
 /**

@@ -35,7 +35,8 @@ void ASailingHUD::EnsureOverlayWidget()
 	}
 }
 
-void ASailingHUD::PushOverlayData(int32 DiscoveredIslands, int32 Credits, FName ActiveMissionId)
+void ASailingHUD::PushOverlayData(int32 DiscoveredIslands, int32 Credits, FName ActiveMissionId,
+	const FText& ActiveMissionTitle, float ObjectiveDistanceMeters)
 {
 	EnsureOverlayWidget();
 	if (!OverlayWidget)
@@ -47,6 +48,8 @@ void ASailingHUD::PushOverlayData(int32 DiscoveredIslands, int32 Credits, FName 
 	OverlayData.DiscoveredIslands = DiscoveredIslands;
 	OverlayData.Credits = Credits;
 	OverlayData.ActiveMissionId = ActiveMissionId;
+	OverlayData.ActiveMissionTitle = ActiveMissionTitle;
+	OverlayData.ObjectiveDistanceMeters = ObjectiveDistanceMeters;
 	OverlayWidget->PushOverlayData(OverlayData);
 }
 
@@ -485,6 +488,8 @@ void ASailingHUD::DrawDiscoveryCounter()
 
 	int32 Credits = 0;
 	FName ActiveMissionId = NAME_None;
+	FText ActiveMissionTitle = FText::GetEmpty();
+	float ObjectiveDistanceMeters = -1.0f;
 	if (UGameInstance* GI = GetWorld()->GetGameInstance())
 	{
 		if (UEconomySubsystem* EconomySubsystem = GI->GetSubsystem<UEconomySubsystem>())
@@ -494,6 +499,16 @@ void ASailingHUD::DrawDiscoveryCounter()
 		if (UMissionSubsystem* MissionSubsystem = GI->GetSubsystem<UMissionSubsystem>())
 		{
 			ActiveMissionId = MissionSubsystem->GetActiveMissionId();
+			ActiveMissionTitle = MissionSubsystem->GetActiveMissionDisplayName();
+			FVector ObjectiveLocation;
+			if (MissionSubsystem->GetActiveMissionObjectiveLocation(ObjectiveLocation))
+			{
+				if (APawn* Pawn = GetOwningPawn())
+				{
+					const float DistCm = FVector::Dist(Pawn->GetActorLocation(), ObjectiveLocation);
+					ObjectiveDistanceMeters = DistCm * 0.01f;
+				}
+			}
 		}
 	}
 
@@ -507,7 +522,21 @@ void ASailingHUD::DrawDiscoveryCounter()
 	DrawText(MissionText, FLinearColor(0.7f, 1.0f, 0.8f, 1.0f),
 		BoxX + 10.0f, BoxY + 56.0f, nullptr, 1.0f);
 
-	PushOverlayData(SaveGame->TotalIslandsDiscovered, Credits, ActiveMissionId);
+	if (!ActiveMissionTitle.IsEmpty())
+	{
+		const FString TitleText = FString::Printf(TEXT("MÅL: %s"), *ActiveMissionTitle.ToString());
+		DrawText(TitleText, FLinearColor(0.8f, 0.9f, 1.0f, 1.0f),
+			BoxX + 170.0f, BoxY + 56.0f, nullptr, 0.9f);
+	}
+
+	if (ObjectiveDistanceMeters >= 0.0f)
+	{
+		const FString DistText = FString::Printf(TEXT("DIST: %.0f m"), ObjectiveDistanceMeters);
+		DrawText(DistText, FLinearColor(1.0f, 0.95f, 0.55f, 1.0f),
+			BoxX + 170.0f, BoxY + 32.0f, nullptr, 1.0f);
+	}
+
+	PushOverlayData(SaveGame->TotalIslandsDiscovered, Credits, ActiveMissionId, ActiveMissionTitle, ObjectiveDistanceMeters);
 }
 
 bool ASailingHUD::PauseMenuButtonHit(float X, float Y, float Bx, float By, float Bw, float Bh) const

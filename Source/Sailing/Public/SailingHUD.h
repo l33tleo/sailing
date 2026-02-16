@@ -76,7 +76,8 @@ private:
 	void DrawDiscoveryCounter();
 
 	void EnsureOverlayWidget();
-	void PushOverlayData(int32 DiscoveredIslands, int32 Credits, FName ActiveMissionId);
+	void PushOverlayData(int32 DiscoveredIslands, int32 Credits, FName ActiveMissionId,
+		const FText& ActiveMissionTitle, float ObjectiveDistanceMeters);
 
 	// Oversiktskart (spiller sentrum, oppdagede øyer som prikker)
 	void DrawOverviewMap();

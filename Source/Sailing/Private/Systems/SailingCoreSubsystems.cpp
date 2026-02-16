@@ -133,6 +133,28 @@ const USailingMissionDataAsset* UMissionSubsystem::GetActiveMissionAsset() const
 	return nullptr;
 }
 
+FText UMissionSubsystem::GetActiveMissionDisplayName() const
+{
+	if (const USailingMissionDataAsset* ActiveMission = GetActiveMissionAsset())
+	{
+		return ActiveMission->DisplayName;
+	}
+	return FText::GetEmpty();
+}
+
+bool UMissionSubsystem::GetActiveMissionObjectiveLocation(FVector& OutLocation) const
+{
+	if (const USailingMissionDataAsset* ActiveMission = GetActiveMissionAsset())
+	{
+		if (ActiveMission->bRequireLocationMatch)
+		{
+			OutLocation = ActiveMission->EndWorldLocation;
+			return true;
+		}
+	}
+	return false;
+}
+
 int32 UMissionSubsystem::CompleteActiveMissionByTrigger(ESailingMissionType TriggerType)
 {
 	return CompleteActiveMissionAtLocation(TriggerType, FVector::ZeroVector);

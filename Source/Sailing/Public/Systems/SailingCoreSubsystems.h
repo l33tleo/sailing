@@ -100,6 +100,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Sailing|Mission")
 	const USailingMissionDataAsset* GetActiveMissionAsset() const;
 
+	UFUNCTION(BlueprintPure, Category = "Sailing|Mission")
+	FText GetActiveMissionDisplayName() const;
+
+	UFUNCTION(BlueprintPure, Category = "Sailing|Mission")
+	bool GetActiveMissionObjectiveLocation(FVector& OutLocation) const;
+
 	UFUNCTION(BlueprintCallable, Category = "Sailing|Mission")
 	int32 CompleteActiveMissionByTrigger(ESailingMissionType TriggerType);
 
