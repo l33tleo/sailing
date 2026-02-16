@@ -135,6 +135,9 @@ public:
 	const USailingMissionDataAsset* GetActiveMissionAsset() const;
 
 	UFUNCTION(BlueprintPure, Category = "Sailing|Mission")
+	const USailingMissionDataAsset* GetMissionAssetById(FName MissionId) const;
+
+	UFUNCTION(BlueprintPure, Category = "Sailing|Mission")
 	FText GetActiveMissionDisplayName() const;
 
 	UFUNCTION(BlueprintPure, Category = "Sailing|Mission")

@@ -198,6 +198,20 @@ const USailingMissionDataAsset* UMissionSubsystem::GetActiveMissionAsset() const
 	return nullptr;
 }
 
+const USailingMissionDataAsset* UMissionSubsystem::GetMissionAssetById(FName MissionId) const
+{
+	if (MissionId.IsNone())
+	{
+		return nullptr;
+	}
+
+	if (const TObjectPtr<USailingMissionDataAsset>* MissionPtr = RegisteredMissions.Find(MissionId))
+	{
+		return MissionPtr ? MissionPtr->Get() : nullptr;
+	}
+	return nullptr;
+}
+
 FText UMissionSubsystem::GetActiveMissionDisplayName() const
 {
 	if (const USailingMissionDataAsset* ActiveMission = GetActiveMissionAsset())

@@ -64,28 +64,47 @@ void ASailingGameMode::BeginPlay()
 
 		if (UMissionSubsystem* MissionSubsystem = GI->GetSubsystem<UMissionSubsystem>())
 		{
-			USailingMissionDataAsset* StarterDiscoveryMission = NewObject<USailingMissionDataAsset>(this);
-			StarterDiscoveryMission->MissionId = TEXT("OppdagForsteOy");
-			StarterDiscoveryMission->DisplayName = FText::FromString(TEXT("Oppdag første øy"));
-			StarterDiscoveryMission->Description = FText::FromString(TEXT("Seil ut og oppdag din første øy."));
-			StarterDiscoveryMission->MissionType = ESailingMissionType::NavigationChallenge;
-			StarterDiscoveryMission->RewardCredits = 250;
-			StarterDiscoveryMission->bRepeatable = false;
-			StarterDiscoveryMission->NextMissionId = TEXT("LeveringTilBoye");
-			MissionSubsystem->RegisterMissionAsset(StarterDiscoveryMission);
+			const FName DiscoveryMissionId(TEXT("OppdagForsteOy"));
+			const FName DeliveryMissionId(TEXT("LeveringTilBoye"));
 
-			USailingMissionDataAsset* StarterDeliveryMission = NewObject<USailingMissionDataAsset>(this);
-			StarterDeliveryMission->MissionId = TEXT("LeveringTilBoye");
-			StarterDeliveryMission->DisplayName = FText::FromString(TEXT("Levering til bøye"));
-			StarterDeliveryMission->Description = FText::FromString(TEXT("Seil til leveringsbøyen og fullfør leveransen."));
-			StarterDeliveryMission->MissionType = ESailingMissionType::Delivery;
-			StarterDeliveryMission->RewardCredits = 400;
-			StarterDeliveryMission->StartWorldLocation = FVector::ZeroVector;
-			StarterDeliveryMission->EndWorldLocation = DeliveryObjectiveLocation;
-			StarterDeliveryMission->bRequireLocationMatch = true;
-			StarterDeliveryMission->CompletionRadius = 1200.0f;
-			StarterDeliveryMission->bRepeatable = true;
-			MissionSubsystem->RegisterMissionAsset(StarterDeliveryMission);
+			auto EnsureMission = [this, MissionSubsystem](FName MissionId, TFunction<void(USailingMissionDataAsset*)> ConfigureFallback)
+				-> USailingMissionDataAsset*
+			{
+				if (const USailingMissionDataAsset* ExistingMission = MissionSubsystem->GetMissionAssetById(MissionId))
+				{
+					return const_cast<USailingMissionDataAsset*>(ExistingMission);
+				}
+
+				USailingMissionDataAsset* RuntimeFallbackMission = NewObject<USailingMissionDataAsset>(this);
+				RuntimeFallbackMission->MissionId = MissionId;
+				ConfigureFallback(RuntimeFallbackMission);
+				MissionSubsystem->RegisterMissionAsset(RuntimeFallbackMission);
+				UE_LOG(LogTemp, Warning, TEXT("SailingGameMode: Bruker runtime fallback for oppdrag '%s'."), *MissionId.ToString());
+				return RuntimeFallbackMission;
+			};
+
+			EnsureMission(DiscoveryMissionId, [DeliveryMissionId](USailingMissionDataAsset* Mission)
+			{
+				Mission->DisplayName = FText::FromString(TEXT("Oppdag første øy"));
+				Mission->Description = FText::FromString(TEXT("Seil ut og oppdag din første øy."));
+				Mission->MissionType = ESailingMissionType::NavigationChallenge;
+				Mission->RewardCredits = 250;
+				Mission->bRepeatable = false;
+				Mission->NextMissionId = DeliveryMissionId;
+			});
+
+			EnsureMission(DeliveryMissionId, [DeliveryObjectiveLocation](USailingMissionDataAsset* Mission)
+			{
+				Mission->DisplayName = FText::FromString(TEXT("Levering til bøye"));
+				Mission->Description = FText::FromString(TEXT("Seil til leveringsbøyen og fullfør leveransen."));
+				Mission->MissionType = ESailingMissionType::Delivery;
+				Mission->RewardCredits = 400;
+				Mission->StartWorldLocation = FVector::ZeroVector;
+				Mission->EndWorldLocation = DeliveryObjectiveLocation;
+				Mission->bRequireLocationMatch = true;
+				Mission->CompletionRadius = 1200.0f;
+				Mission->bRepeatable = true;
+			});
 
 			MissionSubsystem->SetCompletedMissionIds(SaveGame ? SaveGame->CompletedMissionIds : TArray<FName>());
 			MissionSubsystem->SetMissionBoardSelectionHistory(SaveGame ? SaveGame->MissionBoardSelectionHistory : TArray<FMissionBoardSelectionEntry>());
@@ -94,11 +113,11 @@ void ASailingGameMode::BeginPlay()
 			{
 				if (SaveGame->TotalIslandsDiscovered == 0)
 				{
-					MissionSubsystem->ActivateMissionAsset(StarterDiscoveryMission);
+					MissionSubsystem->ActivateMissionFromCandidates({ DiscoveryMissionId }, false);
 				}
 				else
 				{
-					MissionSubsystem->ActivateMissionAsset(StarterDeliveryMission);
+					MissionSubsystem->ActivateMissionFromCandidates({ DeliveryMissionId }, false);
 				}
 			}
 
