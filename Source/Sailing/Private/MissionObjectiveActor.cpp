@@ -50,11 +50,15 @@ void AMissionObjectiveActor::OnObjectiveOverlap(UPrimitiveComponent* OverlappedC
 	}
 
 	int32 RewardCredits = 0;
+	bool bMissionStateAdvanced = false;
 	if (UGameInstance* GI = GetGameInstance())
 	{
 		if (UMissionSubsystem* MissionSubsystem = GI->GetSubsystem<UMissionSubsystem>())
 		{
+			const FName MissionIdBeforeCompletion = MissionSubsystem->GetActiveMissionId();
 			RewardCredits = MissionSubsystem->CompleteActiveMissionAtLocation(TriggerType, GetActorLocation());
+			const FName MissionIdAfterCompletion = MissionSubsystem->GetActiveMissionId();
+			bMissionStateAdvanced = MissionIdBeforeCompletion != MissionIdAfterCompletion;
 		}
 
 		if (RewardCredits > 0)
@@ -63,16 +67,22 @@ void AMissionObjectiveActor::OnObjectiveOverlap(UPrimitiveComponent* OverlappedC
 			{
 				EconomySubsystem->AddCredits(RewardCredits);
 			}
+		}
 
-			if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
+		if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
+		{
+			if (bMissionStateAdvanced)
 			{
 				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionCompleted"), 1);
+			}
+			if (RewardCredits > 0)
+			{
 				TelemetrySubsystem->RecordCounterEvent(TEXT("CreditsGranted"), RewardCredits);
 			}
 		}
 	}
 
-	if (RewardCredits <= 0)
+	if (!bMissionStateAdvanced && RewardCredits <= 0)
 	{
 		return;
 	}
@@ -81,7 +91,9 @@ void AMissionObjectiveActor::OnObjectiveOverlap(UPrimitiveComponent* OverlappedC
 	{
 		if (ASailingHUD* HUD = Cast<ASailingHUD>(PC->GetHUD()))
 		{
-			HUD->ShowDiscoveryPopup(FString::Printf(TEXT("Oppdrag fullført (+%d)"), RewardCredits));
+			HUD->ShowDiscoveryPopup(RewardCredits > 0
+				? FString::Printf(TEXT("Oppdrag fullført (+%d)"), RewardCredits)
+				: FString(TEXT("Oppdrag fullført")));
 		}
 	}
 
@@ -91,9 +103,11 @@ void AMissionObjectiveActor::OnObjectiveOverlap(UPrimitiveComponent* OverlappedC
 		GM->SaveGame_();
 	}
 
-	UE_LOG(LogTemp, Log, TEXT("Mission objective completed. Reward=%d"), RewardCredits);
+	UE_LOG(LogTemp, Log, TEXT("Mission objective completed. Reward=%d Advanced=%s"),
+		RewardCredits,
+		bMissionStateAdvanced ? TEXT("true") : TEXT("false"));
 
-	if (bDestroyAfterCompletion)
+	if (bDestroyAfterCompletion && (bMissionStateAdvanced || RewardCredits > 0))
 	{
 		Destroy();
 	}
