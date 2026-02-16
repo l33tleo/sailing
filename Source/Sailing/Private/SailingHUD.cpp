@@ -293,6 +293,22 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastHasPurchasableUpgrades"), LastMissionBoardData.bHasPurchasableUpgradeOffers ? 1 : 0);
 			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastHasImmediateActions"), LastMissionBoardData.bHasAnyImmediateActions ? 1 : 0);
 			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastPrimaryActionHint"), static_cast<int32>(LastMissionBoardData.PrimaryActionHint));
+			switch (LastMissionBoardData.PrimaryActionHint)
+			{
+			case EPortBoardPrimaryActionHint::SelectMission:
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardPrimaryHint_SelectMission"), 1);
+				break;
+			case EPortBoardPrimaryActionHint::BuyUpgrade:
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardPrimaryHint_BuyUpgrade"), 1);
+				break;
+			case EPortBoardPrimaryActionHint::SelectMissionOrBuyUpgrade:
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardPrimaryHint_Mixed"), 1);
+				break;
+			case EPortBoardPrimaryActionHint::None:
+			default:
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardPrimaryHint_None"), 1);
+				break;
+			}
 		}
 	}
 
