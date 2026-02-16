@@ -28,11 +28,27 @@ bool FSailingSaveMigrationRecountsDiscoveredIslandsTest::RunTest(const FString& 
 	IslandB.IslandIndex = 1;
 	IslandB.bDiscovered = true;
 	Save->DiscoveredIslands.Add(IslandB.GetUniqueKey(), IslandB);
+	Save->LastVisitedPortId = TEXT("HavnNord");
+	Save->PortVisitCounts.Add(TEXT("HavnNord"), 3);
+	Save->PortVisitCounts.Add(TEXT("HavnVest"), -2);
+
+	FMissionBoardSelectionEntry HistoryA;
+	HistoryA.PortId = TEXT("HavnNord");
+	HistoryA.MissionId = TEXT("LeveringTilBoye");
+	HistoryA.AcceptedTime = FDateTime::UtcNow();
+	Save->MissionBoardSelectionHistory.Add(HistoryA);
+
+	FMissionBoardSelectionEntry HistoryInvalid;
+	HistoryInvalid.PortId = NAME_None;
+	HistoryInvalid.MissionId = TEXT("Broken");
+	Save->MissionBoardSelectionHistory.Add(HistoryInvalid);
 
 	Save->EnsureCompatibility();
 
 	TestEqual(TEXT("Migration should recalculate discovered counter"), Save->TotalIslandsDiscovered, 2);
 	TestEqual(TEXT("Save schema should be upgraded"), Save->SaveSchemaVersion, USaveGameSailing::CurrentSaveSchemaVersion);
+	TestEqual(TEXT("Port visit counts should be clamped"), Save->PortVisitCounts.FindRef(TEXT("HavnVest")), 0);
+	TestEqual(TEXT("Mission board history should remove invalid entries"), Save->MissionBoardSelectionHistory.Num(), 1);
 	return true;
 }
 
@@ -174,6 +190,15 @@ bool FSailingWorldPortRegistryTest::RunTest(const FString& Parameters)
 	const TMap<FName, int32> VisitCounts = WorldSubsystem->GetPortVisitCounts();
 	TestEqual(TEXT("Port_A should have two visits"), VisitCounts.FindRef(TEXT("Port_A")), 2);
 	TestEqual(TEXT("Port_B should have one visit"), VisitCounts.FindRef(TEXT("Port_B")), 1);
+
+	TMap<FName, int32> PersistedStats;
+	PersistedStats.Add(TEXT("Port_A"), -4);
+	PersistedStats.Add(TEXT("Port_C"), 6);
+	WorldSubsystem->SetPortVisitStats(TEXT("Port_C"), PersistedStats);
+	const TMap<FName, int32> SanitizedStats = WorldSubsystem->GetPortVisitCounts();
+	TestEqual(TEXT("SetPortVisitStats should sanitize negative counts"), SanitizedStats.FindRef(TEXT("Port_A")), 0);
+	TestEqual(TEXT("SetPortVisitStats should keep positive counts"), SanitizedStats.FindRef(TEXT("Port_C")), 6);
+	TestEqual(TEXT("SetPortVisitStats should set last visited port"), WorldSubsystem->GetLastVisitedPortId(), FName(TEXT("Port_C")));
 	return true;
 }
 
