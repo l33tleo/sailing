@@ -17,6 +17,7 @@ Aksjeanalyse- og anbefalingsapp — analyserer aksjer med teknisk og fundamental
 - **Portefølje-tracker** — Spor beholdning og avkastning
 - **Paper Trading** — Simuler handler uten ekte penger, spor P&L og win rate
 - **Watchlist** — Følg aksjer du er interessert i
+- **AI Chat** — Still spørsmål som «Bør jeg kjøpe Equinor?» og få analyse-baserte svar
 - **Varsler** — Sett opp varsler for kurs- og RSI-nivåer
 - **CSV-eksport** — Last ned anbefalingshistorikk for dokumentasjon
 
@@ -128,6 +129,11 @@ docker-compose up -d
 | Metode | Sti | Beskrivelse |
 |--------|-----|-------------|
 | GET | `/api/sectors` | Sektoroversikt med kursendring per sektor |
+
+### AI Chat
+| Metode | Sti | Beskrivelse |
+|--------|-----|-------------|
+| POST | `/api/chat` | Still spørsmål om aksjer i naturlig språk |
 
 ### Eksport
 | Metode | Sti | Beskrivelse |
