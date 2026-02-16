@@ -103,7 +103,7 @@ private:
 	void HandleMissionBoardCloseRequest();
 	void PushOverlayData(int32 DiscoveredIslands, int32 Credits, FName ActiveMissionId,
 		const FText& ActiveMissionTitle, float ObjectiveDistanceMeters, int32 BoatConditionPercent,
-		float ObjectiveBearingDegrees);
+		float ObjectiveBearingDegrees, FName LastVisitedPortId);
 
 	// Oversiktskart (spiller sentrum, oppdagede øyer som prikker)
 	void DrawOverviewMap();

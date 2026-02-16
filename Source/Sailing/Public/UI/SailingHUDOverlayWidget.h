@@ -29,6 +29,9 @@ struct SAILING_API FSailingHUDOverlayData
 
 	UPROPERTY(BlueprintReadOnly, Category = "HUD")
 	float ObjectiveBearingDegrees = -1.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "HUD")
+	FName LastVisitedPortId = NAME_None;
 };
 
 /**

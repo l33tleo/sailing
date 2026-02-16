@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/SaveGame.h"
+#include "Data/SailingProgressionTypes.h"
 #include "SaveGameSailing.generated.h"
 
 USTRUCT(BlueprintType)
@@ -73,6 +74,15 @@ public:
 
 	UPROPERTY(BlueprintReadWrite, Category = "Save|Telemetry")
 	TMap<FName, int32> TelemetryCounters;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Save|Ports")
+	FName LastVisitedPortId = NAME_None;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Save|Ports")
+	TMap<FName, int32> PortVisitCounts;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Save|MissionBoard")
+	TArray<FMissionBoardSelectionEntry> MissionBoardSelectionHistory;
 
 	// Helper functions
 	bool IsIslandDiscovered(FIntPoint ChunkCoord, int32 IslandIndex) const;

@@ -45,6 +45,8 @@ void UWorldStreamingSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 void UWorldStreamingSubsystem::Deinitialize()
 {
 	RegisteredPortPoints.Empty();
+	PortVisitCounts.Empty();
+	LastVisitedPortId = NAME_None;
 	UE_LOG(LogTemp, Log, TEXT("WorldStreamingSubsystem deinitialized."));
 	Super::Deinitialize();
 }
@@ -80,6 +82,30 @@ bool UWorldStreamingSubsystem::GetPortLocation(FName PortId, FVector& OutWorldLo
 		return true;
 	}
 	return false;
+}
+
+void UWorldStreamingSubsystem::MarkPortVisited(FName PortId)
+{
+	if (PortId.IsNone())
+	{
+		return;
+	}
+
+	LastVisitedPortId = PortId;
+	PortVisitCounts.FindOrAdd(PortId) += 1;
+}
+
+void UWorldStreamingSubsystem::SetPortVisitStats(FName InLastVisitedPortId, const TMap<FName, int32>& InPortVisitCounts)
+{
+	LastVisitedPortId = InLastVisitedPortId;
+	PortVisitCounts.Empty();
+	for (const TPair<FName, int32>& Pair : InPortVisitCounts)
+	{
+		if (!Pair.Key.IsNone())
+		{
+			PortVisitCounts.Add(Pair.Key, FMath::Max(0, Pair.Value));
+		}
+	}
 }
 
 void UMissionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
@@ -414,6 +440,33 @@ TArray<FName> UMissionSubsystem::GetCompletedMissionIds() const
 	CompletedMissionIds.GenerateKeyArray(Result);
 	Result.Sort(FNameLexicalLess());
 	return Result;
+}
+
+void UMissionSubsystem::RecordMissionBoardSelection(FName PortId, FName MissionId)
+{
+	if (PortId.IsNone() || MissionId.IsNone())
+	{
+		return;
+	}
+
+	FMissionBoardSelectionEntry Entry;
+	Entry.PortId = PortId;
+	Entry.MissionId = MissionId;
+	Entry.AcceptedTime = FDateTime::UtcNow();
+	MissionBoardSelectionHistory.Add(Entry);
+}
+
+void UMissionSubsystem::SetMissionBoardSelectionHistory(const TArray<FMissionBoardSelectionEntry>& InHistory)
+{
+	MissionBoardSelectionHistory.Empty();
+	for (const FMissionBoardSelectionEntry& Entry : InHistory)
+	{
+		if (Entry.PortId.IsNone() || Entry.MissionId.IsNone())
+		{
+			continue;
+		}
+		MissionBoardSelectionHistory.Add(Entry);
+	}
 }
 
 void UEconomySubsystem::Initialize(FSubsystemCollectionBase& Collection)

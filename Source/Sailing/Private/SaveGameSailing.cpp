@@ -13,6 +13,9 @@ USaveGameSailing::USaveGameSailing()
 	ActiveMissionId = NAME_None;
 	CompletedMissionIds.Empty();
 	TelemetryCounters.Empty();
+	LastVisitedPortId = NAME_None;
+	PortVisitCounts.Empty();
+	MissionBoardSelectionHistory.Empty();
 }
 
 bool USaveGameSailing::IsIslandDiscovered(FIntPoint ChunkCoord, int32 IslandIndex) const
@@ -80,6 +83,29 @@ void USaveGameSailing::EnsureCompatibility()
 	for (TPair<FName, int32>& Pair : TelemetryCounters)
 	{
 		Pair.Value = FMath::Max(0, Pair.Value);
+	}
+	if (LastVisitedPortId.IsNone() && PortVisitCounts.Num() > 0)
+	{
+		for (const TPair<FName, int32>& Pair : PortVisitCounts)
+		{
+			if (!Pair.Key.IsNone() && Pair.Value > 0)
+			{
+				LastVisitedPortId = Pair.Key;
+				break;
+			}
+		}
+	}
+	for (TPair<FName, int32>& Pair : PortVisitCounts)
+	{
+		Pair.Value = FMath::Max(0, Pair.Value);
+	}
+	MissionBoardSelectionHistory.RemoveAll([](const FMissionBoardSelectionEntry& Entry)
+	{
+		return Entry.PortId.IsNone() || Entry.MissionId.IsNone();
+	});
+	if (!LastVisitedPortId.IsNone() && !PortVisitCounts.Contains(LastVisitedPortId))
+	{
+		LastVisitedPortId = NAME_None;
 	}
 	SaveSchemaVersion = CurrentSaveSchemaVersion;
 }

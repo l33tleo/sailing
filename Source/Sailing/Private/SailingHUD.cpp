@@ -119,6 +119,12 @@ bool ASailingHUD::AcceptMissionFromBoard(FName MissionId)
 	const bool bActivated = MissionSubsystem->ActivateMissionFromCandidates({ MissionId }, false);
 	if (bActivated)
 	{
+		MissionSubsystem->RecordMissionBoardSelection(LastMissionBoardPortId, MissionId);
+		if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
+		{
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardSelections"), 1);
+		}
+
 		ShowDiscoveryPopup(FString::Printf(TEXT("Oppdrag valgt: %s"), *MissionId.ToString()));
 		if (ASailingGameMode* GM = Cast<ASailingGameMode>(UGameplayStatics::GetGameMode(GetWorld())))
 		{
@@ -157,7 +163,7 @@ void ASailingHUD::HandleMissionBoardCloseRequest()
 
 void ASailingHUD::PushOverlayData(int32 DiscoveredIslands, int32 Credits, FName ActiveMissionId,
 	const FText& ActiveMissionTitle, float ObjectiveDistanceMeters, int32 BoatConditionPercent,
-	float ObjectiveBearingDegrees)
+	float ObjectiveBearingDegrees, FName LastVisitedPortId)
 {
 	EnsureOverlayWidget();
 	if (!OverlayWidget)
@@ -173,6 +179,7 @@ void ASailingHUD::PushOverlayData(int32 DiscoveredIslands, int32 Credits, FName 
 	OverlayData.ObjectiveDistanceMeters = ObjectiveDistanceMeters;
 	OverlayData.BoatConditionPercent = BoatConditionPercent;
 	OverlayData.ObjectiveBearingDegrees = ObjectiveBearingDegrees;
+	OverlayData.LastVisitedPortId = LastVisitedPortId;
 	OverlayWidget->PushOverlayData(OverlayData);
 }
 
@@ -685,7 +692,7 @@ void ASailingHUD::DrawDiscoveryCounter()
 	float BoxX = 10.0f;
 	float BoxY = 10.0f;
 	float BoxW = 320.0f;
-	float BoxH = 104.0f;
+	float BoxH = 124.0f;
 	DrawRect(FLinearColor(0.0f, 0.05f, 0.15f, 0.7f), BoxX, BoxY, BoxW, BoxH);
 
 	FString CounterText = FString::Printf(TEXT("OYER: %d oppdaget"), SaveGame->TotalIslandsDiscovered);
@@ -698,6 +705,7 @@ void ASailingHUD::DrawDiscoveryCounter()
 	FText ActiveMissionTitle = FText::GetEmpty();
 	float ObjectiveDistanceMeters = -1.0f;
 	float ObjectiveBearingDegrees = -999.0f;
+	FName LastVisitedPortId = NAME_None;
 	if (UGameInstance* GI = GetWorld()->GetGameInstance())
 	{
 		if (UEconomySubsystem* EconomySubsystem = GI->GetSubsystem<UEconomySubsystem>())
@@ -727,6 +735,10 @@ void ASailingHUD::DrawDiscoveryCounter()
 					}
 				}
 			}
+		}
+		if (UWorldStreamingSubsystem* WorldSubsystem = GI->GetSubsystem<UWorldStreamingSubsystem>())
+		{
+			LastVisitedPortId = WorldSubsystem->GetLastVisitedPortId();
 		}
 	}
 
@@ -767,7 +779,14 @@ void ASailingHUD::DrawDiscoveryCounter()
 	const FString ConditionText = FString::Printf(TEXT("SKROGTILSTAND: %d%%"), BoatCondition);
 	DrawText(ConditionText, ConditionColor, BoxX + 10.0f, BoxY + 80.0f, nullptr, 1.0f);
 
-	PushOverlayData(SaveGame->TotalIslandsDiscovered, Credits, ActiveMissionId, ActiveMissionTitle, ObjectiveDistanceMeters, BoatCondition, ObjectiveBearingDegrees);
+	if (!LastVisitedPortId.IsNone())
+	{
+		const FString PortText = FString::Printf(TEXT("SISTE HAVN: %s"), *LastVisitedPortId.ToString());
+		DrawText(PortText, FLinearColor(0.85f, 0.75f, 1.0f, 1.0f), BoxX + 10.0f, BoxY + 98.0f, nullptr, 0.9f);
+	}
+
+	PushOverlayData(SaveGame->TotalIslandsDiscovered, Credits, ActiveMissionId, ActiveMissionTitle,
+		ObjectiveDistanceMeters, BoatCondition, ObjectiveBearingDegrees, LastVisitedPortId);
 }
 
 bool ASailingHUD::PauseMenuButtonHit(float X, float Y, float Bx, float By, float Bw, float Bh) const

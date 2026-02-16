@@ -88,6 +88,7 @@ void ASailingGameMode::BeginPlay()
 			MissionSubsystem->RegisterMissionAsset(StarterDeliveryMission);
 
 			MissionSubsystem->SetCompletedMissionIds(SaveGame ? SaveGame->CompletedMissionIds : TArray<FName>());
+			MissionSubsystem->SetMissionBoardSelectionHistory(SaveGame ? SaveGame->MissionBoardSelectionHistory : TArray<FMissionBoardSelectionEntry>());
 			MissionSubsystem->SetActiveMissionId(SaveGame ? SaveGame->ActiveMissionId : NAME_None);
 			if (MissionSubsystem->GetActiveMissionId().IsNone() && SaveGame)
 			{
@@ -110,6 +111,7 @@ void ASailingGameMode::BeginPlay()
 			{
 				SaveGame->ActiveMissionId = MissionSubsystem->GetActiveMissionId();
 				SaveGame->CompletedMissionIds = MissionSubsystem->GetCompletedMissionIds();
+				SaveGame->MissionBoardSelectionHistory = MissionSubsystem->GetMissionBoardSelectionHistory();
 			}
 
 			UE_LOG(LogTemp, Log, TEXT("SailingGameMode: Aktivt oppdrag '%s'."), *MissionSubsystem->GetActiveMissionId().ToString());
@@ -118,6 +120,13 @@ void ASailingGameMode::BeginPlay()
 		if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
 		{
 			TelemetrySubsystem->SetAllCounters(SaveGame ? SaveGame->TelemetryCounters : TMap<FName, int32>());
+		}
+
+		if (UWorldStreamingSubsystem* WorldStreamingSubsystem = GI->GetSubsystem<UWorldStreamingSubsystem>())
+		{
+			WorldStreamingSubsystem->SetPortVisitStats(
+				SaveGame ? SaveGame->LastVisitedPortId : NAME_None,
+				SaveGame ? SaveGame->PortVisitCounts : TMap<FName, int32>());
 		}
 	}
 
@@ -306,11 +315,18 @@ void ASailingGameMode::SaveGame_()
 			{
 				SaveGame->ActiveMissionId = MissionSubsystem->GetActiveMissionId();
 				SaveGame->CompletedMissionIds = MissionSubsystem->GetCompletedMissionIds();
+				SaveGame->MissionBoardSelectionHistory = MissionSubsystem->GetMissionBoardSelectionHistory();
 			}
 
 			if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
 			{
 				SaveGame->TelemetryCounters = TelemetrySubsystem->GetAllCounters();
+			}
+
+			if (UWorldStreamingSubsystem* WorldStreamingSubsystem = GI->GetSubsystem<UWorldStreamingSubsystem>())
+			{
+				SaveGame->LastVisitedPortId = WorldStreamingSubsystem->GetLastVisitedPortId();
+				SaveGame->PortVisitCounts = WorldStreamingSubsystem->GetPortVisitCounts();
 			}
 		}
 

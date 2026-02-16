@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
+#include "Data/SailingProgressionTypes.h"
 #include "SailingCoreSubsystems.generated.h"
 
 class UBoatUpgradeDataAsset;
@@ -77,12 +78,30 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Sailing|World")
 	bool GetPortLocation(FName PortId, FVector& OutWorldLocation) const;
 
+	UFUNCTION(BlueprintCallable, Category = "Sailing|World")
+	void MarkPortVisited(FName PortId);
+
+	UFUNCTION(BlueprintPure, Category = "Sailing|World")
+	FName GetLastVisitedPortId() const { return LastVisitedPortId; }
+
+	UFUNCTION(BlueprintPure, Category = "Sailing|World")
+	TMap<FName, int32> GetPortVisitCounts() const { return PortVisitCounts; }
+
+	UFUNCTION(BlueprintCallable, Category = "Sailing|World")
+	void SetPortVisitStats(FName InLastVisitedPortId, const TMap<FName, int32>& InPortVisitCounts);
+
 private:
 	UPROPERTY(EditAnywhere, Category = "Sailing|World")
 	int32 TargetActiveChunkRadius = 3;
 
 	UPROPERTY()
 	TMap<FName, FVector> RegisteredPortPoints;
+
+	UPROPERTY()
+	FName LastVisitedPortId = NAME_None;
+
+	UPROPERTY()
+	TMap<FName, int32> PortVisitCounts;
 };
 
 UCLASS()
@@ -145,6 +164,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Sailing|Mission")
 	TArray<FName> GetCompletedMissionIds() const;
 
+	UFUNCTION(BlueprintCallable, Category = "Sailing|MissionBoard")
+	void RecordMissionBoardSelection(FName PortId, FName MissionId);
+
+	UFUNCTION(BlueprintPure, Category = "Sailing|MissionBoard")
+	TArray<FMissionBoardSelectionEntry> GetMissionBoardSelectionHistory() const { return MissionBoardSelectionHistory; }
+
+	UFUNCTION(BlueprintCallable, Category = "Sailing|MissionBoard")
+	void SetMissionBoardSelectionHistory(const TArray<FMissionBoardSelectionEntry>& InHistory);
+
 private:
 	UPROPERTY()
 	FName ActiveMissionId = NAME_None;
@@ -154,6 +182,9 @@ private:
 
 	UPROPERTY()
 	TSet<FName> CompletedMissionIds;
+
+	UPROPERTY()
+	TArray<FMissionBoardSelectionEntry> MissionBoardSelectionHistory;
 
 	UPROPERTY(EditAnywhere, Category = "Sailing|Mission")
 	FName MissionAssetPath = TEXT("/Game");

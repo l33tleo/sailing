@@ -56,9 +56,18 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 	FName CurrentMissionId = NAME_None;
 	if (UGameInstance* GI = GetGameInstance())
 	{
+		if (UWorldStreamingSubsystem* WorldSubsystem = GI->GetSubsystem<UWorldStreamingSubsystem>())
+		{
+			WorldSubsystem->MarkPortVisited(PortId);
+		}
+
 		if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
 		{
 			TelemetrySubsystem->RecordCounterEvent(TEXT("PortVisits"), 1);
+			if (!PortId.IsNone())
+			{
+				TelemetrySubsystem->RecordCounterEvent(FName(*FString::Printf(TEXT("PortVisit_%s"), *PortId.ToString())), 1);
+			}
 		}
 
 		const bool bCanGrantBonus = (!bVisitedInSession || !bGrantOneTimeDockBonus) && DockBonusCredits > 0;

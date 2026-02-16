@@ -166,6 +166,14 @@ bool FSailingWorldPortRegistryTest::RunTest(const FString& Parameters)
 	const bool bHasPortA = WorldSubsystem->GetPortLocation(TEXT("Port_A"), PortLocation);
 	TestTrue(TEXT("Port_A should be queryable"), bHasPortA);
 	TestEqual(TEXT("Port_A location should match registered value"), PortLocation, FVector(100.0f, 200.0f, 300.0f));
+
+	WorldSubsystem->MarkPortVisited(TEXT("Port_A"));
+	WorldSubsystem->MarkPortVisited(TEXT("Port_A"));
+	WorldSubsystem->MarkPortVisited(TEXT("Port_B"));
+	TestEqual(TEXT("Last visited port should update"), WorldSubsystem->GetLastVisitedPortId(), FName(TEXT("Port_B")));
+	const TMap<FName, int32> VisitCounts = WorldSubsystem->GetPortVisitCounts();
+	TestEqual(TEXT("Port_A should have two visits"), VisitCounts.FindRef(TEXT("Port_A")), 2);
+	TestEqual(TEXT("Port_B should have one visit"), VisitCounts.FindRef(TEXT("Port_B")), 1);
 	return true;
 }
 
@@ -278,6 +286,11 @@ bool FSailingMissionDisplayNameLookupTest::RunTest(const FString& Parameters)
 
 	const FText FallbackTitle = MissionSubsystem->GetMissionDisplayNameById(TEXT("UnknownMission"));
 	TestEqual(TEXT("Unknown mission should fallback to mission id text"), FallbackTitle.ToString(), FString(TEXT("UnknownMission")));
+
+	MissionSubsystem->RecordMissionBoardSelection(TEXT("HavnNord"), Mission->MissionId);
+	const TArray<FMissionBoardSelectionEntry> History = MissionSubsystem->GetMissionBoardSelectionHistory();
+	TestEqual(TEXT("Mission board history should contain selection"), History.Num(), 1);
+	TestEqual(TEXT("History entry should include port id"), History[0].PortId, FName(TEXT("HavnNord")));
 
 	return true;
 }
