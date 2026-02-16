@@ -268,6 +268,41 @@ void ASailingHUD::DrawCompass()
 				WindColor, 2.0f);
 		}
 	}
+
+	// Mission objective marker on compass ring (distinct from wind arrow)
+	if (UGameInstance* GI = GetWorld()->GetGameInstance())
+	{
+		if (UMissionSubsystem* MissionSubsystem = GI->GetSubsystem<UMissionSubsystem>())
+		{
+			FVector ObjectiveLocation = FVector::ZeroVector;
+			if (MissionSubsystem->GetActiveMissionObjectiveLocation(ObjectiveLocation))
+			{
+				const FVector ToObjective = ObjectiveLocation - Pawn->GetActorLocation();
+				const FVector ToObjectiveFlat(ToObjective.X, ToObjective.Y, 0.0f);
+				if (!ToObjectiveFlat.IsNearlyZero())
+				{
+					const FVector BoatFwd = Pawn->GetActorForwardVector();
+					const float ObjectiveAngle = FMath::Atan2(ToObjectiveFlat.Y, ToObjectiveFlat.X) - FMath::Atan2(BoatFwd.Y, BoatFwd.X) - PI * 0.5f;
+
+					const FLinearColor MissionColor(1.0f, 0.3f, 0.85f, 1.0f);
+					const float MarkerRadius = Radius + 2.0f;
+					const float MarkerX = CenterX + FMath::Cos(ObjectiveAngle) * MarkerRadius;
+					const float MarkerY = CenterY + FMath::Sin(ObjectiveAngle) * MarkerRadius;
+					const float MarkerSize = 7.0f;
+
+					// Diamond marker
+					DrawLine(MarkerX, MarkerY - MarkerSize, MarkerX + MarkerSize, MarkerY, MissionColor, 2.0f);
+					DrawLine(MarkerX + MarkerSize, MarkerY, MarkerX, MarkerY + MarkerSize, MissionColor, 2.0f);
+					DrawLine(MarkerX, MarkerY + MarkerSize, MarkerX - MarkerSize, MarkerY, MissionColor, 2.0f);
+					DrawLine(MarkerX - MarkerSize, MarkerY, MarkerX, MarkerY - MarkerSize, MissionColor, 2.0f);
+
+					const float DistanceMeters = ToObjectiveFlat.Size() * 0.01f;
+					const FString ObjectiveText = FString::Printf(TEXT("MAL %.0fm"), DistanceMeters);
+					DrawText(ObjectiveText, MissionColor, MarkerX + 10.0f, MarkerY - 8.0f, nullptr, 0.8f);
+				}
+			}
+		}
+	}
 }
 
 void ASailingHUD::DrawWindAndSpeed()
