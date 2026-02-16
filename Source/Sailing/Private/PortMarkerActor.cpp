@@ -106,13 +106,15 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 
 	bVisitedInSession = true;
 
+	const FString PortNameText = PortDisplayName.IsEmpty() ? PortId.ToString() : PortDisplayName.ToString();
+
 	if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
 	{
 		if (ASailingHUD* HUD = Cast<ASailingHUD>(PC->GetHUD()))
 		{
 			FString PopupText = GrantedCredits > 0
-				? FString::Printf(TEXT("%s: Havnebonus +%d%s"), *PortId.ToString(), GrantedCredits, bBoatRepaired ? TEXT(" | Båt reparert") : TEXT(""))
-				: FString::Printf(TEXT("%s: Havn anløpt%s"), *PortId.ToString(), bBoatRepaired ? TEXT(" | Båt reparert") : TEXT(""));
+				? FString::Printf(TEXT("%s: Havnebonus +%d%s"), *PortNameText, GrantedCredits, bBoatRepaired ? TEXT(" | Båt reparert") : TEXT(""))
+				: FString::Printf(TEXT("%s: Havn anløpt%s"), *PortNameText, bBoatRepaired ? TEXT(" | Båt reparert") : TEXT(""));
 
 			if (bMissionUpdated && !NewMissionId.IsNone())
 			{

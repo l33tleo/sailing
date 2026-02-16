@@ -212,6 +212,7 @@ void ASailingGameMode::BeginPlay()
 				}
 
 				PortMarker->PortId = PortData->PortId;
+				PortMarker->PortDisplayName = PortData->DisplayName;
 				PortMarker->DockBonusCredits = PortData->DockBonusCredits;
 				PortMarker->bGrantOneTimeDockBonus = PortData->bGrantOneTimeDockBonus;
 				PortMarker->bAutoRepairAtPort = PortData->bAutoRepairAtPort;
