@@ -94,30 +94,40 @@ void ASailingGameMode::BeginPlay()
 				return RuntimeFallbackUpgrade;
 			};
 
-			EnsureUpgrade(
+			int32 MissingBootstrapUpgrades = 0;
+			MissingBootstrapUpgrades += EnsureUpgrade(
 				TEXT("SkrogTrimV1"),
 				450,
 				1.06f,
 				0.96f,
 				1.0f,
 				TEXT("Skrogtrim V1"),
-				TEXT("Lett skrogtrim som reduserer motstand i moderate hastigheter."));
-			EnsureUpgrade(
+				TEXT("Lett skrogtrim som reduserer motstand i moderate hastigheter.")) ? 0 : 1;
+			MissingBootstrapUpgrades += EnsureUpgrade(
 				TEXT("RorResponsV1"),
 				600,
 				1.0f,
 				1.0f,
 				1.15f,
 				TEXT("Rorrespons V1"),
-				TEXT("Forbedret rorutslag for raskere vending i trange farvann."));
-			EnsureUpgrade(
+				TEXT("Forbedret rorutslag for raskere vending i trange farvann.")) ? 0 : 1;
+			MissingBootstrapUpgrades += EnsureUpgrade(
 				TEXT("RiggeffektivitetV1"),
 				850,
 				1.1f,
 				0.94f,
 				1.05f,
 				TEXT("Riggeffektivitet V1"),
-				TEXT("Optimaliserte seiltrimlinjer for bedre fremdrift i kryss."));
+				TEXT("Optimaliserte seiltrimlinjer for bedre fremdrift i kryss.")) ? 0 : 1;
+
+			if (MissingBootstrapUpgrades > 0)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("SailingGameMode: %d bootstrap-oppgraderinger mangler."), MissingBootstrapUpgrades);
+				if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
+				{
+					TelemetrySubsystem->RecordCounterEvent(TEXT("MissingBootstrapUpgradeContent"), MissingBootstrapUpgrades);
+				}
+			}
 
 			EconomySubsystem->SetCredits(SaveGame ? SaveGame->PlayerCredits : 0);
 			EconomySubsystem->SetBoatConditionPercent(SaveGame ? SaveGame->BoatConditionPercent : 100);
@@ -153,7 +163,7 @@ void ASailingGameMode::BeginPlay()
 				return RuntimeFallbackMission;
 			};
 
-			EnsureMission(DiscoveryMissionId, [DeliveryMissionId](USailingMissionDataAsset* Mission)
+			const USailingMissionDataAsset* BootstrapDiscoveryMission = EnsureMission(DiscoveryMissionId, [DeliveryMissionId](USailingMissionDataAsset* Mission)
 			{
 				Mission->DisplayName = FText::FromString(TEXT("Oppdag første øy"));
 				Mission->Description = FText::FromString(TEXT("Seil ut og oppdag din første øy."));
@@ -163,7 +173,7 @@ void ASailingGameMode::BeginPlay()
 				Mission->NextMissionId = DeliveryMissionId;
 			});
 
-			EnsureMission(DeliveryMissionId, [DeliveryObjectiveLocation](USailingMissionDataAsset* Mission)
+			const USailingMissionDataAsset* BootstrapDeliveryMission = EnsureMission(DeliveryMissionId, [DeliveryObjectiveLocation](USailingMissionDataAsset* Mission)
 			{
 				Mission->DisplayName = FText::FromString(TEXT("Levering til bøye"));
 				Mission->Description = FText::FromString(TEXT("Seil til leveringsbøyen og fullfør leveransen."));
@@ -176,18 +186,50 @@ void ASailingGameMode::BeginPlay()
 				Mission->bRepeatable = true;
 			});
 
+			const int32 MissingBootstrapMissions =
+				(BootstrapDiscoveryMission ? 0 : 1) +
+				(BootstrapDeliveryMission ? 0 : 1);
+			if (MissingBootstrapMissions > 0)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("SailingGameMode: %d bootstrap-oppdrag mangler."), MissingBootstrapMissions);
+				if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
+				{
+					TelemetrySubsystem->RecordCounterEvent(TEXT("MissingBootstrapMissionContent"), MissingBootstrapMissions);
+				}
+			}
+
 			MissionSubsystem->SetCompletedMissionIds(SaveGame ? SaveGame->CompletedMissionIds : TArray<FName>());
 			MissionSubsystem->SetMissionBoardSelectionHistory(SaveGame ? SaveGame->MissionBoardSelectionHistory : TArray<FMissionBoardSelectionEntry>());
 			MissionSubsystem->SetActiveMissionId(SaveGame ? SaveGame->ActiveMissionId : NAME_None);
 			if (MissionSubsystem->GetActiveMissionId().IsNone() && SaveGame)
 			{
+				TArray<FName> BootstrapCandidates;
 				if (SaveGame->TotalIslandsDiscovered == 0)
 				{
-					MissionSubsystem->ActivateMissionFromCandidates({ DiscoveryMissionId }, false);
+					if (BootstrapDiscoveryMission)
+					{
+						BootstrapCandidates.Add(DiscoveryMissionId);
+					}
+					if (BootstrapDeliveryMission)
+					{
+						BootstrapCandidates.Add(DeliveryMissionId);
+					}
 				}
 				else
 				{
-					MissionSubsystem->ActivateMissionFromCandidates({ DeliveryMissionId }, false);
+					if (BootstrapDeliveryMission)
+					{
+						BootstrapCandidates.Add(DeliveryMissionId);
+					}
+					if (BootstrapDiscoveryMission)
+					{
+						BootstrapCandidates.Add(DiscoveryMissionId);
+					}
+				}
+
+				if (BootstrapCandidates.Num() > 0)
+				{
+					MissionSubsystem->ActivateMissionFromCandidates(BootstrapCandidates, false);
 				}
 			}
 
