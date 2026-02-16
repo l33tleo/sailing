@@ -267,6 +267,10 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 
 	if (ASailingGameMode* GM = Cast<ASailingGameMode>(UGameplayStatics::GetGameMode(this)))
 	{
+		if (bMissionUpdated)
+		{
+			GM->SyncActiveMissionObjectiveMarker();
+		}
 		GM->SaveGame_();
 	}
 }
