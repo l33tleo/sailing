@@ -56,17 +56,18 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 	float MissionBoardCooldownRemaining = 0.0f;
 	FName NewMissionId = NAME_None;
 	FName CurrentMissionId = NAME_None;
-	TArray<FName> EffectiveOfferedMissionIds = OfferedMissionIds;
-	if (MaxOfferedMissionsAtBoard > 0 && EffectiveOfferedMissionIds.Num() > MaxOfferedMissionsAtBoard)
-	{
-		EffectiveOfferedMissionIds.SetNum(MaxOfferedMissionsAtBoard);
-	}
+	int32 PortVisitCount = 0;
+	TArray<FName> EffectiveOfferedMissionIds;
 	if (UGameInstance* GI = GetGameInstance())
 	{
 		if (UWorldStreamingSubsystem* WorldSubsystem = GI->GetSubsystem<UWorldStreamingSubsystem>())
 		{
 			WorldSubsystem->MarkPortVisited(PortId);
+			PortVisitCount = WorldSubsystem->GetPortVisitCounts().FindRef(PortId);
 		}
+
+		EffectiveOfferedMissionIds = UPortDataAsset::BuildPrioritizedMissionIds(
+			WeightedOfferedMissions, OfferedMissionIds, PortVisitCount, MaxOfferedMissionsAtBoard);
 
 		if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
 		{
@@ -138,6 +139,11 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 				CurrentMissionId = MissionSubsystem->GetActiveMissionId();
 			}
 		}
+	}
+	else
+	{
+		EffectiveOfferedMissionIds = UPortDataAsset::BuildPrioritizedMissionIds(
+			WeightedOfferedMissions, OfferedMissionIds, PortVisitCount, MaxOfferedMissionsAtBoard);
 	}
 
 	bVisitedInSession = true;

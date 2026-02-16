@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Data/PortDataAsset.h"
 #include "GameFramework/Actor.h"
 #include "PortMarkerActor.generated.h"
 
@@ -55,6 +56,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Port|MissionBoard")
 	TArray<FName> OfferedMissionIds;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Port|MissionBoard")
+	TArray<FPortMissionWeightedOffer> WeightedOfferedMissions;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Port|MissionBoard", meta = (ClampMin = "0", ClampMax = "10"))
 	int32 MaxOfferedMissionsAtBoard = 3;

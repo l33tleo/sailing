@@ -217,6 +217,17 @@ void ASailingGameMode::BeginPlay()
 				PortNord->WorldLocation = FVector(2000.0f, -6000.0f, 100.0f);
 				PortNord->bRestrictToOfferedMissions = true;
 				PortNord->OfferedMissionIds = { TEXT("LeveringTilBoye"), TEXT("OppdagForsteOy") };
+				{
+					FPortMissionWeightedOffer WeightedDeliveryOffer;
+					WeightedDeliveryOffer.MissionId = TEXT("LeveringTilBoye");
+					WeightedDeliveryOffer.PriorityWeight = 2.0f;
+					PortNord->WeightedOfferedMissions.Add(WeightedDeliveryOffer);
+
+					FPortMissionWeightedOffer WeightedDiscoveryOffer;
+					WeightedDiscoveryOffer.MissionId = TEXT("OppdagForsteOy");
+					WeightedDiscoveryOffer.PriorityWeight = 1.0f;
+					PortNord->WeightedOfferedMissions.Add(WeightedDiscoveryOffer);
+				}
 				PortNord->bCycleMissionOnDock = true;
 				PortNord->MissionBoardCooldownSeconds = 12.0f;
 				PortDefinitions.Add(PortNord);
@@ -227,6 +238,12 @@ void ASailingGameMode::BeginPlay()
 				PortVest->WorldLocation = FVector(-7000.0f, 1500.0f, 100.0f);
 				PortVest->bRestrictToOfferedMissions = true;
 				PortVest->OfferedMissionIds = { TEXT("LeveringTilBoye") };
+				{
+					FPortMissionWeightedOffer WeightedDeliveryOffer;
+					WeightedDeliveryOffer.MissionId = TEXT("LeveringTilBoye");
+					WeightedDeliveryOffer.PriorityWeight = 1.5f;
+					PortVest->WeightedOfferedMissions.Add(WeightedDeliveryOffer);
+				}
 				PortVest->bCycleMissionOnDock = true;
 				PortVest->MissionBoardCooldownSeconds = 12.0f;
 				PortDefinitions.Add(PortVest);
@@ -237,6 +254,13 @@ void ASailingGameMode::BeginPlay()
 				PortSor->WorldLocation = FVector(8500.0f, 4500.0f, 100.0f);
 				PortSor->bRestrictToOfferedMissions = true;
 				PortSor->OfferedMissionIds = { TEXT("LeveringTilBoye") };
+				{
+					FPortMissionWeightedOffer WeightedDeliveryOffer;
+					WeightedDeliveryOffer.MissionId = TEXT("LeveringTilBoye");
+					WeightedDeliveryOffer.PriorityWeight = 1.0f;
+					WeightedDeliveryOffer.MinPortVisits = 1;
+					PortSor->WeightedOfferedMissions.Add(WeightedDeliveryOffer);
+				}
 				PortSor->bCycleMissionOnDock = true;
 				PortSor->MissionBoardCooldownSeconds = 12.0f;
 				PortDefinitions.Add(PortSor);
@@ -261,6 +285,7 @@ void ASailingGameMode::BeginPlay()
 				PortMarker->bCycleMissionOnDock = PortData->bCycleMissionOnDock;
 				PortMarker->bRestrictToOfferedMissions = PortData->bRestrictToOfferedMissions;
 				PortMarker->OfferedMissionIds = PortData->OfferedMissionIds;
+				PortMarker->WeightedOfferedMissions = PortData->WeightedOfferedMissions;
 				PortMarker->MaxOfferedMissionsAtBoard = PortData->MaxOfferedMissionsAtBoard;
 				PortMarker->MissionBoardCooldownSeconds = PortData->MissionBoardCooldownSeconds;
 

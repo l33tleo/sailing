@@ -4,6 +4,7 @@
 #include "SaveGameSailing.h"
 #include "Systems/SailingCoreSubsystems.h"
 #include "Data/BoatUpgradeDataAsset.h"
+#include "Data/PortDataAsset.h"
 #include "Data/SailingMissionDataAsset.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
@@ -287,6 +288,52 @@ bool FSailingMissionCandidateSelectionTest::RunTest(const FString& Parameters)
 		{ MissionA->MissionId, MissionB->MissionId }, true);
 	TestTrue(TEXT("Candidate activation should succeed"), bActivated);
 	TestEqual(TEXT("Candidate selector should skip completed non-repeatable mission"), MissionSubsystem->GetActiveMissionId(), MissionB->MissionId);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSailingPortWeightedOffersTest,
+	"Sailing.Progression.Port.WeightedOfferPrioritization",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSailingPortWeightedOffersTest::RunTest(const FString& Parameters)
+{
+	TArray<FPortMissionWeightedOffer> WeightedOffers;
+
+	FPortMissionWeightedOffer OfferHigh;
+	OfferHigh.MissionId = TEXT("Mission_A");
+	OfferHigh.PriorityWeight = 3.0f;
+	WeightedOffers.Add(OfferHigh);
+
+	FPortMissionWeightedOffer OfferGated;
+	OfferGated.MissionId = TEXT("Mission_B");
+	OfferGated.PriorityWeight = 2.0f;
+	OfferGated.MinPortVisits = 2;
+	WeightedOffers.Add(OfferGated);
+
+	FPortMissionWeightedOffer OfferLow;
+	OfferLow.MissionId = TEXT("Mission_C");
+	OfferLow.PriorityWeight = 1.0f;
+	WeightedOffers.Add(OfferLow);
+
+	const TArray<FName> PrioritizedAtOneVisit = UPortDataAsset::BuildPrioritizedMissionIds(
+		WeightedOffers, { TEXT("Fallback_1") }, 1, 3);
+	TestEqual(TEXT("Only ungated weighted offers should appear"), PrioritizedAtOneVisit.Num(), 2);
+	TestEqual(TEXT("Highest weight should come first"), PrioritizedAtOneVisit[0], FName(TEXT("Mission_A")));
+	TestEqual(TEXT("Lower weight should come after"), PrioritizedAtOneVisit[1], FName(TEXT("Mission_C")));
+
+	const TArray<FName> PrioritizedAtThreeVisits = UPortDataAsset::BuildPrioritizedMissionIds(
+		WeightedOffers, { TEXT("Fallback_1") }, 3, 2);
+	TestEqual(TEXT("Max offer limit should trim result"), PrioritizedAtThreeVisits.Num(), 2);
+	TestEqual(TEXT("Top priority mission should remain first"), PrioritizedAtThreeVisits[0], FName(TEXT("Mission_A")));
+	TestEqual(TEXT("Second priority mission should be included once gate opens"), PrioritizedAtThreeVisits[1], FName(TEXT("Mission_B")));
+
+	const TArray<FName> FallbackOnly = UPortDataAsset::BuildPrioritizedMissionIds(
+		{}, { TEXT("Fallback_1"), TEXT("Fallback_1"), TEXT("Fallback_2") }, 0, 0);
+	TestEqual(TEXT("Fallback list should deduplicate mission ids"), FallbackOnly.Num(), 2);
+	TestEqual(TEXT("Fallback should preserve first unique order"), FallbackOnly[0], FName(TEXT("Fallback_1")));
+	TestEqual(TEXT("Fallback should include subsequent unique ids"), FallbackOnly[1], FName(TEXT("Fallback_2")));
+
 	return true;
 }
 
