@@ -16,7 +16,7 @@ void UPortMissionBoardWidget::RequestAcceptMission(FName MissionId)
 		{
 			OnActionBlocked.Broadcast(
 				EPortBoardActionType::MissionAccept,
-				ToBoardBlockedReason(BlockReason),
+				ToBoardBlockedReasonFromMissionOffer(BlockReason),
 				BlockedReasonText);
 		}
 		return;
@@ -468,7 +468,7 @@ FText UPortMissionBoardWidget::BuildMissionOfferActionBlockReasonSummaryLabel(
 	}
 }
 
-EPortBoardActionBlockedReason UPortMissionBoardWidget::ToBoardBlockedReason(EPortMissionOfferActionBlockReason BlockReason)
+EPortBoardActionBlockedReason UPortMissionBoardWidget::ToBoardBlockedReasonFromMissionOffer(EPortMissionOfferActionBlockReason BlockReason)
 {
 	switch (BlockReason)
 	{
@@ -613,7 +613,7 @@ FText UPortMissionBoardWidget::BuildUpgradeOfferActionBlockReasonSummaryLabel(
 	}
 }
 
-EPortBoardActionBlockedReason UPortMissionBoardWidget::ToBoardBlockedReason(EPortUpgradeOfferActionBlockReason BlockReason)
+EPortBoardActionBlockedReason UPortMissionBoardWidget::ToBoardBlockedReasonFromUpgradeOffer(EPortUpgradeOfferActionBlockReason BlockReason)
 {
 	switch (BlockReason)
 	{
@@ -690,7 +690,7 @@ FText UPortMissionBoardWidget::BuildRepairActionBlockReasonText(
 	}
 }
 
-EPortBoardActionBlockedReason UPortMissionBoardWidget::ToBoardBlockedReason(EPortRepairActionBlockReason BlockReason)
+EPortBoardActionBlockedReason UPortMissionBoardWidget::ToBoardBlockedReasonFromRepair(EPortRepairActionBlockReason BlockReason)
 {
 	switch (BlockReason)
 	{
@@ -765,7 +765,7 @@ FText UPortMissionBoardWidget::BuildManualRefreshActionBlockReasonText(
 	}
 }
 
-EPortBoardActionBlockedReason UPortMissionBoardWidget::ToBoardBlockedReason(EPortManualRefreshActionBlockReason BlockReason)
+EPortBoardActionBlockedReason UPortMissionBoardWidget::ToBoardBlockedReasonFromManualRefresh(EPortManualRefreshActionBlockReason BlockReason)
 {
 	switch (BlockReason)
 	{
@@ -1012,7 +1012,7 @@ void UPortMissionBoardWidget::RequestRefreshBoard()
 		{
 			OnActionBlocked.Broadcast(
 				EPortBoardActionType::ManualRefresh,
-				ToBoardBlockedReason(BlockReason),
+				ToBoardBlockedReasonFromManualRefresh(BlockReason),
 				BlockedReasonText);
 		}
 		return;
@@ -1031,7 +1031,7 @@ void UPortMissionBoardWidget::RequestRepairService()
 		{
 			OnActionBlocked.Broadcast(
 				EPortBoardActionType::RepairService,
-				ToBoardBlockedReason(BlockReason),
+				ToBoardBlockedReasonFromRepair(BlockReason),
 				BlockedReasonText);
 		}
 		return;
@@ -1050,7 +1050,7 @@ void UPortMissionBoardWidget::RequestPurchaseUpgrade(FName UpgradeId)
 		{
 			OnActionBlocked.Broadcast(
 				EPortBoardActionType::UpgradePurchase,
-				ToBoardBlockedReason(BlockReason),
+				ToBoardBlockedReasonFromUpgradeOffer(BlockReason),
 				BlockedReasonText);
 		}
 		return;

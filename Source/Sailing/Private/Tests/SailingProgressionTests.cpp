@@ -818,7 +818,7 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 		UPortMissionBoardWidget::DetermineMissionOfferActionBlockReason(MissionBoardData, TEXT("Mission_A")),
 		EPortMissionOfferActionBlockReason::AlreadyActiveMission);
 	TestEqual(TEXT("Mission block reason mapping should translate already-active state"),
-		UPortMissionBoardWidget::ToBoardBlockedReason(EPortMissionOfferActionBlockReason::AlreadyActiveMission),
+		UPortMissionBoardWidget::ToBoardBlockedReasonFromMissionOffer(EPortMissionOfferActionBlockReason::AlreadyActiveMission),
 		EPortBoardActionBlockedReason::MissionAlreadyActive);
 	TestEqual(TEXT("Mission accept helper should explain already-active rejection"),
 		BlockedReason.ToString(),
@@ -883,7 +883,7 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 		UPortMissionBoardWidget::DetermineUpgradeOfferActionBlockReason(UpgradeBoardData, UpgradeOffer.UpgradeId),
 		EPortUpgradeOfferActionBlockReason::InsufficientCredits);
 	TestEqual(TEXT("Upgrade block reason mapping should translate insufficient credits"),
-		UPortMissionBoardWidget::ToBoardBlockedReason(EPortUpgradeOfferActionBlockReason::InsufficientCredits),
+		UPortMissionBoardWidget::ToBoardBlockedReasonFromUpgradeOffer(EPortUpgradeOfferActionBlockReason::InsufficientCredits),
 		EPortBoardActionBlockedReason::UpgradeNoCredits);
 	TestEqual(TEXT("Upgrade helper should explain unaffordable rejection"),
 		BlockedReason.ToString(),
@@ -928,7 +928,7 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 		UPortMissionBoardWidget::DetermineRepairActionBlockReason(RepairBoardData),
 		EPortRepairActionBlockReason::InsufficientCredits);
 	TestEqual(TEXT("Repair block reason mapping should translate insufficient credits"),
-		UPortMissionBoardWidget::ToBoardBlockedReason(EPortRepairActionBlockReason::InsufficientCredits),
+		UPortMissionBoardWidget::ToBoardBlockedReasonFromRepair(EPortRepairActionBlockReason::InsufficientCredits),
 		EPortBoardActionBlockedReason::RepairNoCredits);
 	TestEqual(TEXT("Repair helper should explain unaffordable repair"),
 		BlockedReason.ToString(),
@@ -976,7 +976,7 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 		UPortMissionBoardWidget::DetermineManualRefreshActionBlockReason(RefreshBoardData),
 		EPortManualRefreshActionBlockReason::ManualRefreshCooldown);
 	TestEqual(TEXT("Manual refresh block reason mapping should translate cooldown"),
-		UPortMissionBoardWidget::ToBoardBlockedReason(EPortManualRefreshActionBlockReason::ManualRefreshCooldown),
+		UPortMissionBoardWidget::ToBoardBlockedReasonFromManualRefresh(EPortManualRefreshActionBlockReason::ManualRefreshCooldown),
 		EPortBoardActionBlockedReason::ManualRefreshCooldown);
 	TestEqual(TEXT("Manual refresh helper should expose cooldown reason"),
 		BlockedReason.ToString(),
