@@ -6,6 +6,7 @@
 
 class USaveGameSailing;
 class AChunkManager;
+class AMissionObjectiveActor;
 
 UCLASS()
 class SAILING_API ASailingGameMode : public AGameModeBase
@@ -38,6 +39,9 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<AActor> SpawnedOcean;
+
+	UPROPERTY()
+	TObjectPtr<AMissionObjectiveActor> SpawnedMissionObjective;
 
 	UPROPERTY()
 	TObjectPtr<USaveGameSailing> SaveGame;

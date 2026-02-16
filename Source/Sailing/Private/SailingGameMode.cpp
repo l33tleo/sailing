@@ -6,6 +6,7 @@
 #include "WindActor.h"
 #include "ChunkManager.h"
 #include "OceanPlaneActor.h"
+#include "MissionObjectiveActor.h"
 #include "Data/SailingMissionDataAsset.h"
 #include "SaveGameSailing.h"
 #include "Systems/SailingCoreSubsystems.h"
@@ -22,6 +23,8 @@ ASailingGameMode::ASailingGameMode()
 void ASailingGameMode::BeginPlay()
 {
 	Super::BeginPlay();
+
+	const FVector DeliveryObjectiveLocation(6500.0f, -2500.0f, 120.0f);
 
 	USailingGameInstance* GI = Cast<USailingGameInstance>(GetGameInstance());
 	if (GI && GI->bRequestNewGame)
@@ -56,22 +59,47 @@ void ASailingGameMode::BeginPlay()
 
 		if (UMissionSubsystem* MissionSubsystem = GI->GetSubsystem<UMissionSubsystem>())
 		{
-			MissionSubsystem->SetActiveMissionId(SaveGame ? SaveGame->ActiveMissionId : NAME_None);
+			USailingMissionDataAsset* StarterDiscoveryMission = NewObject<USailingMissionDataAsset>(this);
+			StarterDiscoveryMission->MissionId = TEXT("OppdagForsteOy");
+			StarterDiscoveryMission->DisplayName = FText::FromString(TEXT("Oppdag første øy"));
+			StarterDiscoveryMission->Description = FText::FromString(TEXT("Seil ut og oppdag din første øy."));
+			StarterDiscoveryMission->MissionType = ESailingMissionType::NavigationChallenge;
+			StarterDiscoveryMission->RewardCredits = 250;
+			StarterDiscoveryMission->bRepeatable = false;
+			MissionSubsystem->RegisterMissionAsset(StarterDiscoveryMission);
 
-			if (MissionSubsystem->GetActiveMissionId().IsNone() &&
-				SaveGame && SaveGame->TotalIslandsDiscovered == 0)
+			USailingMissionDataAsset* StarterDeliveryMission = NewObject<USailingMissionDataAsset>(this);
+			StarterDeliveryMission->MissionId = TEXT("LeveringTilBoye");
+			StarterDeliveryMission->DisplayName = FText::FromString(TEXT("Levering til bøye"));
+			StarterDeliveryMission->Description = FText::FromString(TEXT("Seil til leveringsbøyen og fullfør leveransen."));
+			StarterDeliveryMission->MissionType = ESailingMissionType::Delivery;
+			StarterDeliveryMission->RewardCredits = 400;
+			StarterDeliveryMission->StartWorldLocation = FVector::ZeroVector;
+			StarterDeliveryMission->EndWorldLocation = DeliveryObjectiveLocation;
+			StarterDeliveryMission->bRequireLocationMatch = true;
+			StarterDeliveryMission->CompletionRadius = 1200.0f;
+			StarterDeliveryMission->bRepeatable = true;
+			MissionSubsystem->RegisterMissionAsset(StarterDeliveryMission);
+
+			MissionSubsystem->SetActiveMissionId(SaveGame ? SaveGame->ActiveMissionId : NAME_None);
+			if (MissionSubsystem->GetActiveMissionId().IsNone() && SaveGame)
 			{
-				USailingMissionDataAsset* StarterMission = NewObject<USailingMissionDataAsset>(this);
-				StarterMission->MissionId = TEXT("OppdagForsteOy");
-				StarterMission->DisplayName = FText::FromString(TEXT("Oppdag første øy"));
-				StarterMission->Description = FText::FromString(TEXT("Seil ut og oppdag din første øy."));
-				StarterMission->MissionType = ESailingMissionType::NavigationChallenge;
-				StarterMission->RewardCredits = 250;
-				StarterMission->bRepeatable = false;
-				MissionSubsystem->ActivateMissionAsset(StarterMission);
-				SaveGame->ActiveMissionId = StarterMission->MissionId;
-				UE_LOG(LogTemp, Log, TEXT("SailingGameMode: Aktivert startoppdrag '%s'."), *StarterMission->MissionId.ToString());
+				if (SaveGame->TotalIslandsDiscovered == 0)
+				{
+					MissionSubsystem->ActivateMissionAsset(StarterDiscoveryMission);
+				}
+				else
+				{
+					MissionSubsystem->ActivateMissionAsset(StarterDeliveryMission);
+				}
 			}
+
+			if (SaveGame)
+			{
+				SaveGame->ActiveMissionId = MissionSubsystem->GetActiveMissionId();
+			}
+
+			UE_LOG(LogTemp, Log, TEXT("SailingGameMode: Aktivt oppdrag '%s'."), *MissionSubsystem->GetActiveMissionId().ToString());
 		}
 	}
 
@@ -95,6 +123,14 @@ void ASailingGameMode::BeginPlay()
 	// Spawn ocean plane
 	SpawnedOcean = GetWorld()->SpawnActor<AOceanPlaneActor>(
 		AOceanPlaneActor::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Params);
+
+	// Spawn concrete delivery mission objective marker
+	SpawnedMissionObjective = GetWorld()->SpawnActor<AMissionObjectiveActor>(
+		AMissionObjectiveActor::StaticClass(), DeliveryObjectiveLocation, FRotator::ZeroRotator, Params);
+	if (SpawnedMissionObjective)
+	{
+		SpawnedMissionObjective->SetTriggerType(ESailingMissionType::Delivery);
+	}
 
 	// Teleporter pawn til siste posisjon ved Fortsett (etter at pawn er spawnet)
 	if (SaveGame && SaveGame->LastPlayerLocation != FVector::ZeroVector)
