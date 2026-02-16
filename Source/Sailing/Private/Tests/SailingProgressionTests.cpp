@@ -374,6 +374,32 @@ bool FSailingPortWeightedOffersTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Upgrade rotation should offset by visit count"), RotatedUpgrades[0], FName(TEXT("Upgrade_C")));
 	TestEqual(TEXT("Upgrade rotation should continue circular order"), RotatedUpgrades[1], FName(TEXT("Upgrade_A")));
 
+	TArray<FPortUpgradeWeightedOffer> WeightedUpgradeOffers;
+	FPortUpgradeWeightedOffer UpgradeOfferA;
+	UpgradeOfferA.UpgradeId = TEXT("Upgrade_A");
+	UpgradeOfferA.PriorityWeight = 2.0f;
+	WeightedUpgradeOffers.Add(UpgradeOfferA);
+	FPortUpgradeWeightedOffer UpgradeOfferB;
+	UpgradeOfferB.UpgradeId = TEXT("Upgrade_B");
+	UpgradeOfferB.PriorityWeight = 1.0f;
+	UpgradeOfferB.MinPortVisits = 2;
+	WeightedUpgradeOffers.Add(UpgradeOfferB);
+	const TArray<FName> PrioritizedWeightedUpgrades = UPortDataAsset::BuildPrioritizedUpgradeIds(
+		WeightedUpgradeOffers, { TEXT("Fallback_Upgrade") }, 2, 2, true);
+	TestEqual(TEXT("Weighted upgrade selector should include gated offer once unlocked"),
+		PrioritizedWeightedUpgrades.Num(), 2);
+	TestEqual(TEXT("Weighted upgrade selector should preserve priority before rotation"),
+		PrioritizedWeightedUpgrades[0], FName(TEXT("Upgrade_A")));
+	TestEqual(TEXT("Weighted upgrade selector should include second eligible offer"),
+		PrioritizedWeightedUpgrades[1], FName(TEXT("Upgrade_B")));
+
+	const TArray<FName> FallbackWeightedUpgrades = UPortDataAsset::BuildPrioritizedUpgradeIds(
+		{}, { TEXT("Fallback_Upgrade_A"), TEXT("Fallback_Upgrade_B") }, 1, 1, false);
+	TestEqual(TEXT("Weighted upgrade selector should fallback when weighted list is empty"),
+		FallbackWeightedUpgrades.Num(), 1);
+	TestEqual(TEXT("Weighted upgrade fallback should respect source order"),
+		FallbackWeightedUpgrades[0], FName(TEXT("Fallback_Upgrade_A")));
+
 	const TArray<FName> StaticUpgrades = UPortDataAsset::BuildRotatedUpgradeIds(
 		{ TEXT("Upgrade_A"), TEXT("Upgrade_A"), TEXT("Upgrade_B") }, 5, 0, false);
 	TestEqual(TEXT("Non-rotating upgrade list should deduplicate"), StaticUpgrades.Num(), 2);

@@ -69,7 +69,8 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 
 		EffectiveOfferedMissionIds = UPortDataAsset::BuildPrioritizedMissionIds(
 			WeightedOfferedMissions, OfferedMissionIds, PortVisitCount, MaxOfferedMissionsAtBoard);
-		EffectiveOfferedUpgradeIds = UPortDataAsset::BuildRotatedUpgradeIds(
+		EffectiveOfferedUpgradeIds = UPortDataAsset::BuildPrioritizedUpgradeIds(
+			WeightedOfferedUpgrades,
 			OfferedUpgradeIds,
 			PortVisitCount,
 			MaxOfferedUpgrades,
@@ -150,7 +151,8 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 	{
 		EffectiveOfferedMissionIds = UPortDataAsset::BuildPrioritizedMissionIds(
 			WeightedOfferedMissions, OfferedMissionIds, PortVisitCount, MaxOfferedMissionsAtBoard);
-		EffectiveOfferedUpgradeIds = UPortDataAsset::BuildRotatedUpgradeIds(
+		EffectiveOfferedUpgradeIds = UPortDataAsset::BuildPrioritizedUpgradeIds(
+			WeightedOfferedUpgrades,
 			OfferedUpgradeIds,
 			PortVisitCount,
 			MaxOfferedUpgrades,

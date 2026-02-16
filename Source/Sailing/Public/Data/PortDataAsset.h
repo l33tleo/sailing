@@ -19,6 +19,21 @@ struct SAILING_API FPortMissionWeightedOffer
 	int32 MinPortVisits = 0;
 };
 
+USTRUCT(BlueprintType)
+struct SAILING_API FPortUpgradeWeightedOffer
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Port|Services")
+	FName UpgradeId = NAME_None;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Port|Services", meta = (ClampMin = "0.0"))
+	float PriorityWeight = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Port|Services", meta = (ClampMin = "0"))
+	int32 MinPortVisits = 0;
+};
+
 /**
  * Data-driven harbor definition for world feature spawning.
  */
@@ -76,6 +91,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Port|Services")
 	TArray<FName> OfferedUpgradeIds;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Port|Services")
+	TArray<FPortUpgradeWeightedOffer> WeightedOfferedUpgrades;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Port|Services", meta = (ClampMin = "0", ClampMax = "10"))
 	int32 MaxOfferedUpgrades = 3;
 
@@ -93,6 +111,13 @@ public:
 
 	static TArray<FName> BuildRotatedUpgradeIds(
 		const TArray<FName>& InOfferedUpgradeIds,
+		int32 PortVisitCount,
+		int32 MaxOffers,
+		bool bRotateByVisits);
+
+	static TArray<FName> BuildPrioritizedUpgradeIds(
+		const TArray<FPortUpgradeWeightedOffer>& InWeightedOffers,
+		const TArray<FName>& InFallbackOffers,
 		int32 PortVisitCount,
 		int32 MaxOffers,
 		bool bRotateByVisits);

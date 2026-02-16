@@ -37,6 +37,9 @@ struct SAILING_API FPortUpgradeOfferEntry
 	int32 CreditCost = 0;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	int32 BaseCreditCost = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
 	bool bUnlocked = false;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
@@ -101,6 +104,12 @@ struct SAILING_API FPortMissionBoardData
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
 	FText UpgradeStatus;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	float UpgradeCostMultiplier = 1.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	FText UpgradePricingStatus;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
 	bool bAwaitingUpgradePurchaseConfirmation = false;

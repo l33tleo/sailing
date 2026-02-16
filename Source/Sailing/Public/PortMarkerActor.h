@@ -72,6 +72,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Port|Services")
 	TArray<FName> OfferedUpgradeIds;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Port|Services")
+	TArray<FPortUpgradeWeightedOffer> WeightedOfferedUpgrades;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Port|Services", meta = (ClampMin = "0", ClampMax = "10"))
 	int32 MaxOfferedUpgrades = 3;
 

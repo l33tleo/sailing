@@ -302,6 +302,18 @@ void ASailingGameMode::BeginPlay()
 				PortNord->MissionBoardCooldownSeconds = 12.0f;
 				PortNord->bOfferUpgradeService = true;
 				PortNord->OfferedUpgradeIds = { TEXT("SkrogTrimV1"), TEXT("RorResponsV1") };
+				{
+					FPortUpgradeWeightedOffer WeightedTrim;
+					WeightedTrim.UpgradeId = TEXT("SkrogTrimV1");
+					WeightedTrim.PriorityWeight = 1.8f;
+					PortNord->WeightedOfferedUpgrades.Add(WeightedTrim);
+
+					FPortUpgradeWeightedOffer WeightedRudder;
+					WeightedRudder.UpgradeId = TEXT("RorResponsV1");
+					WeightedRudder.PriorityWeight = 1.2f;
+					WeightedRudder.MinPortVisits = 1;
+					PortNord->WeightedOfferedUpgrades.Add(WeightedRudder);
+				}
 				PortNord->bRotateUpgradeStockByVisits = true;
 				PortNord->UpgradeCostMultiplier = 0.95f;
 				PortDefinitions.Add(PortNord);
@@ -322,6 +334,18 @@ void ASailingGameMode::BeginPlay()
 				PortVest->MissionBoardCooldownSeconds = 12.0f;
 				PortVest->bOfferUpgradeService = true;
 				PortVest->OfferedUpgradeIds = { TEXT("RorResponsV1"), TEXT("RiggeffektivitetV1") };
+				{
+					FPortUpgradeWeightedOffer WeightedRudder;
+					WeightedRudder.UpgradeId = TEXT("RorResponsV1");
+					WeightedRudder.PriorityWeight = 1.4f;
+					PortVest->WeightedOfferedUpgrades.Add(WeightedRudder);
+
+					FPortUpgradeWeightedOffer WeightedRig;
+					WeightedRig.UpgradeId = TEXT("RiggeffektivitetV1");
+					WeightedRig.PriorityWeight = 2.0f;
+					WeightedRig.MinPortVisits = 2;
+					PortVest->WeightedOfferedUpgrades.Add(WeightedRig);
+				}
 				PortVest->bRotateUpgradeStockByVisits = true;
 				PortVest->UpgradeCostMultiplier = 1.05f;
 				PortDefinitions.Add(PortVest);
@@ -343,6 +367,18 @@ void ASailingGameMode::BeginPlay()
 				PortSor->MissionBoardCooldownSeconds = 12.0f;
 				PortSor->bOfferUpgradeService = true;
 				PortSor->OfferedUpgradeIds = { TEXT("SkrogTrimV1"), TEXT("RiggeffektivitetV1") };
+				{
+					FPortUpgradeWeightedOffer WeightedRig;
+					WeightedRig.UpgradeId = TEXT("RiggeffektivitetV1");
+					WeightedRig.PriorityWeight = 2.2f;
+					WeightedRig.MinPortVisits = 1;
+					PortSor->WeightedOfferedUpgrades.Add(WeightedRig);
+
+					FPortUpgradeWeightedOffer WeightedTrim;
+					WeightedTrim.UpgradeId = TEXT("SkrogTrimV1");
+					WeightedTrim.PriorityWeight = 1.0f;
+					PortSor->WeightedOfferedUpgrades.Add(WeightedTrim);
+				}
 				PortSor->bRotateUpgradeStockByVisits = false;
 				PortSor->UpgradeCostMultiplier = 1.12f;
 				PortDefinitions.Add(PortSor);
@@ -376,6 +412,7 @@ void ASailingGameMode::BeginPlay()
 				PortMarker->MissionBoardCooldownSeconds = PortData->MissionBoardCooldownSeconds;
 				PortMarker->bOfferUpgradeService = PortData->bOfferUpgradeService;
 				PortMarker->OfferedUpgradeIds = PortData->OfferedUpgradeIds;
+				PortMarker->WeightedOfferedUpgrades = PortData->WeightedOfferedUpgrades;
 				PortMarker->MaxOfferedUpgrades = PortData->MaxOfferedUpgrades;
 				PortMarker->bRotateUpgradeStockByVisits = PortData->bRotateUpgradeStockByVisits;
 				PortMarker->UpgradeCostMultiplier = PortData->UpgradeCostMultiplier;

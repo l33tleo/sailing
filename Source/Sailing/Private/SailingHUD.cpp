@@ -86,9 +86,28 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 	Data.MissionSwitchConfirmationStatus = FText::GetEmpty();
 	Data.bSupportsUpgradeService = bOfferUpgradeService;
 	Data.OfferedUpgradeIds = OfferedUpgradeIds;
+	Data.UpgradeCostMultiplier = FMath::Max(0.1f, UpgradeCostMultiplier);
 	Data.UpgradeStatus = bOfferUpgradeService
 		? FText::FromString(TEXT("Tilgjengelige oppgraderinger i denne havnen."))
 		: FText::FromString(TEXT("Ingen oppgraderingsservice i denne havnen."));
+	if (!bOfferUpgradeService)
+	{
+		Data.UpgradePricingStatus = FText::FromString(TEXT("Ingen oppgraderingspriser tilgjengelig."));
+	}
+	else if (FMath::IsNearlyEqual(Data.UpgradeCostMultiplier, 1.0f))
+	{
+		Data.UpgradePricingStatus = FText::FromString(TEXT("Standardpriser aktiv."));
+	}
+	else if (Data.UpgradeCostMultiplier < 1.0f)
+	{
+		Data.UpgradePricingStatus = FText::FromString(
+			FString::Printf(TEXT("Havnerabatt: x%.2f"), Data.UpgradeCostMultiplier));
+	}
+	else
+	{
+		Data.UpgradePricingStatus = FText::FromString(
+			FString::Printf(TEXT("Havnepåslag: x%.2f"), Data.UpgradeCostMultiplier));
+	}
 	Data.bAwaitingUpgradePurchaseConfirmation = false;
 	Data.PendingUpgradePurchaseId = NAME_None;
 	Data.UpgradePurchaseConfirmationStatus = FText::GetEmpty();
@@ -152,6 +171,7 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 						OfferEntry.UpgradeTitle = UpgradeData->DisplayName.IsEmpty()
 							? FText::FromName(UpgradeData->UpgradeId)
 							: UpgradeData->DisplayName;
+						OfferEntry.BaseCreditCost = FMath::Max(0, UpgradeData->CreditCost);
 						OfferEntry.CreditCost = UPortDataAsset::CalculateAdjustedUpgradeCost(
 							UpgradeData->CreditCost, SafeUpgradeCostMultiplier);
 						OfferEntry.bUnlocked = EconomySubsystem->IsUpgradeUnlocked(UpgradeData->UpgradeId);

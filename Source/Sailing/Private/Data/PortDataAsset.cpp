@@ -99,6 +99,53 @@ TArray<FName> UPortDataAsset::BuildRotatedUpgradeIds(
 	return Result;
 }
 
+TArray<FName> UPortDataAsset::BuildPrioritizedUpgradeIds(
+	const TArray<FPortUpgradeWeightedOffer>& InWeightedOffers,
+	const TArray<FName>& InFallbackOffers,
+	int32 PortVisitCount,
+	int32 MaxOffers,
+	bool bRotateByVisits)
+{
+	TArray<FName> WeightedIds;
+	TArray<FPortUpgradeWeightedOffer> EligibleWeightedOffers;
+
+	for (const FPortUpgradeWeightedOffer& Offer : InWeightedOffers)
+	{
+		if (Offer.UpgradeId.IsNone())
+		{
+			continue;
+		}
+
+		if (PortVisitCount < FMath::Max(0, Offer.MinPortVisits))
+		{
+			continue;
+		}
+
+		EligibleWeightedOffers.Add(Offer);
+	}
+
+	EligibleWeightedOffers.Sort([](const FPortUpgradeWeightedOffer& A, const FPortUpgradeWeightedOffer& B)
+	{
+		if (!FMath::IsNearlyEqual(A.PriorityWeight, B.PriorityWeight))
+		{
+			return A.PriorityWeight > B.PriorityWeight;
+		}
+		return A.UpgradeId.LexicalLess(B.UpgradeId);
+	});
+
+	for (const FPortUpgradeWeightedOffer& Offer : EligibleWeightedOffers)
+	{
+		WeightedIds.AddUnique(Offer.UpgradeId);
+	}
+
+	if (WeightedIds.Num() > 0)
+	{
+		return BuildRotatedUpgradeIds(WeightedIds, PortVisitCount, MaxOffers, bRotateByVisits);
+	}
+
+	return BuildRotatedUpgradeIds(InFallbackOffers, PortVisitCount, MaxOffers, bRotateByVisits);
+}
+
 int32 UPortDataAsset::CalculateAdjustedUpgradeCost(int32 BaseCost, float CostMultiplier)
 {
 	const int32 SafeBaseCost = FMath::Max(0, BaseCost);
