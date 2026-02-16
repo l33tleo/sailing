@@ -51,6 +51,7 @@ void ASailingHUD::EnsurePortMissionBoardWidget()
 	{
 		PortMissionBoardWidget->OnAcceptMissionRequested.AddDynamic(this, &ASailingHUD::HandleMissionAcceptedRequest);
 		PortMissionBoardWidget->OnCloseRequested.AddDynamic(this, &ASailingHUD::HandleMissionBoardCloseRequest);
+		PortMissionBoardWidget->OnRefreshRequested.AddDynamic(this, &ASailingHUD::HandleMissionBoardRefreshRequest);
 		PortMissionBoardWidget->OnRepairRequested.AddDynamic(this, &ASailingHUD::HandleRepairRequest);
 		PortMissionBoardWidget->OnUpgradePurchaseRequested.AddDynamic(this, &ASailingHUD::HandleUpgradePurchaseRequest);
 		PortMissionBoardWidget->AddToViewport(2);
@@ -511,6 +512,27 @@ bool ASailingHUD::RequestUpgradePurchaseFromBoard(FName UpgradeId)
 	return true;
 }
 
+void ASailingHUD::RefreshCurrentMissionBoard()
+{
+	if (!PortMissionBoardWidget || PortMissionBoardWidget->GetVisibility() == ESlateVisibility::Hidden)
+	{
+		return;
+	}
+
+	if (LastMissionBoardData.PortId.IsNone())
+	{
+		return;
+	}
+
+	LastMissionBoardData.RefreshContext = EPortBoardRefreshContext::ManualRefresh;
+	LastMissionBoardData.RefreshContextStatus = UPortMissionBoardWidget::BuildRefreshContextStatusText(
+		LastMissionBoardData.RefreshContext);
+	PortMissionBoardWidget->PushMissionBoardData(LastMissionBoardData);
+
+	GetWorldTimerManager().ClearTimer(MissionBoardHideTimer);
+	GetWorldTimerManager().SetTimer(MissionBoardHideTimer, this, &ASailingHUD::HidePortMissionBoard, 5.0f, false);
+}
+
 void ASailingHUD::CloseMissionBoard()
 {
 	HidePortMissionBoard();
@@ -543,6 +565,11 @@ void ASailingHUD::HandleMissionAcceptedRequest(FName MissionId)
 void ASailingHUD::HandleMissionBoardCloseRequest()
 {
 	CloseMissionBoard();
+}
+
+void ASailingHUD::HandleMissionBoardRefreshRequest()
+{
+	RefreshCurrentMissionBoard();
 }
 
 void ASailingHUD::HandleRepairRequest()

@@ -590,6 +590,9 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 	TestEqual(TEXT("Refresh context helper should map cooldown text"),
 		UPortMissionBoardWidget::BuildRefreshContextStatusText(EPortBoardRefreshContext::CooldownBlocked).ToString(),
 		FString(TEXT("Tavle oppdatert mens havnen er i nedkjøling.")));
+	TestEqual(TEXT("Refresh context helper should map manual refresh text"),
+		UPortMissionBoardWidget::BuildRefreshContextStatusText(EPortBoardRefreshContext::ManualRefresh).ToString(),
+		FString(TEXT("Tavle manuelt oppdatert.")));
 	return true;
 }
 

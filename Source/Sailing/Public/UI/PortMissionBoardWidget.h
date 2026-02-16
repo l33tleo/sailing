@@ -7,6 +7,7 @@
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPortMissionAcceptRequested, FName, MissionId);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPortMissionBoardCloseRequested);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPortMissionBoardRefreshRequested);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPortRepairRequested);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPortUpgradePurchaseRequested, FName, UpgradeId);
 
@@ -344,6 +345,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MissionBoard")
 	void RequestCloseBoard();
 
+	UFUNCTION(BlueprintCallable, Category = "MissionBoard")
+	void RequestRefreshBoard();
+
 	UFUNCTION(BlueprintCallable, Category = "MissionBoard|Service")
 	void RequestRepairService();
 
@@ -358,6 +362,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "MissionBoard")
 	FOnPortMissionBoardCloseRequested OnCloseRequested;
+
+	UPROPERTY(BlueprintAssignable, Category = "MissionBoard")
+	FOnPortMissionBoardRefreshRequested OnRefreshRequested;
 
 	UPROPERTY(BlueprintAssignable, Category = "MissionBoard|Service")
 	FOnPortRepairRequested OnRepairRequested;

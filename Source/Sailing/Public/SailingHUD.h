@@ -52,6 +52,9 @@ public:
 	bool RequestUpgradePurchaseFromBoard(FName UpgradeId);
 
 	UFUNCTION(BlueprintCallable, Category = "HUD|MissionBoard")
+	void RefreshCurrentMissionBoard();
+
+	UFUNCTION(BlueprintCallable, Category = "HUD|MissionBoard")
 	void CloseMissionBoard();
 
 	/** Kalles fra PlayerController ved museklikk når pause-meny er åpen. */
@@ -125,6 +128,8 @@ private:
 	void HandleMissionAcceptedRequest(FName MissionId);
 	UFUNCTION()
 	void HandleMissionBoardCloseRequest();
+	UFUNCTION()
+	void HandleMissionBoardRefreshRequest();
 	UFUNCTION()
 	void HandleRepairRequest();
 	UFUNCTION()

@@ -340,6 +340,11 @@ void UPortMissionBoardWidget::RequestCloseBoard()
 	OnCloseRequested.Broadcast();
 }
 
+void UPortMissionBoardWidget::RequestRefreshBoard()
+{
+	OnRefreshRequested.Broadcast();
+}
+
 void UPortMissionBoardWidget::RequestRepairService()
 {
 	OnRepairRequested.Broadcast();
