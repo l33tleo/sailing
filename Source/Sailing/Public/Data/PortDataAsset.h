@@ -33,4 +33,16 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Port", meta = (ClampMin = "0"))
 	int32 RepairCostPerPercentPoint = 1;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Port|MissionBoard")
+	bool bOfferMissionBoard = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Port|MissionBoard")
+	bool bCycleMissionOnDock = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Port|MissionBoard")
+	bool bRestrictToOfferedMissions = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Port|MissionBoard")
+	TArray<FName> OfferedMissionIds;
 };

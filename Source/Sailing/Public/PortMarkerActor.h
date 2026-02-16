@@ -50,6 +50,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Port|MissionBoard")
 	bool bCycleMissionOnDock = false;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Port|MissionBoard")
+	bool bRestrictToOfferedMissions = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Port|MissionBoard")
+	TArray<FName> OfferedMissionIds;
+
 private:
 	bool bVisitedInSession = false;
 

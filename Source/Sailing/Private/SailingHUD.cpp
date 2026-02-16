@@ -7,6 +7,7 @@
 #include "SaveGameSailing.h"
 #include "Systems/SailingCoreSubsystems.h"
 #include "UI/SailingHUDOverlayWidget.h"
+#include "UI/PortMissionBoardWidget.h"
 #include "Engine/Canvas.h"
 #include "Engine/Font.h"
 #include "Kismet/GameplayStatics.h"
@@ -15,6 +16,7 @@ void ASailingHUD::BeginPlay()
 {
 	Super::BeginPlay();
 	EnsureOverlayWidget();
+	EnsurePortMissionBoardWidget();
 
 	// Defer binding to allow islands to spawn
 	FTimerHandle TimerHandle;
@@ -32,6 +34,50 @@ void ASailingHUD::EnsureOverlayWidget()
 	if (OverlayWidget)
 	{
 		OverlayWidget->AddToViewport(1);
+	}
+}
+
+void ASailingHUD::EnsurePortMissionBoardWidget()
+{
+	if (PortMissionBoardWidget || !PortMissionBoardWidgetClass || !PlayerOwner)
+	{
+		return;
+	}
+
+	PortMissionBoardWidget = CreateWidget<UPortMissionBoardWidget>(PlayerOwner, PortMissionBoardWidgetClass);
+	if (PortMissionBoardWidget)
+	{
+		PortMissionBoardWidget->AddToViewport(2);
+		PortMissionBoardWidget->SetVisibility(ESlateVisibility::Hidden);
+	}
+}
+
+void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayName,
+	const TArray<FName>& OfferedMissionIds, FName CurrentMissionId)
+{
+	EnsurePortMissionBoardWidget();
+	if (!PortMissionBoardWidget)
+	{
+		return;
+	}
+
+	FPortMissionBoardData Data;
+	Data.PortId = PortId;
+	Data.PortDisplayName = PortDisplayName;
+	Data.OfferedMissionIds = OfferedMissionIds;
+	Data.CurrentMissionId = CurrentMissionId;
+	PortMissionBoardWidget->PushMissionBoardData(Data);
+	PortMissionBoardWidget->SetVisibility(ESlateVisibility::Visible);
+
+	GetWorldTimerManager().ClearTimer(MissionBoardHideTimer);
+	GetWorldTimerManager().SetTimer(MissionBoardHideTimer, this, &ASailingHUD::HidePortMissionBoard, 5.0f, false);
+}
+
+void ASailingHUD::HidePortMissionBoard()
+{
+	if (PortMissionBoardWidget)
+	{
+		PortMissionBoardWidget->SetVisibility(ESlateVisibility::Hidden);
 	}
 }
 

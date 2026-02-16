@@ -134,6 +134,9 @@ public:
 	bool CycleToNextMission();
 
 	UFUNCTION(BlueprintCallable, Category = "Sailing|Mission")
+	bool ActivateMissionFromCandidates(const TArray<FName>& CandidateMissionIds, bool bCycleFromCurrentMission);
+
+	UFUNCTION(BlueprintCallable, Category = "Sailing|Mission")
 	void SetCompletedMissionIds(const TArray<FName>& MissionIds);
 
 	UFUNCTION(BlueprintPure, Category = "Sailing|Mission")

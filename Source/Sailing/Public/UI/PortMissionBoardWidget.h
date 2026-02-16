@@ -1,0 +1,47 @@
+#pragma once
+
+#include "CoreMinimal.h"
+#include "Blueprint/UserWidget.h"
+#include "PortMissionBoardWidget.generated.h"
+
+USTRUCT(BlueprintType)
+struct SAILING_API FPortMissionBoardData
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	FName PortId = NAME_None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	FText PortDisplayName;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	TArray<FName> OfferedMissionIds;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	FName CurrentMissionId = NAME_None;
+};
+
+/**
+ * Optional UMG widget hook for a lightweight mission board at ports.
+ */
+UCLASS(BlueprintType, Blueprintable)
+class SAILING_API UPortMissionBoardWidget : public UUserWidget
+{
+	GENERATED_BODY()
+
+public:
+	UFUNCTION(BlueprintCallable, Category = "MissionBoard")
+	void PushMissionBoardData(const FPortMissionBoardData& InData);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard")
+	const FPortMissionBoardData& GetLastData() const { return LastData; }
+
+protected:
+	UFUNCTION(BlueprintImplementableEvent, Category = "MissionBoard")
+	void OnMissionBoardDataUpdated(const FPortMissionBoardData& InData);
+
+private:
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard", meta = (AllowPrivateAccess = "true"))
+	FPortMissionBoardData LastData;
+};

@@ -227,6 +227,37 @@ bool FSailingMissionCycleSelectionTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSailingMissionCandidateSelectionTest,
+	"Sailing.Progression.Mission.CandidateSelection",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSailingMissionCandidateSelectionTest::RunTest(const FString& Parameters)
+{
+	UMissionSubsystem* MissionSubsystem = NewObject<UMissionSubsystem>();
+
+	USailingMissionDataAsset* MissionA = NewObject<USailingMissionDataAsset>();
+	MissionA->MissionId = TEXT("Mission_A");
+	MissionA->MissionType = ESailingMissionType::NavigationChallenge;
+	MissionA->bRepeatable = false;
+
+	USailingMissionDataAsset* MissionB = NewObject<USailingMissionDataAsset>();
+	MissionB->MissionId = TEXT("Mission_B");
+	MissionB->MissionType = ESailingMissionType::Delivery;
+	MissionB->bRepeatable = true;
+
+	MissionSubsystem->RegisterMissionAsset(MissionA);
+	MissionSubsystem->RegisterMissionAsset(MissionB);
+	MissionSubsystem->SetCompletedMissionIds({ MissionA->MissionId });
+	MissionSubsystem->SetActiveMissionId(MissionA->MissionId);
+
+	const bool bActivated = MissionSubsystem->ActivateMissionFromCandidates(
+		{ MissionA->MissionId, MissionB->MissionId }, true);
+	TestTrue(TEXT("Candidate activation should succeed"), bActivated);
+	TestEqual(TEXT("Candidate selector should skip completed non-repeatable mission"), MissionSubsystem->GetActiveMissionId(), MissionB->MissionId);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FSailingEconomyRepairFlowTest,
 	"Sailing.Progression.Economy.RepairFlow",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

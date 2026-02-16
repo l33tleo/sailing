@@ -324,6 +324,60 @@ bool UMissionSubsystem::CycleToNextMission()
 	return false;
 }
 
+bool UMissionSubsystem::ActivateMissionFromCandidates(const TArray<FName>& CandidateMissionIds, bool bCycleFromCurrentMission)
+{
+	if (CandidateMissionIds.Num() == 0)
+	{
+		return false;
+	}
+
+	TArray<FName> OrderedCandidates;
+	for (const FName& CandidateId : CandidateMissionIds)
+	{
+		if (!CandidateId.IsNone())
+		{
+			OrderedCandidates.AddUnique(CandidateId);
+		}
+	}
+	if (OrderedCandidates.Num() == 0)
+	{
+		return false;
+	}
+
+	int32 StartIndex = 0;
+	if (bCycleFromCurrentMission && !ActiveMissionId.IsNone())
+	{
+		const int32 CurrentIdx = OrderedCandidates.IndexOfByKey(ActiveMissionId);
+		if (CurrentIdx != INDEX_NONE)
+		{
+			StartIndex = (CurrentIdx + 1) % OrderedCandidates.Num();
+		}
+	}
+
+	for (int32 Offset = 0; Offset < OrderedCandidates.Num(); ++Offset)
+	{
+		const int32 Idx = (StartIndex + Offset) % OrderedCandidates.Num();
+		const FName CandidateId = OrderedCandidates[Idx];
+		const TObjectPtr<USailingMissionDataAsset>* MissionPtr = RegisteredMissions.Find(CandidateId);
+		const USailingMissionDataAsset* Mission = MissionPtr ? MissionPtr->Get() : nullptr;
+		if (!Mission)
+		{
+			continue;
+		}
+
+		const bool bAlreadyCompleted = CompletedMissionIds.Contains(CandidateId);
+		if (bAlreadyCompleted && !Mission->bRepeatable)
+		{
+			continue;
+		}
+
+		ActiveMissionId = CandidateId;
+		return true;
+	}
+
+	return false;
+}
+
 void UMissionSubsystem::SetCompletedMissionIds(const TArray<FName>& MissionIds)
 {
 	CompletedMissionIds.Empty();

@@ -187,18 +187,27 @@ void ASailingGameMode::BeginPlay()
 				PortNord->PortId = TEXT("HavnNord");
 				PortNord->DisplayName = FText::FromString(TEXT("Nordhavn"));
 				PortNord->WorldLocation = FVector(2000.0f, -6000.0f, 100.0f);
+				PortNord->bRestrictToOfferedMissions = true;
+				PortNord->OfferedMissionIds = { TEXT("LeveringTilBoye"), TEXT("OppdagForsteOy") };
+				PortNord->bCycleMissionOnDock = true;
 				PortDefinitions.Add(PortNord);
 
 				UPortDataAsset* PortVest = NewObject<UPortDataAsset>(this);
 				PortVest->PortId = TEXT("HavnVest");
 				PortVest->DisplayName = FText::FromString(TEXT("Vesthavn"));
 				PortVest->WorldLocation = FVector(-7000.0f, 1500.0f, 100.0f);
+				PortVest->bRestrictToOfferedMissions = true;
+				PortVest->OfferedMissionIds = { TEXT("LeveringTilBoye") };
+				PortVest->bCycleMissionOnDock = true;
 				PortDefinitions.Add(PortVest);
 
 				UPortDataAsset* PortSor = NewObject<UPortDataAsset>(this);
 				PortSor->PortId = TEXT("HavnSor");
 				PortSor->DisplayName = FText::FromString(TEXT("Sorhavn"));
 				PortSor->WorldLocation = FVector(8500.0f, 4500.0f, 100.0f);
+				PortSor->bRestrictToOfferedMissions = true;
+				PortSor->OfferedMissionIds = { TEXT("LeveringTilBoye") };
+				PortSor->bCycleMissionOnDock = true;
 				PortDefinitions.Add(PortSor);
 			}
 
@@ -217,6 +226,10 @@ void ASailingGameMode::BeginPlay()
 				PortMarker->bGrantOneTimeDockBonus = PortData->bGrantOneTimeDockBonus;
 				PortMarker->bAutoRepairAtPort = PortData->bAutoRepairAtPort;
 				PortMarker->RepairCostPerPercentPoint = PortData->RepairCostPerPercentPoint;
+				PortMarker->bOfferMissionBoard = PortData->bOfferMissionBoard;
+				PortMarker->bCycleMissionOnDock = PortData->bCycleMissionOnDock;
+				PortMarker->bRestrictToOfferedMissions = PortData->bRestrictToOfferedMissions;
+				PortMarker->OfferedMissionIds = PortData->OfferedMissionIds;
 
 				SpawnedPortMarkers.Add(PortMarker);
 				WorldStreamingSubsystem->RegisterPortPoint(PortData->PortId, PortData->WorldLocation);

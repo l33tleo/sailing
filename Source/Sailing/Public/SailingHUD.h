@@ -6,6 +6,7 @@
 
 class AIslandActor;
 class USailingHUDOverlayWidget;
+class UPortMissionBoardWidget;
 
 UCLASS()
 class SAILING_API ASailingHUD : public AHUD
@@ -18,6 +19,10 @@ public:
 
 	// Show island discovery popup
 	void ShowDiscoveryPopup(const FString& IslandName);
+
+	/** Shows mission board data from current harbor interaction. */
+	void ShowPortMissionBoard(FName PortId, const FText& PortDisplayName,
+		const TArray<FName>& OfferedMissionIds, FName CurrentMissionId);
 
 	/** Kalles fra PlayerController ved museklikk når pause-meny er åpen. */
 	void OnPauseMenuClick(float X, float Y);
@@ -54,6 +59,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HUD|UMG")
 	TSubclassOf<USailingHUDOverlayWidget> OverlayWidgetClass;
 
+	/** Optional mission board widget shown when docking at ports. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HUD|UMG")
+	TSubclassOf<UPortMissionBoardWidget> PortMissionBoardWidgetClass;
+
 private:
 	// Discovery popup state
 	FString CurrentDiscoveryName;
@@ -80,6 +89,8 @@ private:
 	void DrawDiscoveryCounter();
 
 	void EnsureOverlayWidget();
+	void EnsurePortMissionBoardWidget();
+	void HidePortMissionBoard();
 	void PushOverlayData(int32 DiscoveredIslands, int32 Credits, FName ActiveMissionId,
 		const FText& ActiveMissionTitle, float ObjectiveDistanceMeters, int32 BoatConditionPercent);
 
@@ -99,4 +110,9 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<USailingHUDOverlayWidget> OverlayWidget;
+
+	UPROPERTY()
+	TObjectPtr<UPortMissionBoardWidget> PortMissionBoardWidget;
+
+	FTimerHandle MissionBoardHideTimer;
 };

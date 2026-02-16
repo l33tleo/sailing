@@ -87,7 +87,11 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 		{
 			if (UMissionSubsystem* MissionSubsystem = GI->GetSubsystem<UMissionSubsystem>())
 			{
-				if (bCycleMissionOnDock)
+				if (bRestrictToOfferedMissions && OfferedMissionIds.Num() > 0)
+				{
+					bMissionUpdated = MissionSubsystem->ActivateMissionFromCandidates(OfferedMissionIds, bCycleMissionOnDock);
+				}
+				else if (bCycleMissionOnDock)
 				{
 					bMissionUpdated = MissionSubsystem->CycleToNextMission();
 				}
@@ -122,6 +126,11 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 			}
 
 			HUD->ShowDiscoveryPopup(PopupText);
+
+			if (bOfferMissionBoard)
+			{
+				HUD->ShowPortMissionBoard(PortId, PortDisplayName, OfferedMissionIds, NewMissionId);
+			}
 		}
 	}
 
