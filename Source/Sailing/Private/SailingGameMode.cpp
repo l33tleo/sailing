@@ -43,6 +43,44 @@ void ASailingGameMode::BeginPlay()
 	int32 MissingRequiredStartupUpgradeCount = 0;
 	int32 MissingRequiredStartupPortCount = 0;
 
+	auto SanitizeRequiredIds = [](TArray<FName>& InOutIds, int32& OutRemovedInvalidOrDuplicateCount)
+	{
+		OutRemovedInvalidOrDuplicateCount = 0;
+		TArray<FName> SanitizedIds;
+		for (const FName& Id : InOutIds)
+		{
+			if (Id.IsNone())
+			{
+				OutRemovedInvalidOrDuplicateCount++;
+				continue;
+			}
+
+			if (SanitizedIds.Contains(Id))
+			{
+				OutRemovedInvalidOrDuplicateCount++;
+				continue;
+			}
+
+			SanitizedIds.Add(Id);
+		}
+		InOutIds = MoveTemp(SanitizedIds);
+	};
+
+	int32 RemovedRequiredMissionIds = 0;
+	int32 RemovedRequiredUpgradeIds = 0;
+	int32 RemovedRequiredPortIds = 0;
+	SanitizeRequiredIds(RequiredStartupMissionIds, RemovedRequiredMissionIds);
+	SanitizeRequiredIds(RequiredStartupUpgradeIds, RemovedRequiredUpgradeIds);
+	SanitizeRequiredIds(RequiredStartupPortIds, RemovedRequiredPortIds);
+	if (RemovedRequiredMissionIds > 0 || RemovedRequiredUpgradeIds > 0 || RemovedRequiredPortIds > 0)
+	{
+		UE_LOG(LogTemp, Warning,
+			TEXT("SailingGameMode: Renset required startup-id lister. Fjernet Mission=%d Upgrade=%d Port=%d ugyldige/duplikate verdier."),
+			RemovedRequiredMissionIds,
+			RemovedRequiredUpgradeIds,
+			RemovedRequiredPortIds);
+	}
+
 	USailingGameInstance* GI = Cast<USailingGameInstance>(GetGameInstance());
 	if (GI && GI->bRequestNewGame)
 	{
@@ -722,6 +760,9 @@ void ASailingGameMode::BeginPlay()
 			TelemetrySubsystem->SetCounterValue(TEXT("StartupRequiredMissionCount"), RequiredStartupMissionIds.Num());
 			TelemetrySubsystem->SetCounterValue(TEXT("StartupRequiredUpgradeCount"), RequiredStartupUpgradeIds.Num());
 			TelemetrySubsystem->SetCounterValue(TEXT("StartupRequiredPortCount"), RequiredStartupPortIds.Num());
+			TelemetrySubsystem->SetCounterValue(TEXT("StartupRequiredMissionIdsSanitized"), RemovedRequiredMissionIds);
+			TelemetrySubsystem->SetCounterValue(TEXT("StartupRequiredUpgradeIdsSanitized"), RemovedRequiredUpgradeIds);
+			TelemetrySubsystem->SetCounterValue(TEXT("StartupRequiredPortIdsSanitized"), RemovedRequiredPortIds);
 			TelemetrySubsystem->SetCounterValue(TEXT("StartupMissingRequiredMissions"), FMath::Max(0, MissingRequiredStartupMissionCount));
 			TelemetrySubsystem->SetCounterValue(TEXT("StartupMissingRequiredUpgrades"), FMath::Max(0, MissingRequiredStartupUpgradeCount));
 			TelemetrySubsystem->SetCounterValue(TEXT("StartupMissingRequiredPorts"), FMath::Max(0, MissingRequiredStartupPortCount));
