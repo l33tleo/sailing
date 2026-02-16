@@ -77,7 +77,7 @@ async def generate_and_save(
     )
 
 
-@router.get("/", response_model=list[RecommendationDetail])
+@router.get("", response_model=list[RecommendationDetail])
 async def list_recommendations(
     ticker: str | None = Query(None, description="Filtrer på ticker"),
     rec_type: str | None = Query(None, description="Filtrer på type: KJØP, HOLD, SELG"),

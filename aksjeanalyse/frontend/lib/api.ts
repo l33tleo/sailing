@@ -414,11 +414,11 @@ export async function createAlert(data: {
   condition_type: string;
   threshold: number;
 }): Promise<AlertItem> {
-  return fetchAPI("/alerts/", { method: "POST", body: JSON.stringify(data) });
+  return fetchAPI("/alerts", { method: "POST", body: JSON.stringify(data) });
 }
 
 export async function getAlerts(activeOnly = true): Promise<AlertItem[]> {
-  return fetchAPI(`/alerts/?active_only=${activeOnly}`);
+  return fetchAPI(`/alerts?active_only=${activeOnly}`);
 }
 
 export async function deleteAlert(id: number): Promise<void> {

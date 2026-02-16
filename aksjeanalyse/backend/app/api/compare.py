@@ -43,7 +43,7 @@ class ComparisonResponse(BaseModel):
     stocks: list[ComparisonStock]
 
 
-@router.get("/", response_model=ComparisonResponse)
+@router.get("", response_model=ComparisonResponse)
 async def compare_stocks(
     tickers: str = Query(
         ...,

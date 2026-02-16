@@ -50,7 +50,7 @@ CONDITION_LABELS = {
 }
 
 
-@router.post("/", response_model=AlertResponse)
+@router.post("", response_model=AlertResponse)
 async def create_alert(
     data: AlertCreate,
     db: AsyncSession = Depends(get_db),
@@ -96,7 +96,7 @@ async def create_alert(
     )
 
 
-@router.get("/", response_model=list[AlertResponse])
+@router.get("", response_model=list[AlertResponse])
 async def list_alerts(
     active_only: bool = Query(True),
     db: AsyncSession = Depends(get_db),
