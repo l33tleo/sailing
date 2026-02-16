@@ -289,6 +289,9 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastBlockedMissionOffers"), LastMissionBoardData.BlockedMissionOfferCount);
 			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastPurchasableUpgradeOffers"), LastMissionBoardData.PurchasableUpgradeOfferCount);
 			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastBlockedUpgradeOffers"), LastMissionBoardData.BlockedUpgradeOfferCount);
+			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastHasSelectableMissions"), LastMissionBoardData.bHasSelectableMissionOffers ? 1 : 0);
+			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastHasPurchasableUpgrades"), LastMissionBoardData.bHasPurchasableUpgradeOffers ? 1 : 0);
+			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastHasImmediateActions"), LastMissionBoardData.bHasAnyImmediateActions ? 1 : 0);
 		}
 	}
 
@@ -792,6 +795,9 @@ void ASailingHUD::RefreshCurrentMissionBoard()
 			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastBlockedMissionOffers"), LastMissionBoardData.BlockedMissionOfferCount);
 			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastPurchasableUpgradeOffers"), LastMissionBoardData.PurchasableUpgradeOfferCount);
 			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastBlockedUpgradeOffers"), LastMissionBoardData.BlockedUpgradeOfferCount);
+			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastHasSelectableMissions"), LastMissionBoardData.bHasSelectableMissionOffers ? 1 : 0);
+			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastHasPurchasableUpgrades"), LastMissionBoardData.bHasPurchasableUpgradeOffers ? 1 : 0);
+			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastHasImmediateActions"), LastMissionBoardData.bHasAnyImmediateActions ? 1 : 0);
 		}
 	}
 
