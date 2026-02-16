@@ -689,6 +689,29 @@ const UBoatUpgradeDataAsset* UEconomySubsystem::GetUpgradeAssetById(FName Upgrad
 	return nullptr;
 }
 
+void UEconomySubsystem::GetCombinedUpgradeMultipliers(
+	float& OutMaxSpeedMultiplier,
+	float& OutDragMultiplier,
+	float& OutTurnRateMultiplier) const
+{
+	OutMaxSpeedMultiplier = 1.0f;
+	OutDragMultiplier = 1.0f;
+	OutTurnRateMultiplier = 1.0f;
+
+	for (const FName& UpgradeId : UnlockedUpgradeIds)
+	{
+		const UBoatUpgradeDataAsset* UpgradeData = GetUpgradeAssetById(UpgradeId);
+		if (!UpgradeData)
+		{
+			continue;
+		}
+
+		OutMaxSpeedMultiplier *= FMath::Max(0.1f, UpgradeData->MaxSpeedMultiplier);
+		OutDragMultiplier *= FMath::Max(0.1f, UpgradeData->DragMultiplier);
+		OutTurnRateMultiplier *= FMath::Max(0.1f, UpgradeData->TurnRateMultiplier);
+	}
+}
+
 void UEconomySubsystem::SetUnlockedUpgrades(const TArray<FName>& UpgradeIds)
 {
 	UnlockedUpgradeIds.Empty();

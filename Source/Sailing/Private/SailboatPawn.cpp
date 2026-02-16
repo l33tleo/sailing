@@ -6,6 +6,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
 #include "EnhancedInputComponent.h"
+#include "Systems/SailingCoreSubsystems.h"
 #include "UObject/ConstructorHelpers.h"
 
 ASailboatPawn::ASailboatPawn()
@@ -385,8 +386,19 @@ void ASailboatPawn::Tick(float DeltaTime)
 	Super::Tick(DeltaTime);
 
 	// 1. Apply turn (yaw)
+	float TurnRateMultiplier = 1.0f;
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UEconomySubsystem* EconomySubsystem = GI->GetSubsystem<UEconomySubsystem>())
+		{
+			float MaxSpeedMultiplierUnused = 1.0f;
+			float DragMultiplierUnused = 1.0f;
+			EconomySubsystem->GetCombinedUpgradeMultipliers(MaxSpeedMultiplierUnused, DragMultiplierUnused, TurnRateMultiplier);
+		}
+	}
+
 	FRotator CurrentRot = GetActorRotation();
-	CurrentRot.Yaw += TurnInput * TurnSpeed * DeltaTime;
+	CurrentRot.Yaw += TurnInput * TurnSpeed * FMath::Max(0.1f, TurnRateMultiplier) * DeltaTime;
 	SetActorRotation(CurrentRot);
 	TurnInput = 0.0f;
 

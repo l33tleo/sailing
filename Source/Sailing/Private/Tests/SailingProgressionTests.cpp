@@ -78,6 +78,23 @@ bool FSailingEconomyPurchaseUpgradeTest::RunTest(const FString& Parameters)
 	const TArray<FName> RegisteredUpgradeIds = Economy->GetRegisteredUpgradeIds();
 	TestTrue(TEXT("Registered upgrades should include purchased upgrade"), RegisteredUpgradeIds.Contains(Upgrade->UpgradeId));
 	TestNull(TEXT("Unknown upgrade lookup should return null"), Economy->GetUpgradeAssetById(TEXT("UnknownUpgrade")));
+
+	UBoatUpgradeDataAsset* UpgradeB = NewObject<UBoatUpgradeDataAsset>();
+	UpgradeB->UpgradeId = TEXT("TurnPackV1");
+	UpgradeB->CreditCost = 100;
+	UpgradeB->MaxSpeedMultiplier = 1.1f;
+	UpgradeB->DragMultiplier = 0.9f;
+	UpgradeB->TurnRateMultiplier = 1.2f;
+	Economy->RegisterUpgradeAsset(UpgradeB);
+	Economy->SetUnlockedUpgrades({ Upgrade->UpgradeId, UpgradeB->UpgradeId });
+
+	float MaxSpeedMultiplier = 0.0f;
+	float DragMultiplier = 0.0f;
+	float TurnRateMultiplier = 0.0f;
+	Economy->GetCombinedUpgradeMultipliers(MaxSpeedMultiplier, DragMultiplier, TurnRateMultiplier);
+	TestEqual(TEXT("Combined speed multiplier should include unlocked upgrades"), MaxSpeedMultiplier, 1.1f);
+	TestEqual(TEXT("Combined drag multiplier should include unlocked upgrades"), DragMultiplier, 0.9f);
+	TestEqual(TEXT("Combined turn multiplier should include unlocked upgrades"), TurnRateMultiplier, 1.2f);
 	return true;
 }
 

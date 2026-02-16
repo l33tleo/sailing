@@ -59,9 +59,22 @@ void UBoatSimulationComponent::Simulate(ASailboatPawn* OwnerPawn, float DeltaTim
 	}
 
 	// Integrate forward speed with quadratic drag
-	const float Drag = OwnerPawn->DragCoefficient * FMath::Square(CurrentSpeed);
+	float MaxSpeedMultiplier = 1.0f;
+	float DragMultiplier = 1.0f;
+	float TurnRateMultiplierUnused = 1.0f;
+	if (UGameInstance* GI = OwnerPawn->GetGameInstance())
+	{
+		if (UEconomySubsystem* EconomySubsystem = GI->GetSubsystem<UEconomySubsystem>())
+		{
+			EconomySubsystem->GetCombinedUpgradeMultipliers(MaxSpeedMultiplier, DragMultiplier, TurnRateMultiplierUnused);
+		}
+	}
+
+	const float EffectiveDragCoefficient = OwnerPawn->DragCoefficient * FMath::Max(0.1f, DragMultiplier);
+	const float EffectiveMaxBoatSpeed = OwnerPawn->MaxBoatSpeed * FMath::Max(0.1f, MaxSpeedMultiplier);
+	const float Drag = EffectiveDragCoefficient * FMath::Square(CurrentSpeed);
 	const float Acceleration = CurrentSailForce - Drag;
-	const float NewSpeed = FMath::Clamp(CurrentSpeed + Acceleration * DeltaTime, 0.0f, OwnerPawn->MaxBoatSpeed);
+	const float NewSpeed = FMath::Clamp(CurrentSpeed + Acceleration * DeltaTime, 0.0f, EffectiveMaxBoatSpeed);
 	const FVector Movement = Forward * NewSpeed * DeltaTime;
 	OwnerPawn->AddActorWorldOffset(Movement, false);
 	WearAccumulatedDistanceCm += Movement.Size();

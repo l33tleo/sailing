@@ -257,6 +257,9 @@ public:
 	const UBoatUpgradeDataAsset* GetUpgradeAssetById(FName UpgradeId) const;
 
 	UFUNCTION(BlueprintPure, Category = "Sailing|Economy")
+	void GetCombinedUpgradeMultipliers(float& OutMaxSpeedMultiplier, float& OutDragMultiplier, float& OutTurnRateMultiplier) const;
+
+	UFUNCTION(BlueprintPure, Category = "Sailing|Economy")
 	bool IsUpgradeUnlocked(FName UpgradeId) const { return UnlockedUpgradeIds.Contains(UpgradeId); }
 
 	UFUNCTION(BlueprintCallable, Category = "Sailing|Economy")
