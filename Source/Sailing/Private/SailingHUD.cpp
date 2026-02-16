@@ -58,6 +58,7 @@ void ASailingHUD::EnsurePortMissionBoardWidget()
 }
 
 void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayName,
+	bool bOfferMissionBoard,
 	const TArray<FName>& OfferedMissionIds, FName CurrentMissionId,
 	bool bMissionBoardOnCooldown, float CooldownRemainingSeconds,
 	bool bAutoRepairAtPort, int32 RepairCostPerPercentPoint,
@@ -72,6 +73,7 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 	FPortMissionBoardData Data;
 	Data.PortId = PortId;
 	Data.PortDisplayName = PortDisplayName;
+	Data.bSupportsMissionBoard = bOfferMissionBoard;
 	Data.OfferedMissionIds = OfferedMissionIds;
 	Data.bHasAnyOffers = OfferedMissionIds.Num() > 0;
 	Data.CurrentMissionId = CurrentMissionId;
@@ -85,13 +87,21 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 	Data.UpgradeStatus = bOfferUpgradeService
 		? FText::FromString(TEXT("Tilgjengelige oppgraderinger i denne havnen."))
 		: FText::FromString(TEXT("Ingen oppgraderingsservice i denne havnen."));
-	if (Data.bMissionBoardOnCooldown)
+	if (!Data.bSupportsMissionBoard)
+	{
+		Data.AvailabilityStatus = Data.bSupportsUpgradeService
+			? FText::FromString(TEXT("Oppdragstavlen er stengt, men havneservice er tilgjengelig."))
+			: FText::FromString(TEXT("Ingen tavletjenester tilgjengelig i denne havnen."));
+	}
+	else if (Data.bMissionBoardOnCooldown)
 	{
 		Data.AvailabilityStatus = FText::FromString(FString::Printf(TEXT("Tavlen oppdateres om %.0f sekunder"), Data.CooldownRemainingSeconds));
 	}
 	else if (!Data.bHasAnyOffers)
 	{
-		Data.AvailabilityStatus = FText::FromString(TEXT("Ingen tilgjengelige oppdrag i denne havnen."));
+		Data.AvailabilityStatus = Data.bSupportsUpgradeService
+			? FText::FromString(TEXT("Ingen tilgjengelige oppdrag – bruk havneservice nedenfor."))
+			: FText::FromString(TEXT("Ingen tilgjengelige oppdrag i denne havnen."));
 	}
 	else
 	{
@@ -197,6 +207,11 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 bool ASailingHUD::AcceptMissionFromBoard(FName MissionId)
 {
 	if (MissionId.IsNone())
+	{
+		return false;
+	}
+
+	if (!LastMissionBoardData.bSupportsMissionBoard)
 	{
 		return false;
 	}

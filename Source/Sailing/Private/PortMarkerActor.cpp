@@ -192,9 +192,10 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 
 			HUD->ShowDiscoveryPopup(PopupText);
 
-			if (bOfferMissionBoard)
+			if (bOfferMissionBoard || bOfferUpgradeService)
 			{
-				HUD->ShowPortMissionBoard(PortId, PortDisplayName, EffectiveOfferedMissionIds, CurrentMissionId,
+				HUD->ShowPortMissionBoard(PortId, PortDisplayName, bOfferMissionBoard,
+					EffectiveOfferedMissionIds, CurrentMissionId,
 					bMissionBoardOnCooldown, MissionBoardCooldownRemaining,
 					bAutoRepairAtPort, RepairCostPerPercentPoint,
 					bOfferUpgradeService, EffectiveOfferedUpgradeIds);

@@ -22,6 +22,7 @@ public:
 
 	/** Shows mission board data from current harbor interaction. */
 	void ShowPortMissionBoard(FName PortId, const FText& PortDisplayName,
+		bool bOfferMissionBoard,
 		const TArray<FName>& OfferedMissionIds, FName CurrentMissionId,
 		bool bMissionBoardOnCooldown, float CooldownRemainingSeconds,
 		bool bAutoRepairAtPort, int32 RepairCostPerPercentPoint,

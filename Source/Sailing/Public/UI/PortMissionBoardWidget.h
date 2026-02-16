@@ -55,6 +55,9 @@ struct SAILING_API FPortMissionBoardData
 	FText PortDisplayName;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	bool bSupportsMissionBoard = true;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
 	TArray<FName> OfferedMissionIds;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
