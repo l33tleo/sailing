@@ -10,10 +10,12 @@ Aksjeanalyse- og anbefalingsapp — analyserer aksjer med teknisk og fundamental
 - **Fundamental analyse** — P/E, gjeld, vekst, utbytte, kontantstrøm
 - **Anbefalingsmotor** — Scorer 0-100 og gir KJØP/HOLD/SELG med begrunnelse
 - **Anbefalingshistorikk** — Lagrer alle anbefalinger med tidsstempel og kurs
-- **Treffsikkerhet** — Evaluerer anbefalinger etter 7, 30 og 90 dager
+- **Treffsikkerhet** — Evaluerer anbefalinger etter 7, 30 og 90 dager (automatisk daglig via APScheduler)
 - **Sammenligning** — Sammenlign 2-5 aksjer side-om-side med normalisert kursgraf
+- **Sektoranalyse** — Norske og globale sektorer med gjennomsnittlig kursendring
 - **Nyheter** — Nyheter per aksje fra Yahoo Finance
 - **Portefølje-tracker** — Spor beholdning og avkastning
+- **Paper Trading** — Simuler handler uten ekte penger, spor P&L og win rate
 - **Watchlist** — Følg aksjer du er interessert i
 - **Varsler** — Sett opp varsler for kurs- og RSI-nivåer
 - **CSV-eksport** — Last ned anbefalingshistorikk for dokumentasjon
@@ -112,6 +114,20 @@ docker-compose up -d
 | GET | `/api/alerts` | Hent aktive varsler |
 | POST | `/api/alerts/check` | Sjekk alle varsler mot live data |
 | DELETE | `/api/alerts/{id}` | Slett varsel |
+
+### Paper Trading
+| Metode | Sti | Beskrivelse |
+|--------|-----|-------------|
+| POST | `/api/paper-trades` | Åpne simulert trade (BUY/SELL) |
+| GET | `/api/paper-trades` | Hent alle trades |
+| POST | `/api/paper-trades/{id}/close` | Lukk trade til markedskurs |
+| GET | `/api/paper-trades/summary` | Oppsummering (equity, win rate, P&L) |
+| DELETE | `/api/paper-trades/{id}` | Slett trade |
+
+### Sektoranalyse
+| Metode | Sti | Beskrivelse |
+|--------|-----|-------------|
+| GET | `/api/sectors` | Sektoroversikt med kursendring per sektor |
 
 ### Eksport
 | Metode | Sti | Beskrivelse |
