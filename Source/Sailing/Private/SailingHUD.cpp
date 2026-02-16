@@ -425,24 +425,10 @@ bool ASailingHUD::RequestUpgradePurchaseFromBoard(FName UpgradeId)
 		UpgradeData->CreditCost,
 		LastMissionBoardUpgradeCostMultiplier);
 
-	if (!EconomySubsystem->SpendCredits(AdjustedCost))
-	{
-		ShowDiscoveryPopup(FString::Printf(TEXT("Ikke nok kreditter til %s (%d)."), *UpgradeId.ToString(), AdjustedCost));
-		return false;
-	}
-
-	EconomySubsystem->SetUnlockedUpgrades(
-		[EconomySubsystem, UpgradeId]()
-		{
-			TArray<FName> UpdatedUpgrades = EconomySubsystem->GetUnlockedUpgradeIds();
-			UpdatedUpgrades.AddUnique(UpgradeId);
-			return UpdatedUpgrades;
-		}());
-
-	const bool bPurchased = EconomySubsystem->IsUpgradeUnlocked(UpgradeId);
+	const bool bPurchased = EconomySubsystem->PurchaseUpgradeById(UpgradeId, AdjustedCost);
 	if (!bPurchased)
 	{
-		ShowDiscoveryPopup(FString::Printf(TEXT("Kunne ikke aktivere oppgradering: %s"), *UpgradeId.ToString()));
+		ShowDiscoveryPopup(FString::Printf(TEXT("Ikke nok kreditter til %s (%d)."), *UpgradeId.ToString(), AdjustedCost));
 		return false;
 	}
 

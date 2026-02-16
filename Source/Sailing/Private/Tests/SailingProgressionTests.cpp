@@ -95,6 +95,17 @@ bool FSailingEconomyPurchaseUpgradeTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Combined speed multiplier should include unlocked upgrades"), MaxSpeedMultiplier, 1.1f);
 	TestEqual(TEXT("Combined drag multiplier should include unlocked upgrades"), DragMultiplier, 0.9f);
 	TestEqual(TEXT("Combined turn multiplier should include unlocked upgrades"), TurnRateMultiplier, 1.2f);
+
+	UEconomySubsystem* EconomyWithOverride = NewObject<UEconomySubsystem>();
+	EconomyWithOverride->SetCredits(650);
+	UBoatUpgradeDataAsset* UpgradeOverride = NewObject<UBoatUpgradeDataAsset>();
+	UpgradeOverride->UpgradeId = TEXT("OverrideCostUpgrade");
+	UpgradeOverride->CreditCost = 800;
+	EconomyWithOverride->RegisterUpgradeAsset(UpgradeOverride);
+	TestTrue(TEXT("PurchaseUpgradeById should allow cheaper override cost"),
+		EconomyWithOverride->PurchaseUpgradeById(UpgradeOverride->UpgradeId, 500));
+	TestEqual(TEXT("PurchaseUpgradeById should spend override amount"), EconomyWithOverride->GetCredits(), 150);
+	TestTrue(TEXT("PurchaseUpgradeById should unlock upgrade"), EconomyWithOverride->IsUpgradeUnlocked(UpgradeOverride->UpgradeId));
 	return true;
 }
 

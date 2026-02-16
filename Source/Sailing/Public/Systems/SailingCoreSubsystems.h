@@ -239,6 +239,9 @@ public:
 	bool PurchaseUpgrade(const UBoatUpgradeDataAsset* UpgradeData);
 
 	UFUNCTION(BlueprintCallable, Category = "Sailing|Economy")
+	bool PurchaseUpgradeById(FName UpgradeId, int32 CostOverride = INDEX_NONE);
+
+	UFUNCTION(BlueprintCallable, Category = "Sailing|Economy")
 	bool RegisterUpgradeAsset(const UBoatUpgradeDataAsset* UpgradeData);
 
 	UFUNCTION(BlueprintCallable, Category = "Sailing|Economy")

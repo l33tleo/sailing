@@ -602,17 +602,37 @@ bool UEconomySubsystem::PurchaseUpgrade(const UBoatUpgradeDataAsset* UpgradeData
 		return false;
 	}
 
-	if (UnlockedUpgradeIds.Contains(UpgradeData->UpgradeId))
-	{
-		return true;
-	}
+	RegisterUpgradeAsset(UpgradeData);
+	return PurchaseUpgradeById(UpgradeData->UpgradeId, UpgradeData->CreditCost);
+}
 
-	if (!SpendCredits(UpgradeData->CreditCost))
+bool UEconomySubsystem::PurchaseUpgradeById(FName UpgradeId, int32 CostOverride)
+{
+	if (UpgradeId.IsNone())
 	{
 		return false;
 	}
 
-	UnlockedUpgradeIds.Add(UpgradeData->UpgradeId);
+	const UBoatUpgradeDataAsset* UpgradeData = GetUpgradeAssetById(UpgradeId);
+	if (!UpgradeData)
+	{
+		return false;
+	}
+
+	if (UnlockedUpgradeIds.Contains(UpgradeId))
+	{
+		return true;
+	}
+
+	const int32 EffectiveCost = CostOverride == INDEX_NONE
+		? FMath::Max(0, UpgradeData->CreditCost)
+		: FMath::Max(0, CostOverride);
+	if (!SpendCredits(EffectiveCost))
+	{
+		return false;
+	}
+
+	UnlockedUpgradeIds.Add(UpgradeId);
 	return true;
 }
 
