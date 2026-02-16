@@ -52,6 +52,8 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 	int32 GrantedCredits = 0;
 	bool bBoatRepaired = false;
 	bool bMissionUpdated = false;
+	bool bMissionBoardOnCooldown = false;
+	float MissionBoardCooldownRemaining = 0.0f;
 	FName NewMissionId = NAME_None;
 	FName CurrentMissionId = NAME_None;
 	if (UGameInstance* GI = GetGameInstance())
@@ -97,24 +99,37 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 		{
 			if (UMissionSubsystem* MissionSubsystem = GI->GetSubsystem<UMissionSubsystem>())
 			{
-				if (bRestrictToOfferedMissions && OfferedMissionIds.Num() > 0)
+				const float CurrentTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+				if (CurrentTime < NextMissionBoardAvailableTime)
 				{
-					bMissionUpdated = MissionSubsystem->ActivateMissionFromCandidates(OfferedMissionIds, bCycleMissionOnDock);
+					bMissionBoardOnCooldown = true;
+					MissionBoardCooldownRemaining = NextMissionBoardAvailableTime - CurrentTime;
 				}
-				else if (bCycleMissionOnDock)
+				else
 				{
-					bMissionUpdated = MissionSubsystem->CycleToNextMission();
-				}
-				else if (MissionSubsystem->GetActiveMissionId().IsNone())
-				{
-					bMissionUpdated = MissionSubsystem->ActivateFallbackMission();
+					if (bRestrictToOfferedMissions && OfferedMissionIds.Num() > 0)
+					{
+						bMissionUpdated = MissionSubsystem->ActivateMissionFromCandidates(OfferedMissionIds, bCycleMissionOnDock);
+					}
+					else if (bCycleMissionOnDock)
+					{
+						bMissionUpdated = MissionSubsystem->CycleToNextMission();
+					}
+					else if (MissionSubsystem->GetActiveMissionId().IsNone())
+					{
+						bMissionUpdated = MissionSubsystem->ActivateFallbackMission();
+					}
+
+					if (MissionBoardCooldownSeconds > 0.0f)
+					{
+						NextMissionBoardAvailableTime = CurrentTime + MissionBoardCooldownSeconds;
+					}
 				}
 
 				if (bMissionUpdated)
 				{
 					NewMissionId = MissionSubsystem->GetActiveMissionId();
 				}
-
 				CurrentMissionId = MissionSubsystem->GetActiveMissionId();
 			}
 		}
@@ -136,10 +151,14 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 			{
 				PopupText += FString::Printf(TEXT(" | Oppdrag: %s"), *NewMissionId.ToString());
 			}
+			if (bMissionBoardOnCooldown)
+			{
+				PopupText += FString::Printf(TEXT(" | Tavle klar om %.0fs"), MissionBoardCooldownRemaining);
+			}
 
 			HUD->ShowDiscoveryPopup(PopupText);
 
-			if (bOfferMissionBoard)
+			if (bOfferMissionBoard && !bMissionBoardOnCooldown)
 			{
 				HUD->ShowPortMissionBoard(PortId, PortDisplayName, OfferedMissionIds, CurrentMissionId);
 			}

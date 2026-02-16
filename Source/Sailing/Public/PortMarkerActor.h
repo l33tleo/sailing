@@ -56,8 +56,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Port|MissionBoard")
 	TArray<FName> OfferedMissionIds;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Port|MissionBoard", meta = (ClampMin = "0"))
+	float MissionBoardCooldownSeconds = 0.0f;
+
 private:
 	bool bVisitedInSession = false;
+	float NextMissionBoardAvailableTime = 0.0f;
 
 	UFUNCTION()
 	void OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,

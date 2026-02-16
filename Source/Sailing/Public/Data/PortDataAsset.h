@@ -45,4 +45,7 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Port|MissionBoard")
 	TArray<FName> OfferedMissionIds;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Port|MissionBoard", meta = (ClampMin = "0"))
+	float MissionBoardCooldownSeconds = 0.0f;
 };

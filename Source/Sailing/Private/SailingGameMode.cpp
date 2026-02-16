@@ -199,6 +199,7 @@ void ASailingGameMode::BeginPlay()
 				PortNord->bRestrictToOfferedMissions = true;
 				PortNord->OfferedMissionIds = { TEXT("LeveringTilBoye"), TEXT("OppdagForsteOy") };
 				PortNord->bCycleMissionOnDock = true;
+				PortNord->MissionBoardCooldownSeconds = 12.0f;
 				PortDefinitions.Add(PortNord);
 
 				UPortDataAsset* PortVest = NewObject<UPortDataAsset>(this);
@@ -208,6 +209,7 @@ void ASailingGameMode::BeginPlay()
 				PortVest->bRestrictToOfferedMissions = true;
 				PortVest->OfferedMissionIds = { TEXT("LeveringTilBoye") };
 				PortVest->bCycleMissionOnDock = true;
+				PortVest->MissionBoardCooldownSeconds = 12.0f;
 				PortDefinitions.Add(PortVest);
 
 				UPortDataAsset* PortSor = NewObject<UPortDataAsset>(this);
@@ -217,6 +219,7 @@ void ASailingGameMode::BeginPlay()
 				PortSor->bRestrictToOfferedMissions = true;
 				PortSor->OfferedMissionIds = { TEXT("LeveringTilBoye") };
 				PortSor->bCycleMissionOnDock = true;
+				PortSor->MissionBoardCooldownSeconds = 12.0f;
 				PortDefinitions.Add(PortSor);
 			}
 
@@ -239,6 +242,7 @@ void ASailingGameMode::BeginPlay()
 				PortMarker->bCycleMissionOnDock = PortData->bCycleMissionOnDock;
 				PortMarker->bRestrictToOfferedMissions = PortData->bRestrictToOfferedMissions;
 				PortMarker->OfferedMissionIds = PortData->OfferedMissionIds;
+				PortMarker->MissionBoardCooldownSeconds = PortData->MissionBoardCooldownSeconds;
 
 				SpawnedPortMarkers.Add(PortMarker);
 				WorldStreamingSubsystem->RegisterPortPoint(PortData->PortId, PortData->WorldLocation);
