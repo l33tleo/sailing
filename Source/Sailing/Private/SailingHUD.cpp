@@ -276,16 +276,10 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 
 	LastMissionBoardPortId = PortId;
 	LastMissionBoardPortDisplayName = PortDisplayName;
-	LastMissionBoardOfferedIds = OfferedMissionIds;
-	bLastMissionBoardOnCooldown = bMissionBoardOnCooldown;
-	LastMissionBoardCooldownRemainingSeconds = FMath::Max(0.0f, CooldownRemainingSeconds);
 	bLastMissionBoardAllowManualRefresh = bAllowManualBoardRefresh;
 	LastMissionBoardManualRefreshCooldownSeconds = FMath::Max(0.0f, ManualBoardRefreshCooldownSeconds);
 	LastMissionBoardManualRefreshCreditCost = FMath::Max(0, ManualBoardRefreshCreditCost);
-	bLastMissionBoardAutoRepairAtPort = bAutoRepairAtPort;
 	LastMissionBoardRepairCostPerPercentPoint = FMath::Max(0, RepairCostPerPercentPoint);
-	bLastMissionBoardOfferUpgradeService = bOfferUpgradeService;
-	LastMissionBoardOfferedUpgradeIds = OfferedUpgradeIds;
 	LastMissionBoardUpgradeCostMultiplier = FMath::Max(0.1f, UpgradeCostMultiplier);
 
 	GetWorldTimerManager().ClearTimer(MissionBoardHideTimer);
@@ -295,21 +289,6 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 bool ASailingHUD::AcceptMissionFromBoard(FName MissionId)
 {
 	if (MissionId.IsNone())
-	{
-		return false;
-	}
-
-	if (!LastMissionBoardData.bSupportsMissionBoard)
-	{
-		return false;
-	}
-
-	if (LastMissionBoardOfferedIds.Num() > 0 && !LastMissionBoardOfferedIds.Contains(MissionId))
-	{
-		return false;
-	}
-
-	if (bLastMissionBoardOnCooldown)
 	{
 		return false;
 	}
@@ -327,11 +306,27 @@ bool ASailingHUD::AcceptMissionFromBoard(FName MissionId)
 	}
 
 	const FName CurrentMissionId = MissionSubsystem->GetActiveMissionId();
+	LastMissionBoardData.CurrentMissionId = CurrentMissionId;
 	if (!CurrentMissionId.IsNone() && CurrentMissionId == MissionId)
 	{
 		ShowDiscoveryPopup(FString::Printf(TEXT("Oppdraget '%s' er allerede aktivt."), *MissionId.ToString()));
 		CloseMissionBoard();
 		return true;
+	}
+
+	FText BlockedReason;
+	if (!UPortMissionBoardWidget::CanRequestMissionAccept(LastMissionBoardData, MissionId, BlockedReason))
+	{
+		if (!BlockedReason.IsEmpty())
+		{
+			LastMissionBoardData.AvailabilityStatus = BlockedReason;
+			if (PortMissionBoardWidget)
+			{
+				PortMissionBoardWidget->PushMissionBoardData(LastMissionBoardData);
+			}
+			ShowDiscoveryPopup(BlockedReason.ToString());
+		}
+		return false;
 	}
 
 	const bool bRequiresSwitchConfirmation = UPortMissionBoardWidget::RequiresMissionSwitchConfirmation(
@@ -394,9 +389,14 @@ bool ASailingHUD::AcceptMissionFromBoard(FName MissionId)
 
 bool ASailingHUD::RequestRepairFromBoard()
 {
-	if (bLastMissionBoardAutoRepairAtPort)
+	FText BlockedReason;
+	if (!UPortMissionBoardWidget::CanRequestRepairService(LastMissionBoardData, BlockedReason))
 	{
-		return false;
+		if (!BlockedReason.IsEmpty())
+		{
+			ShowDiscoveryPopup(BlockedReason.ToString());
+		}
+		return FMath::Clamp(LastMissionBoardData.CurrentBoatConditionPercent, 0, 100) >= 100;
 	}
 
 	UGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
@@ -445,11 +445,13 @@ bool ASailingHUD::RequestRepairFromBoard()
 
 bool ASailingHUD::RequestUpgradePurchaseFromBoard(FName UpgradeId)
 {
-	if (!UPortMissionBoardWidget::IsUpgradePurchaseRequestValid(
-		bLastMissionBoardOfferUpgradeService,
-		LastMissionBoardOfferedUpgradeIds,
-		UpgradeId))
+	FText BlockedReason;
+	if (!UPortMissionBoardWidget::CanRequestUpgradePurchase(LastMissionBoardData, UpgradeId, BlockedReason))
 	{
+		if (!BlockedReason.IsEmpty())
+		{
+			ShowDiscoveryPopup(BlockedReason.ToString());
+		}
 		return false;
 	}
 
@@ -549,39 +551,25 @@ void ASailingHUD::RefreshCurrentMissionBoard()
 		return;
 	}
 
-	if (!bLastMissionBoardAllowManualRefresh)
+	FText RefreshBlockedReason;
+	if (!UPortMissionBoardWidget::CanRequestManualRefresh(LastMissionBoardData, RefreshBlockedReason))
 	{
-		LastMissionBoardData.bSupportsManualRefresh = false;
-		LastMissionBoardData.ManualRefreshStatus = UPortMissionBoardWidget::BuildManualRefreshStatusText(
-			false,
-			false,
-			0.0f,
-			LastMissionBoardData.ManualRefreshCreditCost,
-			true);
+		LastMissionBoardData.ManualRefreshStatus = RefreshBlockedReason;
+		if (LastMissionBoardData.bManualRefreshOnCooldown)
+		{
+			LastMissionBoardData.RefreshContext = EPortBoardRefreshContext::CooldownBlocked;
+			LastMissionBoardData.RefreshContextStatus = UPortMissionBoardWidget::BuildRefreshContextStatusText(
+				LastMissionBoardData.RefreshContext);
+		}
 		PortMissionBoardWidget->PushMissionBoardData(LastMissionBoardData);
-		ShowDiscoveryPopup(TEXT("Manuell oppfriskning er deaktivert i denne havnen."));
+		if (!RefreshBlockedReason.IsEmpty())
+		{
+			ShowDiscoveryPopup(RefreshBlockedReason.ToString());
+		}
 		return;
 	}
 
 	const float CurrentTimeSeconds = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
-	if (CurrentTimeSeconds < LastMissionBoardManualRefreshNextAvailableTime)
-	{
-		LastMissionBoardData.bManualRefreshOnCooldown = true;
-		LastMissionBoardData.ManualRefreshCooldownRemainingSeconds = LastMissionBoardManualRefreshNextAvailableTime - CurrentTimeSeconds;
-		LastMissionBoardData.ManualRefreshStatus = UPortMissionBoardWidget::BuildManualRefreshStatusText(
-			true,
-			true,
-			LastMissionBoardData.ManualRefreshCooldownRemainingSeconds,
-			LastMissionBoardData.ManualRefreshCreditCost,
-			LastMissionBoardData.bCanAffordManualRefresh);
-		LastMissionBoardData.RefreshContext = EPortBoardRefreshContext::CooldownBlocked;
-		LastMissionBoardData.RefreshContextStatus = UPortMissionBoardWidget::BuildRefreshContextStatusText(
-			LastMissionBoardData.RefreshContext);
-		PortMissionBoardWidget->PushMissionBoardData(LastMissionBoardData);
-		ShowDiscoveryPopup(FString::Printf(TEXT("Tavlen kan oppfriskes om %.0f sekunder."), LastMissionBoardData.ManualRefreshCooldownRemainingSeconds));
-		return;
-	}
-
 	UGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
 	UEconomySubsystem* EconomySubsystem = GI ? GI->GetSubsystem<UEconomySubsystem>() : nullptr;
 	const int32 RefreshCost = FMath::Max(0, LastMissionBoardManualRefreshCreditCost);
@@ -684,19 +672,13 @@ void ASailingHUD::RefreshCurrentMissionBoard()
 void ASailingHUD::CloseMissionBoard()
 {
 	HidePortMissionBoard();
-	LastMissionBoardOfferedIds.Reset();
 	LastMissionBoardPortId = NAME_None;
 	LastMissionBoardPortDisplayName = FText::GetEmpty();
-	bLastMissionBoardOnCooldown = false;
-	LastMissionBoardCooldownRemainingSeconds = 0.0f;
 	bLastMissionBoardAllowManualRefresh = true;
 	LastMissionBoardManualRefreshCooldownSeconds = 0.0f;
 	LastMissionBoardManualRefreshCreditCost = 0;
 	LastMissionBoardManualRefreshNextAvailableTime = 0.0f;
-	bLastMissionBoardAutoRepairAtPort = true;
 	LastMissionBoardRepairCostPerPercentPoint = 1;
-	bLastMissionBoardOfferUpgradeService = false;
-	LastMissionBoardOfferedUpgradeIds.Reset();
 	LastMissionBoardUpgradeCostMultiplier = 1.0f;
 	LastMissionBoardData = FPortMissionBoardData();
 }

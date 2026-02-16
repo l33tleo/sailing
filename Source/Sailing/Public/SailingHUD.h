@@ -164,18 +164,12 @@ private:
 	FPortMissionBoardData LastMissionBoardData;
 
 	FTimerHandle MissionBoardHideTimer;
-	TArray<FName> LastMissionBoardOfferedIds;
 	FName LastMissionBoardPortId = NAME_None;
 	FText LastMissionBoardPortDisplayName;
-	bool bLastMissionBoardOnCooldown = false;
-	float LastMissionBoardCooldownRemainingSeconds = 0.0f;
 	bool bLastMissionBoardAllowManualRefresh = true;
 	float LastMissionBoardManualRefreshCooldownSeconds = 0.0f;
 	int32 LastMissionBoardManualRefreshCreditCost = 0;
 	float LastMissionBoardManualRefreshNextAvailableTime = 0.0f;
-	bool bLastMissionBoardAutoRepairAtPort = true;
 	int32 LastMissionBoardRepairCostPerPercentPoint = 1;
-	bool bLastMissionBoardOfferUpgradeService = false;
-	TArray<FName> LastMissionBoardOfferedUpgradeIds;
 	float LastMissionBoardUpgradeCostMultiplier = 1.0f;
 };
