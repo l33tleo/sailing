@@ -139,6 +139,7 @@ private:
 	void HandleUpgradePurchaseRequest(FName UpgradeId);
 	UFUNCTION()
 	void HandleMissionBoardActionBlocked(EPortBoardActionType ActionType, EPortBoardActionBlockedReason BlockedReasonType, const FText& Reason);
+	void RecordMissionBoardTelemetrySnapshot(UTelemetrySubsystem* TelemetrySubsystem, bool bRecordPrimaryHintDistribution) const;
 	void PushOverlayData(int32 DiscoveredIslands, int32 Credits, FName ActiveMissionId,
 		const FText& ActiveMissionTitle, float ObjectiveDistanceMeters, int32 BoatConditionPercent,
 		float ObjectiveBearingDegrees, FName LastVisitedPortId);

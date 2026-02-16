@@ -372,68 +372,7 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardBlockedMissionOffers"), LastMissionBoardData.BlockedMissionOfferCount);
 			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardPurchasableUpgradeOffers"), LastMissionBoardData.PurchasableUpgradeOfferCount);
 			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardBlockedUpgradeOffers"), LastMissionBoardData.BlockedUpgradeOfferCount);
-			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastSelectableMissionOffers"), LastMissionBoardData.SelectableMissionOfferCount);
-			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastBlockedMissionOffers"), LastMissionBoardData.BlockedMissionOfferCount);
-			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastPurchasableUpgradeOffers"), LastMissionBoardData.PurchasableUpgradeOfferCount);
-			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastBlockedUpgradeOffers"), LastMissionBoardData.BlockedUpgradeOfferCount);
-			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastHasSelectableMissions"), LastMissionBoardData.bHasSelectableMissionOffers ? 1 : 0);
-			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastHasPurchasableUpgrades"), LastMissionBoardData.bHasPurchasableUpgradeOffers ? 1 : 0);
-			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastHasImmediateActions"), LastMissionBoardData.bHasAnyImmediateActions ? 1 : 0);
-			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastPrimaryActionHint"), static_cast<int32>(LastMissionBoardData.PrimaryActionHint));
-			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastRepairActionBlockReason"), static_cast<int32>(LastMissionBoardData.RepairActionBlockReasonType));
-			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastManualRefreshActionBlockReason"), static_cast<int32>(LastMissionBoardData.ManualRefreshActionBlockReasonType));
-			switch (LastMissionBoardData.PrimaryActionHint)
-			{
-			case EPortBoardPrimaryActionHint::SelectMission:
-				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardPrimaryHint_SelectMission"), 1);
-				break;
-			case EPortBoardPrimaryActionHint::BuyUpgrade:
-				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardPrimaryHint_BuyUpgrade"), 1);
-				break;
-			case EPortBoardPrimaryActionHint::SelectMissionOrBuyUpgrade:
-				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardPrimaryHint_Mixed"), 1);
-				break;
-			case EPortBoardPrimaryActionHint::None:
-			default:
-				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardPrimaryHint_None"), 1);
-				break;
-			}
-			switch (LastMissionBoardData.RepairActionBlockReasonType)
-			{
-			case EPortRepairActionBlockReason::None:
-				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardRepairAction_Ready"), 1);
-				break;
-			case EPortRepairActionBlockReason::RepairServiceDisabled:
-				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardRepairAction_Blocked_NoService"), 1);
-				break;
-			case EPortRepairActionBlockReason::AlreadyAtFullCondition:
-				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardRepairAction_Blocked_FullCondition"), 1);
-				break;
-			case EPortRepairActionBlockReason::InsufficientCredits:
-				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardRepairAction_Blocked_NoCredits"), 1);
-				break;
-			default:
-				break;
-			}
-			switch (LastMissionBoardData.ManualRefreshActionBlockReasonType)
-			{
-			case EPortManualRefreshActionBlockReason::None:
-				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardManualRefreshAction_Ready"), 1);
-				break;
-			case EPortManualRefreshActionBlockReason::ManualRefreshDisabled:
-				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardManualRefreshAction_Blocked_Disabled"), 1);
-				break;
-			case EPortManualRefreshActionBlockReason::ManualRefreshCooldown:
-				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardManualRefreshAction_Blocked_Cooldown"), 1);
-				break;
-			case EPortManualRefreshActionBlockReason::InsufficientCredits:
-				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardManualRefreshAction_Blocked_NoCredits"), 1);
-				break;
-			default:
-				break;
-			}
-			RecordMissionOfferBlockedReasonSummaryTelemetry(TelemetrySubsystem, LastMissionBoardData);
-			RecordUpgradeOfferBlockedReasonSummaryTelemetry(TelemetrySubsystem, LastMissionBoardData);
+			RecordMissionBoardTelemetrySnapshot(TelemetrySubsystem, true);
 		}
 	}
 
@@ -933,18 +872,7 @@ void ASailingHUD::RefreshCurrentMissionBoard()
 	{
 		if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
 		{
-			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastSelectableMissionOffers"), LastMissionBoardData.SelectableMissionOfferCount);
-			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastBlockedMissionOffers"), LastMissionBoardData.BlockedMissionOfferCount);
-			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastPurchasableUpgradeOffers"), LastMissionBoardData.PurchasableUpgradeOfferCount);
-			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastBlockedUpgradeOffers"), LastMissionBoardData.BlockedUpgradeOfferCount);
-			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastHasSelectableMissions"), LastMissionBoardData.bHasSelectableMissionOffers ? 1 : 0);
-			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastHasPurchasableUpgrades"), LastMissionBoardData.bHasPurchasableUpgradeOffers ? 1 : 0);
-			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastHasImmediateActions"), LastMissionBoardData.bHasAnyImmediateActions ? 1 : 0);
-			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastPrimaryActionHint"), static_cast<int32>(LastMissionBoardData.PrimaryActionHint));
-			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastRepairActionBlockReason"), static_cast<int32>(LastMissionBoardData.RepairActionBlockReasonType));
-			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastManualRefreshActionBlockReason"), static_cast<int32>(LastMissionBoardData.ManualRefreshActionBlockReasonType));
-			RecordMissionOfferBlockedReasonSummaryTelemetry(TelemetrySubsystem, LastMissionBoardData);
-			RecordUpgradeOfferBlockedReasonSummaryTelemetry(TelemetrySubsystem, LastMissionBoardData);
+			RecordMissionBoardTelemetrySnapshot(TelemetrySubsystem, false);
 		}
 	}
 
@@ -1091,6 +1019,84 @@ void ASailingHUD::HandleMissionBoardActionBlocked(EPortBoardActionType ActionTyp
 	{
 		ShowDiscoveryPopup(Reason.ToString());
 	}
+}
+
+void ASailingHUD::RecordMissionBoardTelemetrySnapshot(UTelemetrySubsystem* TelemetrySubsystem, bool bRecordPrimaryHintDistribution) const
+{
+	if (!TelemetrySubsystem)
+	{
+		return;
+	}
+
+	TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastSelectableMissionOffers"), LastMissionBoardData.SelectableMissionOfferCount);
+	TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastBlockedMissionOffers"), LastMissionBoardData.BlockedMissionOfferCount);
+	TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastPurchasableUpgradeOffers"), LastMissionBoardData.PurchasableUpgradeOfferCount);
+	TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastBlockedUpgradeOffers"), LastMissionBoardData.BlockedUpgradeOfferCount);
+	TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastHasSelectableMissions"), LastMissionBoardData.bHasSelectableMissionOffers ? 1 : 0);
+	TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastHasPurchasableUpgrades"), LastMissionBoardData.bHasPurchasableUpgradeOffers ? 1 : 0);
+	TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastHasImmediateActions"), LastMissionBoardData.bHasAnyImmediateActions ? 1 : 0);
+	TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastPrimaryActionHint"), static_cast<int32>(LastMissionBoardData.PrimaryActionHint));
+	TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastRepairActionBlockReason"), static_cast<int32>(LastMissionBoardData.RepairActionBlockReasonType));
+	TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastManualRefreshActionBlockReason"), static_cast<int32>(LastMissionBoardData.ManualRefreshActionBlockReasonType));
+
+	if (bRecordPrimaryHintDistribution)
+	{
+		switch (LastMissionBoardData.PrimaryActionHint)
+		{
+		case EPortBoardPrimaryActionHint::SelectMission:
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardPrimaryHint_SelectMission"), 1);
+			break;
+		case EPortBoardPrimaryActionHint::BuyUpgrade:
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardPrimaryHint_BuyUpgrade"), 1);
+			break;
+		case EPortBoardPrimaryActionHint::SelectMissionOrBuyUpgrade:
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardPrimaryHint_Mixed"), 1);
+			break;
+		case EPortBoardPrimaryActionHint::None:
+		default:
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardPrimaryHint_None"), 1);
+			break;
+		}
+
+		switch (LastMissionBoardData.RepairActionBlockReasonType)
+		{
+		case EPortRepairActionBlockReason::None:
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardRepairAction_Ready"), 1);
+			break;
+		case EPortRepairActionBlockReason::RepairServiceDisabled:
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardRepairAction_Blocked_NoService"), 1);
+			break;
+		case EPortRepairActionBlockReason::AlreadyAtFullCondition:
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardRepairAction_Blocked_FullCondition"), 1);
+			break;
+		case EPortRepairActionBlockReason::InsufficientCredits:
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardRepairAction_Blocked_NoCredits"), 1);
+			break;
+		default:
+			break;
+		}
+
+		switch (LastMissionBoardData.ManualRefreshActionBlockReasonType)
+		{
+		case EPortManualRefreshActionBlockReason::None:
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardManualRefreshAction_Ready"), 1);
+			break;
+		case EPortManualRefreshActionBlockReason::ManualRefreshDisabled:
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardManualRefreshAction_Blocked_Disabled"), 1);
+			break;
+		case EPortManualRefreshActionBlockReason::ManualRefreshCooldown:
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardManualRefreshAction_Blocked_Cooldown"), 1);
+			break;
+		case EPortManualRefreshActionBlockReason::InsufficientCredits:
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardManualRefreshAction_Blocked_NoCredits"), 1);
+			break;
+		default:
+			break;
+		}
+	}
+
+	RecordMissionOfferBlockedReasonSummaryTelemetry(TelemetrySubsystem, LastMissionBoardData);
+	RecordUpgradeOfferBlockedReasonSummaryTelemetry(TelemetrySubsystem, LastMissionBoardData);
 }
 
 void ASailingHUD::PushOverlayData(int32 DiscoveredIslands, int32 Credits, FName ActiveMissionId,
