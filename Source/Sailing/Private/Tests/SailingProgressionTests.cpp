@@ -911,13 +911,33 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 	RepairBoardData.bCanAffordRepair = true;
 	TestTrue(TEXT("Repair helper should allow when service available and affordable"),
 		UPortMissionBoardWidget::CanRequestRepairService(RepairBoardData, BlockedReason));
+	TestEqual(TEXT("Repair helper should classify ready state"),
+		UPortMissionBoardWidget::DetermineRepairActionBlockReason(RepairBoardData),
+		EPortRepairActionBlockReason::None);
 	RepairBoardData.bCanAffordRepair = false;
 	RepairBoardData.RepairStatus = FText::FromString(TEXT("Mangler kreditter til reparasjon (30)."));
 	TestFalse(TEXT("Repair helper should reject unaffordable repair"),
 		UPortMissionBoardWidget::CanRequestRepairService(RepairBoardData, BlockedReason));
+	TestEqual(TEXT("Repair helper should classify unaffordable state"),
+		UPortMissionBoardWidget::DetermineRepairActionBlockReason(RepairBoardData),
+		EPortRepairActionBlockReason::InsufficientCredits);
 	TestEqual(TEXT("Repair helper should explain unaffordable repair"),
 		BlockedReason.ToString(),
 		FString(TEXT("Mangler kreditter til reparasjon (30).")));
+	RepairBoardData.bCanAffordRepair = true;
+	RepairBoardData.CurrentBoatConditionPercent = 100;
+	TestEqual(TEXT("Repair helper should classify full-condition state"),
+		UPortMissionBoardWidget::DetermineRepairActionBlockReason(RepairBoardData),
+		EPortRepairActionBlockReason::AlreadyAtFullCondition);
+	TestEqual(TEXT("Repair helper text should describe full-condition block"),
+		UPortMissionBoardWidget::BuildRepairActionBlockReasonText(
+			EPortRepairActionBlockReason::AlreadyAtFullCondition,
+			RepairBoardData).ToString(),
+		FString(TEXT("Båten er allerede i topp stand.")));
+	RepairBoardData.bSupportsRepairService = false;
+	TestEqual(TEXT("Repair helper should classify disabled-service state"),
+		UPortMissionBoardWidget::DetermineRepairActionBlockReason(RepairBoardData),
+		EPortRepairActionBlockReason::RepairServiceDisabled);
 
 	FPortMissionBoardData RefreshBoardData;
 	RefreshBoardData.bSupportsManualRefresh = true;
@@ -926,9 +946,15 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 	RefreshBoardData.bCanAffordManualRefresh = true;
 	TestTrue(TEXT("Manual refresh helper should allow enabled affordable refresh"),
 		UPortMissionBoardWidget::CanRequestManualRefresh(RefreshBoardData, BlockedReason));
+	TestEqual(TEXT("Manual refresh helper should classify ready state"),
+		UPortMissionBoardWidget::DetermineManualRefreshActionBlockReason(RefreshBoardData),
+		EPortManualRefreshActionBlockReason::None);
 	RefreshBoardData.bSupportsManualRefresh = false;
 	TestFalse(TEXT("Manual refresh helper should reject when refresh disabled"),
 		UPortMissionBoardWidget::CanRequestManualRefresh(RefreshBoardData, BlockedReason));
+	TestEqual(TEXT("Manual refresh helper should classify disabled state"),
+		UPortMissionBoardWidget::DetermineManualRefreshActionBlockReason(RefreshBoardData),
+		EPortManualRefreshActionBlockReason::ManualRefreshDisabled);
 	TestEqual(TEXT("Manual refresh helper should expose disabled reason"),
 		BlockedReason.ToString(),
 		FString(TEXT("Manuell oppfriskning er deaktivert i denne havnen.")));
@@ -937,6 +963,9 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 	RefreshBoardData.ManualRefreshCooldownRemainingSeconds = 6.0f;
 	TestFalse(TEXT("Manual refresh helper should reject while cooldown active"),
 		UPortMissionBoardWidget::CanRequestManualRefresh(RefreshBoardData, BlockedReason));
+	TestEqual(TEXT("Manual refresh helper should classify cooldown state"),
+		UPortMissionBoardWidget::DetermineManualRefreshActionBlockReason(RefreshBoardData),
+		EPortManualRefreshActionBlockReason::ManualRefreshCooldown);
 	TestEqual(TEXT("Manual refresh helper should expose cooldown reason"),
 		BlockedReason.ToString(),
 		FString(TEXT("Manuell oppfriskning klar om 6 sekunder.")));
@@ -944,6 +973,9 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 	RefreshBoardData.bCanAffordManualRefresh = false;
 	TestFalse(TEXT("Manual refresh helper should reject unaffordable refresh"),
 		UPortMissionBoardWidget::CanRequestManualRefresh(RefreshBoardData, BlockedReason));
+	TestEqual(TEXT("Manual refresh helper should classify unaffordable state"),
+		UPortMissionBoardWidget::DetermineManualRefreshActionBlockReason(RefreshBoardData),
+		EPortManualRefreshActionBlockReason::InsufficientCredits);
 	TestEqual(TEXT("Manual refresh helper should explain unaffordable refresh"),
 		BlockedReason.ToString(),
 		FString(TEXT("Mangler kreditter til manuell oppfriskning (25).")));
@@ -959,6 +991,14 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 	AnnotatedBoardData.bSupportsUpgradeService = true;
 	AnnotatedBoardData.OfferedUpgradeIds = { TEXT("Upgrade_A") };
 	AnnotatedBoardData.UpgradeAvailabilityReason = EPortUpgradeAvailabilityReason::Ready;
+	AnnotatedBoardData.bSupportsRepairService = true;
+	AnnotatedBoardData.CurrentBoatConditionPercent = 72;
+	AnnotatedBoardData.bCanAffordRepair = false;
+	AnnotatedBoardData.RepairStatus = FText::FromString(TEXT("Mangler kreditter til reparasjon (56)."));
+	AnnotatedBoardData.bSupportsManualRefresh = true;
+	AnnotatedBoardData.bManualRefreshOnCooldown = false;
+	AnnotatedBoardData.ManualRefreshCreditCost = 25;
+	AnnotatedBoardData.bCanAffordManualRefresh = false;
 	FPortUpgradeOfferEntry AnnotatedUpgradeEntry;
 	AnnotatedUpgradeEntry.UpgradeId = TEXT("Upgrade_A");
 	AnnotatedUpgradeEntry.CreditCost = 300;
@@ -987,6 +1027,12 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 	TestEqual(TEXT("Annotated board should track blocked upgrade count"), AnnotatedResult.BlockedUpgradeOfferCount, 1);
 	TestFalse(TEXT("Annotated board should mark no purchasable upgrades"), AnnotatedResult.bHasPurchasableUpgradeOffers);
 	TestFalse(TEXT("Annotated board should mark no immediate actions"), AnnotatedResult.bHasAnyImmediateActions);
+	TestEqual(TEXT("Annotated board should classify repair as blocked by insufficient credits"),
+		AnnotatedResult.RepairActionBlockReasonType,
+		EPortRepairActionBlockReason::InsufficientCredits);
+	TestEqual(TEXT("Annotated board should classify manual refresh as blocked by insufficient credits"),
+		AnnotatedResult.ManualRefreshActionBlockReasonType,
+		EPortManualRefreshActionBlockReason::InsufficientCredits);
 	TestEqual(TEXT("Annotated board should expose no primary action hint"),
 		AnnotatedResult.PrimaryActionHint,
 		EPortBoardPrimaryActionHint::None);
@@ -1017,6 +1063,12 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 			EPortUpgradeOfferActionBlockReason::InsufficientCredits);
 		TestEqual(TEXT("PushMissionBoardData should include upgrade blocked reason"), LastData.OfferedUpgrades[0].PurchaseBlockedReason.ToString(), FString(TEXT("Ikke nok kreditter (300 kreves).")));
 		TestEqual(TEXT("PushMissionBoardData should track blocked upgrade count"), LastData.BlockedUpgradeOfferCount, 1);
+		TestEqual(TEXT("PushMissionBoardData should annotate repair block reason enum"),
+			LastData.RepairActionBlockReasonType,
+			EPortRepairActionBlockReason::InsufficientCredits);
+		TestEqual(TEXT("PushMissionBoardData should annotate manual-refresh block reason enum"),
+			LastData.ManualRefreshActionBlockReasonType,
+			EPortManualRefreshActionBlockReason::InsufficientCredits);
 	}
 
 	FPortMissionBoardData SummaryBoardData;

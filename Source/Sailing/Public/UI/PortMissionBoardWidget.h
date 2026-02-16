@@ -100,6 +100,24 @@ enum class EPortUpgradeOfferActionBlockReason : uint8
 	UpgradeAvailabilityBlocked
 };
 
+UENUM(BlueprintType)
+enum class EPortRepairActionBlockReason : uint8
+{
+	None,
+	RepairServiceDisabled,
+	AlreadyAtFullCondition,
+	InsufficientCredits
+};
+
+UENUM(BlueprintType)
+enum class EPortManualRefreshActionBlockReason : uint8
+{
+	None,
+	ManualRefreshDisabled,
+	ManualRefreshCooldown,
+	InsufficientCredits
+};
+
 USTRUCT(BlueprintType)
 struct SAILING_API FPortMissionOfferEntry
 {
@@ -259,6 +277,9 @@ struct SAILING_API FPortMissionBoardData
 	FText ManualRefreshStatus;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	EPortManualRefreshActionBlockReason ManualRefreshActionBlockReasonType = EPortManualRefreshActionBlockReason::None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
 	int32 PortVisitCount = 0;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
@@ -362,6 +383,9 @@ struct SAILING_API FPortMissionBoardData
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
 	FText RepairStatus;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	EPortRepairActionBlockReason RepairActionBlockReasonType = EPortRepairActionBlockReason::None;
 };
 
 /**
@@ -499,10 +523,28 @@ public:
 		const FPortMissionBoardData& BoardData,
 		FText& OutBlockedReason);
 
+	UFUNCTION(BlueprintPure, Category = "MissionBoard|Service")
+	static EPortRepairActionBlockReason DetermineRepairActionBlockReason(
+		const FPortMissionBoardData& BoardData);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard|Service")
+	static FText BuildRepairActionBlockReasonText(
+		EPortRepairActionBlockReason BlockReason,
+		const FPortMissionBoardData& BoardData);
+
 	UFUNCTION(BlueprintPure, Category = "MissionBoard")
 	static bool CanRequestManualRefresh(
 		const FPortMissionBoardData& BoardData,
 		FText& OutBlockedReason);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard")
+	static EPortManualRefreshActionBlockReason DetermineManualRefreshActionBlockReason(
+		const FPortMissionBoardData& BoardData);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard")
+	static FText BuildManualRefreshActionBlockReasonText(
+		EPortManualRefreshActionBlockReason BlockReason,
+		const FPortMissionBoardData& BoardData);
 
 	UFUNCTION(BlueprintPure, Category = "MissionBoard")
 	static FPortMissionBoardData BuildActionStateAnnotatedBoardData(const FPortMissionBoardData& BoardData);

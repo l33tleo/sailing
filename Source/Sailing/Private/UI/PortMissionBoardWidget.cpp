@@ -547,66 +547,112 @@ bool UPortMissionBoardWidget::CanRequestRepairService(
 	const FPortMissionBoardData& BoardData,
 	FText& OutBlockedReason)
 {
+	const EPortRepairActionBlockReason BlockReason = DetermineRepairActionBlockReason(BoardData);
+	OutBlockedReason = BuildRepairActionBlockReasonText(BlockReason, BoardData);
+	return BlockReason == EPortRepairActionBlockReason::None;
+}
+
+EPortRepairActionBlockReason UPortMissionBoardWidget::DetermineRepairActionBlockReason(
+	const FPortMissionBoardData& BoardData)
+{
 	if (!BoardData.bSupportsRepairService)
 	{
-		OutBlockedReason = BoardData.RepairStatus.IsEmpty()
-			? FText::FromString(TEXT("Reparasjon er ikke tilgjengelig i denne havnen."))
-			: BoardData.RepairStatus;
-		return false;
+		return EPortRepairActionBlockReason::RepairServiceDisabled;
 	}
 
 	if (FMath::Clamp(BoardData.CurrentBoatConditionPercent, 0, 100) >= 100)
 	{
-		OutBlockedReason = FText::FromString(TEXT("Båten er allerede i topp stand."));
-		return false;
+		return EPortRepairActionBlockReason::AlreadyAtFullCondition;
 	}
 
 	if (!BoardData.bCanAffordRepair)
 	{
-		OutBlockedReason = BoardData.RepairStatus.IsEmpty()
-			? FText::FromString(TEXT("Ikke nok kreditter til reparasjon."))
-			: BoardData.RepairStatus;
-		return false;
+		return EPortRepairActionBlockReason::InsufficientCredits;
 	}
 
-	OutBlockedReason = FText::GetEmpty();
-	return true;
+	return EPortRepairActionBlockReason::None;
+}
+
+FText UPortMissionBoardWidget::BuildRepairActionBlockReasonText(
+	EPortRepairActionBlockReason BlockReason,
+	const FPortMissionBoardData& BoardData)
+{
+	switch (BlockReason)
+	{
+	case EPortRepairActionBlockReason::None:
+		return FText::GetEmpty();
+	case EPortRepairActionBlockReason::RepairServiceDisabled:
+		return BoardData.RepairStatus.IsEmpty()
+			? FText::FromString(TEXT("Reparasjon er ikke tilgjengelig i denne havnen."))
+			: BoardData.RepairStatus;
+	case EPortRepairActionBlockReason::AlreadyAtFullCondition:
+		return FText::FromString(TEXT("Båten er allerede i topp stand."));
+	case EPortRepairActionBlockReason::InsufficientCredits:
+		return BoardData.RepairStatus.IsEmpty()
+			? FText::FromString(TEXT("Ikke nok kreditter til reparasjon."))
+			: BoardData.RepairStatus;
+	default:
+		return FText::FromString(TEXT("Reparasjon er utilgjengelig akkurat nå."));
+	}
 }
 
 bool UPortMissionBoardWidget::CanRequestManualRefresh(
 	const FPortMissionBoardData& BoardData,
 	FText& OutBlockedReason)
 {
+	const EPortManualRefreshActionBlockReason BlockReason = DetermineManualRefreshActionBlockReason(BoardData);
+	OutBlockedReason = BuildManualRefreshActionBlockReasonText(BlockReason, BoardData);
+	return BlockReason == EPortManualRefreshActionBlockReason::None;
+}
+
+EPortManualRefreshActionBlockReason UPortMissionBoardWidget::DetermineManualRefreshActionBlockReason(
+	const FPortMissionBoardData& BoardData)
+{
 	if (!BoardData.bSupportsManualRefresh)
 	{
-		OutBlockedReason = BuildManualRefreshStatusText(false, false, 0.0f, BoardData.ManualRefreshCreditCost, true);
-		return false;
+		return EPortManualRefreshActionBlockReason::ManualRefreshDisabled;
 	}
 
 	if (BoardData.bManualRefreshOnCooldown)
 	{
-		OutBlockedReason = BuildManualRefreshStatusText(
+		return EPortManualRefreshActionBlockReason::ManualRefreshCooldown;
+	}
+
+	if (!BoardData.bCanAffordManualRefresh)
+	{
+		return EPortManualRefreshActionBlockReason::InsufficientCredits;
+	}
+
+	return EPortManualRefreshActionBlockReason::None;
+}
+
+FText UPortMissionBoardWidget::BuildManualRefreshActionBlockReasonText(
+	EPortManualRefreshActionBlockReason BlockReason,
+	const FPortMissionBoardData& BoardData)
+{
+	switch (BlockReason)
+	{
+	case EPortManualRefreshActionBlockReason::None:
+		return FText::GetEmpty();
+	case EPortManualRefreshActionBlockReason::ManualRefreshDisabled:
+		return BuildManualRefreshStatusText(false, false, 0.0f, BoardData.ManualRefreshCreditCost, true);
+	case EPortManualRefreshActionBlockReason::ManualRefreshCooldown:
+		return BuildManualRefreshStatusText(
 			true,
 			true,
 			BoardData.ManualRefreshCooldownRemainingSeconds,
 			BoardData.ManualRefreshCreditCost,
 			BoardData.bCanAffordManualRefresh);
-		return false;
-	}
-
-	if (!BoardData.bCanAffordManualRefresh)
-	{
-		OutBlockedReason = BuildManualRefreshStatusText(
+	case EPortManualRefreshActionBlockReason::InsufficientCredits:
+		return BuildManualRefreshStatusText(
 			true,
 			false,
 			0.0f,
 			BoardData.ManualRefreshCreditCost,
 			false);
-		return false;
+	default:
+		return FText::FromString(TEXT("Manuell oppfriskning er utilgjengelig akkurat nå."));
 	}
-
-	OutBlockedReason = FText::GetEmpty();
-	return true;
 }
 
 FPortMissionBoardData UPortMissionBoardWidget::BuildActionStateAnnotatedBoardData(const FPortMissionBoardData& BoardData)
@@ -659,6 +705,8 @@ FPortMissionBoardData UPortMissionBoardWidget::BuildActionStateAnnotatedBoardDat
 	Result.OfferActionSummaryStatus = BuildOfferActionSummaryStatusText(Result);
 	Result.PrimaryActionHint = DeterminePrimaryActionHint(Result);
 	Result.PrimaryActionHintStatus = BuildPrimaryActionHintStatusText(Result.PrimaryActionHint);
+	Result.RepairActionBlockReasonType = DetermineRepairActionBlockReason(Result);
+	Result.ManualRefreshActionBlockReasonType = DetermineManualRefreshActionBlockReason(Result);
 	return Result;
 }
 
