@@ -83,21 +83,7 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 				Data.OfferedMissions.Add(Entry);
 			}
 
-			const TArray<FMissionBoardSelectionEntry> History = MissionSubsystem->GetMissionBoardSelectionHistory();
-			for (int32 i = History.Num() - 1; i >= 0; --i)
-			{
-				const FMissionBoardSelectionEntry& Entry = History[i];
-				if (Entry.PortId != PortId)
-				{
-					continue;
-				}
-
-				Data.RecentSelections.Add(Entry);
-				if (Data.RecentSelections.Num() >= 5)
-				{
-					break;
-				}
-			}
+			Data.RecentSelections = MissionSubsystem->GetRecentMissionBoardSelectionsForPort(PortId, 5);
 		}
 	}
 	PortMissionBoardWidget->PushMissionBoardData(Data);

@@ -173,6 +173,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Sailing|MissionBoard")
 	void SetMissionBoardSelectionHistory(const TArray<FMissionBoardSelectionEntry>& InHistory);
 
+	UFUNCTION(BlueprintPure, Category = "Sailing|MissionBoard")
+	TArray<FMissionBoardSelectionEntry> GetRecentMissionBoardSelectionsForPort(FName PortId, int32 MaxEntries = 5) const;
+
 private:
 	UPROPERTY()
 	FName ActiveMissionId = NAME_None;

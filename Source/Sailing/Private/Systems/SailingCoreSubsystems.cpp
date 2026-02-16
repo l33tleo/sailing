@@ -469,6 +469,32 @@ void UMissionSubsystem::SetMissionBoardSelectionHistory(const TArray<FMissionBoa
 	}
 }
 
+TArray<FMissionBoardSelectionEntry> UMissionSubsystem::GetRecentMissionBoardSelectionsForPort(FName PortId, int32 MaxEntries) const
+{
+	TArray<FMissionBoardSelectionEntry> Result;
+	if (PortId.IsNone() || MaxEntries <= 0)
+	{
+		return Result;
+	}
+
+	for (int32 i = MissionBoardSelectionHistory.Num() - 1; i >= 0; --i)
+	{
+		const FMissionBoardSelectionEntry& Entry = MissionBoardSelectionHistory[i];
+		if (Entry.PortId != PortId)
+		{
+			continue;
+		}
+
+		Result.Add(Entry);
+		if (Result.Num() >= MaxEntries)
+		{
+			break;
+		}
+	}
+
+	return Result;
+}
+
 void UEconomySubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);

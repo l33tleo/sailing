@@ -313,9 +313,15 @@ bool FSailingMissionDisplayNameLookupTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Unknown mission should fallback to mission id text"), FallbackTitle.ToString(), FString(TEXT("UnknownMission")));
 
 	MissionSubsystem->RecordMissionBoardSelection(TEXT("HavnNord"), Mission->MissionId);
+	MissionSubsystem->RecordMissionBoardSelection(TEXT("HavnNord"), TEXT("Mission_B"));
+	MissionSubsystem->RecordMissionBoardSelection(TEXT("HavnVest"), TEXT("Mission_C"));
 	const TArray<FMissionBoardSelectionEntry> History = MissionSubsystem->GetMissionBoardSelectionHistory();
-	TestEqual(TEXT("Mission board history should contain selection"), History.Num(), 1);
+	TestEqual(TEXT("Mission board history should contain selections"), History.Num(), 3);
 	TestEqual(TEXT("History entry should include port id"), History[0].PortId, FName(TEXT("HavnNord")));
+
+	const TArray<FMissionBoardSelectionEntry> RecentNord = MissionSubsystem->GetRecentMissionBoardSelectionsForPort(TEXT("HavnNord"), 2);
+	TestEqual(TEXT("Recent per-port selections should return requested count"), RecentNord.Num(), 2);
+	TestEqual(TEXT("Most recent entry should be first in result"), RecentNord[0].MissionId, FName(TEXT("Mission_B")));
 
 	return true;
 }
