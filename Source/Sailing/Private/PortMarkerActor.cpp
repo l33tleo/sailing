@@ -53,6 +53,7 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 	bool bBoatRepaired = false;
 	bool bMissionUpdated = false;
 	FName NewMissionId = NAME_None;
+	FName CurrentMissionId = NAME_None;
 	if (UGameInstance* GI = GetGameInstance())
 	{
 		if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
@@ -104,6 +105,8 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 				{
 					NewMissionId = MissionSubsystem->GetActiveMissionId();
 				}
+
+				CurrentMissionId = MissionSubsystem->GetActiveMissionId();
 			}
 		}
 	}
@@ -129,7 +132,7 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 
 			if (bOfferMissionBoard)
 			{
-				HUD->ShowPortMissionBoard(PortId, PortDisplayName, OfferedMissionIds, NewMissionId);
+				HUD->ShowPortMissionBoard(PortId, PortDisplayName, OfferedMissionIds, CurrentMissionId);
 			}
 		}
 	}

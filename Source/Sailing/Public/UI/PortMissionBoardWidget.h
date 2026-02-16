@@ -4,6 +4,9 @@
 #include "Blueprint/UserWidget.h"
 #include "PortMissionBoardWidget.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPortMissionAcceptRequested, FName, MissionId);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPortMissionBoardCloseRequested);
+
 USTRUCT(BlueprintType)
 struct SAILING_API FPortMissionBoardData
 {
@@ -34,8 +37,20 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MissionBoard")
 	void PushMissionBoardData(const FPortMissionBoardData& InData);
 
+	UFUNCTION(BlueprintCallable, Category = "MissionBoard")
+	void RequestAcceptMission(FName MissionId);
+
+	UFUNCTION(BlueprintCallable, Category = "MissionBoard")
+	void RequestCloseBoard();
+
 	UFUNCTION(BlueprintPure, Category = "MissionBoard")
 	const FPortMissionBoardData& GetLastData() const { return LastData; }
+
+	UPROPERTY(BlueprintAssignable, Category = "MissionBoard")
+	FOnPortMissionAcceptRequested OnAcceptMissionRequested;
+
+	UPROPERTY(BlueprintAssignable, Category = "MissionBoard")
+	FOnPortMissionBoardCloseRequested OnCloseRequested;
 
 protected:
 	UFUNCTION(BlueprintImplementableEvent, Category = "MissionBoard")

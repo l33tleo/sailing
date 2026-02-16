@@ -47,6 +47,8 @@ void ASailingHUD::EnsurePortMissionBoardWidget()
 	PortMissionBoardWidget = CreateWidget<UPortMissionBoardWidget>(PlayerOwner, PortMissionBoardWidgetClass);
 	if (PortMissionBoardWidget)
 	{
+		PortMissionBoardWidget->OnAcceptMissionRequested.AddDynamic(this, &ASailingHUD::HandleMissionAcceptedRequest);
+		PortMissionBoardWidget->OnCloseRequested.AddDynamic(this, &ASailingHUD::HandleMissionBoardCloseRequest);
 		PortMissionBoardWidget->AddToViewport(2);
 		PortMissionBoardWidget->SetVisibility(ESlateVisibility::Hidden);
 	}
@@ -69,8 +71,57 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 	PortMissionBoardWidget->PushMissionBoardData(Data);
 	PortMissionBoardWidget->SetVisibility(ESlateVisibility::Visible);
 
+	LastMissionBoardPortId = PortId;
+	LastMissionBoardPortDisplayName = PortDisplayName;
+	LastMissionBoardOfferedIds = OfferedMissionIds;
+
 	GetWorldTimerManager().ClearTimer(MissionBoardHideTimer);
 	GetWorldTimerManager().SetTimer(MissionBoardHideTimer, this, &ASailingHUD::HidePortMissionBoard, 5.0f, false);
+}
+
+bool ASailingHUD::AcceptMissionFromBoard(FName MissionId)
+{
+	if (MissionId.IsNone())
+	{
+		return false;
+	}
+
+	if (LastMissionBoardOfferedIds.Num() > 0 && !LastMissionBoardOfferedIds.Contains(MissionId))
+	{
+		return false;
+	}
+
+	UGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
+	if (!GI)
+	{
+		return false;
+	}
+
+	UMissionSubsystem* MissionSubsystem = GI->GetSubsystem<UMissionSubsystem>();
+	if (!MissionSubsystem)
+	{
+		return false;
+	}
+
+	const bool bActivated = MissionSubsystem->ActivateMissionFromCandidates({ MissionId }, false);
+	if (bActivated)
+	{
+		ShowDiscoveryPopup(FString::Printf(TEXT("Oppdrag valgt: %s"), *MissionId.ToString()));
+		if (ASailingGameMode* GM = Cast<ASailingGameMode>(UGameplayStatics::GetGameMode(GetWorld())))
+		{
+			GM->SaveGame_();
+		}
+		CloseMissionBoard();
+	}
+	return bActivated;
+}
+
+void ASailingHUD::CloseMissionBoard()
+{
+	HidePortMissionBoard();
+	LastMissionBoardOfferedIds.Reset();
+	LastMissionBoardPortId = NAME_None;
+	LastMissionBoardPortDisplayName = FText::GetEmpty();
 }
 
 void ASailingHUD::HidePortMissionBoard()
@@ -79,6 +130,16 @@ void ASailingHUD::HidePortMissionBoard()
 	{
 		PortMissionBoardWidget->SetVisibility(ESlateVisibility::Hidden);
 	}
+}
+
+void ASailingHUD::HandleMissionAcceptedRequest(FName MissionId)
+{
+	AcceptMissionFromBoard(MissionId);
+}
+
+void ASailingHUD::HandleMissionBoardCloseRequest()
+{
+	CloseMissionBoard();
 }
 
 void ASailingHUD::PushOverlayData(int32 DiscoveredIslands, int32 Credits, FName ActiveMissionId,

@@ -5,3 +5,18 @@ void UPortMissionBoardWidget::PushMissionBoardData(const FPortMissionBoardData& 
 	LastData = InData;
 	OnMissionBoardDataUpdated(InData);
 }
+
+void UPortMissionBoardWidget::RequestAcceptMission(FName MissionId)
+{
+	if (MissionId.IsNone())
+	{
+		return;
+	}
+
+	OnAcceptMissionRequested.Broadcast(MissionId);
+}
+
+void UPortMissionBoardWidget::RequestCloseBoard()
+{
+	OnCloseRequested.Broadcast();
+}

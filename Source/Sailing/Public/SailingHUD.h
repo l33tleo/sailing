@@ -24,6 +24,12 @@ public:
 	void ShowPortMissionBoard(FName PortId, const FText& PortDisplayName,
 		const TArray<FName>& OfferedMissionIds, FName CurrentMissionId);
 
+	UFUNCTION(BlueprintCallable, Category = "HUD|MissionBoard")
+	bool AcceptMissionFromBoard(FName MissionId);
+
+	UFUNCTION(BlueprintCallable, Category = "HUD|MissionBoard")
+	void CloseMissionBoard();
+
 	/** Kalles fra PlayerController ved museklikk når pause-meny er åpen. */
 	void OnPauseMenuClick(float X, float Y);
 
@@ -91,6 +97,10 @@ private:
 	void EnsureOverlayWidget();
 	void EnsurePortMissionBoardWidget();
 	void HidePortMissionBoard();
+	UFUNCTION()
+	void HandleMissionAcceptedRequest(FName MissionId);
+	UFUNCTION()
+	void HandleMissionBoardCloseRequest();
 	void PushOverlayData(int32 DiscoveredIslands, int32 Credits, FName ActiveMissionId,
 		const FText& ActiveMissionTitle, float ObjectiveDistanceMeters, int32 BoatConditionPercent,
 		float ObjectiveBearingDegrees);
@@ -116,4 +126,7 @@ private:
 	TObjectPtr<UPortMissionBoardWidget> PortMissionBoardWidget;
 
 	FTimerHandle MissionBoardHideTimer;
+	TArray<FName> LastMissionBoardOfferedIds;
+	FName LastMissionBoardPortId = NAME_None;
+	FText LastMissionBoardPortDisplayName;
 };
