@@ -30,6 +30,11 @@ void ASailingGameMode::BeginPlay()
 	Super::BeginPlay();
 
 	const FVector DeliveryObjectiveLocation(6500.0f, -2500.0f, 120.0f);
+	const FName DiscoveryMissionId(TEXT("OppdagForsteOy"));
+	const FName DeliveryMissionId(TEXT("LeveringTilBoye"));
+	FVector EffectiveDeliveryObjectiveLocation = DeliveryObjectiveLocation;
+	ESailingMissionType DeliveryObjectiveTriggerType = ESailingMissionType::Delivery;
+	bool bShouldSpawnDeliveryObjective = false;
 	int32 StartupRegisteredMissionCount = 0;
 	int32 StartupRegisteredUpgradeCount = 0;
 	int32 StartupPortDefinitionCount = 0;
@@ -157,9 +162,6 @@ void ASailingGameMode::BeginPlay()
 			MissionSubsystem->SetMissionAssetPath(MissionAssetScanPath);
 			int32 RuntimeFallbackMissionCount = 0;
 
-			const FName DiscoveryMissionId(TEXT("OppdagForsteOy"));
-			const FName DeliveryMissionId(TEXT("LeveringTilBoye"));
-
 			auto EnsureMission = [this, MissionSubsystem](int32& OutRuntimeFallbackMissionCount, FName MissionId, TFunction<void(USailingMissionDataAsset*)> ConfigureFallback)
 				-> USailingMissionDataAsset*
 			{
@@ -222,6 +224,34 @@ void ASailingGameMode::BeginPlay()
 				if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
 				{
 					TelemetrySubsystem->RecordCounterEvent(TEXT("RuntimeFallbackMissions"), RuntimeFallbackMissionCount);
+				}
+			}
+
+			if (const USailingMissionDataAsset* DeliveryMissionAsset = MissionSubsystem->GetMissionAssetById(DeliveryMissionId))
+			{
+				const bool bRequiresObjectiveMarker = DeliveryMissionAsset->bRequireLocationMatch
+					|| DeliveryMissionAsset->MissionType == ESailingMissionType::Delivery;
+				if (bRequiresObjectiveMarker)
+				{
+					bShouldSpawnDeliveryObjective = true;
+					DeliveryObjectiveTriggerType = DeliveryMissionAsset->MissionType;
+					if (!DeliveryMissionAsset->EndWorldLocation.IsNearlyZero())
+					{
+						EffectiveDeliveryObjectiveLocation = DeliveryMissionAsset->EndWorldLocation;
+					}
+				}
+				else
+				{
+					UE_LOG(LogTemp, Warning, TEXT("SailingGameMode: Leveringsoppdrag '%s' krever ikke lokasjonsmarkor; hopper over objective actor."),
+						*DeliveryMissionId.ToString());
+				}
+			}
+			else
+			{
+				UE_LOG(LogTemp, Warning, TEXT("SailingGameMode: Fant ikke oppdrag '%s' for objective marker."), *DeliveryMissionId.ToString());
+				if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
+				{
+					TelemetrySubsystem->RecordCounterEvent(TEXT("MissingDeliveryObjectiveMission"), 1);
 				}
 			}
 			StartupRegisteredMissionCount = MissionSubsystem->GetRegisteredMissionIds().Num();
@@ -310,12 +340,31 @@ void ASailingGameMode::BeginPlay()
 	SpawnedOcean = GetWorld()->SpawnActor<AOceanPlaneActor>(
 		AOceanPlaneActor::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Params);
 
-	// Spawn concrete delivery mission objective marker
-	SpawnedMissionObjective = GetWorld()->SpawnActor<AMissionObjectiveActor>(
-		AMissionObjectiveActor::StaticClass(), DeliveryObjectiveLocation, FRotator::ZeroRotator, Params);
-	if (SpawnedMissionObjective)
+	// Spawn concrete delivery mission objective marker when mission content requires it.
+	if (bShouldSpawnDeliveryObjective)
 	{
-		SpawnedMissionObjective->SetTriggerType(ESailingMissionType::Delivery);
+		SpawnedMissionObjective = GetWorld()->SpawnActor<AMissionObjectiveActor>(
+			AMissionObjectiveActor::StaticClass(), EffectiveDeliveryObjectiveLocation, FRotator::ZeroRotator, Params);
+		if (SpawnedMissionObjective)
+		{
+			SpawnedMissionObjective->SetTriggerType(DeliveryObjectiveTriggerType);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("SailingGameMode: Klarte ikke å spawne objective actor ved %s."),
+				*EffectiveDeliveryObjectiveLocation.ToCompactString());
+			if (GI)
+			{
+				if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
+				{
+					TelemetrySubsystem->RecordCounterEvent(TEXT("DeliveryObjectiveSpawnFailed"), 1);
+				}
+			}
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("SailingGameMode: Hopper over objective actor; ingen lokasjonsbasert leveringsoppdrag registrert."));
 	}
 
 	// Spawn simple harbor markers and register with world subsystem
