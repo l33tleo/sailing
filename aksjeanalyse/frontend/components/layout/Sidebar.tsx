@@ -12,6 +12,8 @@ import {
   LayoutDashboard,
   GitCompareArrows,
   Bell,
+  CandlestickChart,
+  Layers,
 } from "lucide-react";
 
 const navItems = [
@@ -19,8 +21,10 @@ const navItems = [
   { href: "/aksjer", label: "Aksjer", icon: Search },
   { href: "/anbefalinger", label: "Anbefalinger", icon: TrendingUp },
   { href: "/sammenligning", label: "Sammenligning", icon: GitCompareArrows },
+  { href: "/sektorer", label: "Sektorer", icon: Layers },
   { href: "/scorecard", label: "Treffsikkerhet", icon: Target },
   { href: "/portefolje", label: "Portefølje", icon: Briefcase },
+  { href: "/paper-trading", label: "Paper Trading", icon: CandlestickChart },
   { href: "/varsler", label: "Varsler", icon: Bell },
 ];
 

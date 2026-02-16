@@ -434,3 +434,89 @@ export async function checkAlerts(): Promise<AlertCheckResult[]> {
 export function getExportCsvUrl(): string {
   return `${API_BASE}/export/recommendations/csv`;
 }
+
+// --- Paper Trading endpoints ---
+
+export interface PaperTrade {
+  id: number;
+  ticker: string;
+  stock_name: string;
+  trade_type: string;
+  shares: number;
+  entry_price: number;
+  exit_price: number | null;
+  current_price: number | null;
+  is_open: boolean;
+  pnl: number | null;
+  pnl_pct: number | null;
+  unrealized_pnl: number | null;
+  unrealized_pnl_pct: number | null;
+  note: string | null;
+  opened_at: string;
+  closed_at: string | null;
+}
+
+export interface PaperTradeSummary {
+  total_trades: number;
+  open_trades: number;
+  closed_trades: number;
+  total_realized_pnl: number;
+  total_unrealized_pnl: number;
+  win_rate: number;
+  avg_pnl_pct: number;
+  best_trade_pnl_pct: number | null;
+  worst_trade_pnl_pct: number | null;
+  starting_capital: number;
+  current_equity: number;
+}
+
+export async function openPaperTrade(data: {
+  ticker: string;
+  trade_type: string;
+  shares: number;
+  note?: string;
+}): Promise<PaperTrade> {
+  return fetchAPI("/paper-trades", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function closePaperTrade(
+  tradeId: number,
+  note?: string
+): Promise<PaperTrade> {
+  return fetchAPI(`/paper-trades/${tradeId}/close`, {
+    method: "POST",
+    body: JSON.stringify({ note }),
+  });
+}
+
+export async function getPaperTrades(openOnly = false): Promise<PaperTrade[]> {
+  return fetchAPI(`/paper-trades?open_only=${openOnly}`);
+}
+
+export async function getPaperTradeSummary(): Promise<PaperTradeSummary> {
+  return fetchAPI("/paper-trades/summary");
+}
+
+export async function deletePaperTrade(id: number): Promise<void> {
+  return fetchAPI(`/paper-trades/${id}`, { method: "DELETE" });
+}
+
+// --- Sector endpoints ---
+
+export interface SectorStock {
+  ticker: string;
+  name: string;
+  price: number | null;
+  change_percent: number | null;
+}
+
+export interface SectorData {
+  name: string;
+  avg_change_pct: number;
+  stock_count: number;
+  stocks: SectorStock[];
+}
+
+export async function getSectors(): Promise<{ sectors: SectorData[] }> {
+  return fetchAPI("/sectors");
+}
