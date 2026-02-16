@@ -199,6 +199,60 @@ bool FSailingMissionChainProgressionTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSailingMissionObjectiveMarkerConfigTest,
+	"Sailing.Progression.Mission.ObjectiveMarkerConfig",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSailingMissionObjectiveMarkerConfigTest::RunTest(const FString& Parameters)
+{
+	UMissionSubsystem* MissionSubsystem = NewObject<UMissionSubsystem>();
+
+	USailingMissionDataAsset* DeliveryMission = NewObject<USailingMissionDataAsset>();
+	DeliveryMission->MissionId = TEXT("Mission_Delivery");
+	DeliveryMission->MissionType = ESailingMissionType::Delivery;
+	DeliveryMission->EndWorldLocation = FVector(500.0f, 250.0f, 50.0f);
+	DeliveryMission->bRequireLocationMatch = false;
+	MissionSubsystem->RegisterMissionAsset(DeliveryMission);
+
+	USailingMissionDataAsset* OptionalMission = NewObject<USailingMissionDataAsset>();
+	OptionalMission->MissionId = TEXT("Mission_Optional");
+	OptionalMission->MissionType = ESailingMissionType::NavigationChallenge;
+	OptionalMission->bRequireLocationMatch = false;
+	OptionalMission->EndWorldLocation = FVector(1000.0f, 0.0f, 0.0f);
+	MissionSubsystem->RegisterMissionAsset(OptionalMission);
+
+	USailingMissionDataAsset* RequiredMission = NewObject<USailingMissionDataAsset>();
+	RequiredMission->MissionId = TEXT("Mission_Required");
+	RequiredMission->MissionType = ESailingMissionType::NavigationChallenge;
+	RequiredMission->bRequireLocationMatch = true;
+	RequiredMission->EndWorldLocation = FVector(1500.0f, -300.0f, 0.0f);
+	MissionSubsystem->RegisterMissionAsset(RequiredMission);
+
+	FVector ObjectiveLocation = FVector::ZeroVector;
+	ESailingMissionType ObjectiveType = ESailingMissionType::NavigationChallenge;
+	TestTrue(TEXT("Delivery mission should require objective marker by mission type"),
+		MissionSubsystem->GetMissionObjectiveMarkerConfig(DeliveryMission->MissionId, ObjectiveLocation, ObjectiveType));
+	TestEqual(TEXT("Delivery objective location should match mission"), ObjectiveLocation, DeliveryMission->EndWorldLocation);
+	TestEqual(TEXT("Delivery objective trigger type should match mission type"), ObjectiveType, ESailingMissionType::Delivery);
+
+	ObjectiveLocation = FVector::ZeroVector;
+	ObjectiveType = ESailingMissionType::Delivery;
+	TestFalse(TEXT("Non-location mission should not request objective marker"),
+		MissionSubsystem->GetMissionObjectiveMarkerConfig(OptionalMission->MissionId, ObjectiveLocation, ObjectiveType));
+
+	ObjectiveLocation = FVector::ZeroVector;
+	ObjectiveType = ESailingMissionType::Delivery;
+	TestTrue(TEXT("Location-required mission should request objective marker"),
+		MissionSubsystem->GetMissionObjectiveMarkerConfig(RequiredMission->MissionId, ObjectiveLocation, ObjectiveType));
+	TestEqual(TEXT("Required mission objective location should match mission"), ObjectiveLocation, RequiredMission->EndWorldLocation);
+	TestEqual(TEXT("Required mission objective trigger type should match mission type"), ObjectiveType, ESailingMissionType::NavigationChallenge);
+
+	TestFalse(TEXT("Unknown mission should not request objective marker"),
+		MissionSubsystem->GetMissionObjectiveMarkerConfig(TEXT("Mission_Unknown"), ObjectiveLocation, ObjectiveType));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FSailingWorldPortRegistryTest,
 	"Sailing.Progression.World.PortRegistry",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

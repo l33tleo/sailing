@@ -253,14 +253,29 @@ FText UMissionSubsystem::GetMissionDisplayNameById(FName MissionId) const
 
 bool UMissionSubsystem::GetActiveMissionObjectiveLocation(FVector& OutLocation) const
 {
-	if (const USailingMissionDataAsset* ActiveMission = GetActiveMissionAsset())
+	ESailingMissionType ObjectiveTriggerType = ESailingMissionType::NavigationChallenge;
+	return GetMissionObjectiveMarkerConfig(ActiveMissionId, OutLocation, ObjectiveTriggerType);
+}
+
+bool UMissionSubsystem::GetMissionObjectiveMarkerConfig(FName MissionId, FVector& OutLocation, ESailingMissionType& OutTriggerType) const
+{
+	if (MissionId.IsNone())
 	{
-		if (ActiveMission->bRequireLocationMatch)
+		return false;
+	}
+
+	if (const USailingMissionDataAsset* MissionData = GetMissionAssetById(MissionId))
+	{
+		const bool bRequiresObjectiveMarker = MissionData->bRequireLocationMatch
+			|| MissionData->MissionType == ESailingMissionType::Delivery;
+		if (bRequiresObjectiveMarker)
 		{
-			OutLocation = ActiveMission->EndWorldLocation;
+			OutLocation = MissionData->EndWorldLocation;
+			OutTriggerType = MissionData->MissionType;
 			return true;
 		}
 	}
+
 	return false;
 }
 

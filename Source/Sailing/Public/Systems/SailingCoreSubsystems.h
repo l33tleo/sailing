@@ -152,6 +152,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Sailing|Mission")
 	bool GetActiveMissionObjectiveLocation(FVector& OutLocation) const;
 
+	UFUNCTION(BlueprintPure, Category = "Sailing|Mission")
+	bool GetMissionObjectiveMarkerConfig(FName MissionId, FVector& OutLocation, ESailingMissionType& OutTriggerType) const;
+
 	UFUNCTION(BlueprintCallable, Category = "Sailing|Mission")
 	int32 CompleteActiveMissionByTrigger(ESailingMissionType TriggerType);
 

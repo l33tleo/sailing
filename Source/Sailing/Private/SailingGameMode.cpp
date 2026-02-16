@@ -227,24 +227,24 @@ void ASailingGameMode::BeginPlay()
 				}
 			}
 
-			if (const USailingMissionDataAsset* DeliveryMissionAsset = MissionSubsystem->GetMissionAssetById(DeliveryMissionId))
+			if (MissionSubsystem->GetMissionObjectiveMarkerConfig(
+				DeliveryMissionId,
+				EffectiveDeliveryObjectiveLocation,
+				DeliveryObjectiveTriggerType))
 			{
-				const bool bRequiresObjectiveMarker = DeliveryMissionAsset->bRequireLocationMatch
-					|| DeliveryMissionAsset->MissionType == ESailingMissionType::Delivery;
-				if (bRequiresObjectiveMarker)
+				bShouldSpawnDeliveryObjective = true;
+				if (EffectiveDeliveryObjectiveLocation.IsNearlyZero())
 				{
-					bShouldSpawnDeliveryObjective = true;
-					DeliveryObjectiveTriggerType = DeliveryMissionAsset->MissionType;
-					if (!DeliveryMissionAsset->EndWorldLocation.IsNearlyZero())
-					{
-						EffectiveDeliveryObjectiveLocation = DeliveryMissionAsset->EndWorldLocation;
-					}
+					EffectiveDeliveryObjectiveLocation = DeliveryObjectiveLocation;
 				}
-				else
-				{
-					UE_LOG(LogTemp, Warning, TEXT("SailingGameMode: Leveringsoppdrag '%s' krever ikke lokasjonsmarkor; hopper over objective actor."),
-						*DeliveryMissionId.ToString());
-				}
+			}
+			else if (const USailingMissionDataAsset* DeliveryMissionAsset = MissionSubsystem->GetMissionAssetById(DeliveryMissionId))
+			{
+				UE_LOG(LogTemp, Warning, TEXT("SailingGameMode: Leveringsoppdrag '%s' krever ikke lokasjonsmarkor; hopper over objective actor."),
+					*DeliveryMissionId.ToString());
+				UE_LOG(LogTemp, Warning, TEXT("SailingGameMode: Oppdragstype=%d bRequireLocationMatch=%s"),
+					static_cast<int32>(DeliveryMissionAsset->MissionType),
+					DeliveryMissionAsset->bRequireLocationMatch ? TEXT("true") : TEXT("false"));
 			}
 			else
 			{
