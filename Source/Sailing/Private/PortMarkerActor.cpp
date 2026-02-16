@@ -69,17 +69,11 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 
 		EffectiveOfferedMissionIds = UPortDataAsset::BuildPrioritizedMissionIds(
 			WeightedOfferedMissions, OfferedMissionIds, PortVisitCount, MaxOfferedMissionsAtBoard);
-		for (const FName& UpgradeId : OfferedUpgradeIds)
-		{
-			if (!UpgradeId.IsNone())
-			{
-				EffectiveOfferedUpgradeIds.AddUnique(UpgradeId);
-			}
-		}
-		if (MaxOfferedUpgrades > 0 && EffectiveOfferedUpgradeIds.Num() > MaxOfferedUpgrades)
-		{
-			EffectiveOfferedUpgradeIds.SetNum(MaxOfferedUpgrades);
-		}
+		EffectiveOfferedUpgradeIds = UPortDataAsset::BuildRotatedUpgradeIds(
+			OfferedUpgradeIds,
+			PortVisitCount,
+			MaxOfferedUpgrades,
+			bRotateUpgradeStockByVisits);
 
 		if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
 		{
@@ -156,17 +150,11 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 	{
 		EffectiveOfferedMissionIds = UPortDataAsset::BuildPrioritizedMissionIds(
 			WeightedOfferedMissions, OfferedMissionIds, PortVisitCount, MaxOfferedMissionsAtBoard);
-		for (const FName& UpgradeId : OfferedUpgradeIds)
-		{
-			if (!UpgradeId.IsNone())
-			{
-				EffectiveOfferedUpgradeIds.AddUnique(UpgradeId);
-			}
-		}
-		if (MaxOfferedUpgrades > 0 && EffectiveOfferedUpgradeIds.Num() > MaxOfferedUpgrades)
-		{
-			EffectiveOfferedUpgradeIds.SetNum(MaxOfferedUpgrades);
-		}
+		EffectiveOfferedUpgradeIds = UPortDataAsset::BuildRotatedUpgradeIds(
+			OfferedUpgradeIds,
+			PortVisitCount,
+			MaxOfferedUpgrades,
+			bRotateUpgradeStockByVisits);
 	}
 
 	bVisitedInSession = true;
@@ -189,6 +177,10 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 			{
 				PopupText += FString::Printf(TEXT(" | Tavle klar om %.0fs"), MissionBoardCooldownRemaining);
 			}
+			if (bOfferUpgradeService && !FMath::IsNearlyEqual(UpgradeCostMultiplier, 1.0f))
+			{
+				PopupText += FString::Printf(TEXT(" | Oppgraderingspris x%.2f"), FMath::Max(0.1f, UpgradeCostMultiplier));
+			}
 
 			HUD->ShowDiscoveryPopup(PopupText);
 
@@ -198,7 +190,8 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 					EffectiveOfferedMissionIds, CurrentMissionId,
 					bMissionBoardOnCooldown, MissionBoardCooldownRemaining,
 					bAutoRepairAtPort, RepairCostPerPercentPoint,
-					bOfferUpgradeService, EffectiveOfferedUpgradeIds);
+					bOfferUpgradeService, EffectiveOfferedUpgradeIds,
+					UpgradeCostMultiplier);
 			}
 		}
 	}

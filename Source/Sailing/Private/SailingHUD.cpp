@@ -7,6 +7,7 @@
 #include "SaveGameSailing.h"
 #include "Systems/SailingCoreSubsystems.h"
 #include "Data/BoatUpgradeDataAsset.h"
+#include "Data/PortDataAsset.h"
 #include "UI/SailingHUDOverlayWidget.h"
 #include "UI/PortMissionBoardWidget.h"
 #include "Engine/Canvas.h"
@@ -62,7 +63,8 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 	const TArray<FName>& OfferedMissionIds, FName CurrentMissionId,
 	bool bMissionBoardOnCooldown, float CooldownRemainingSeconds,
 	bool bAutoRepairAtPort, int32 RepairCostPerPercentPoint,
-	bool bOfferUpgradeService, const TArray<FName>& OfferedUpgradeIds)
+	bool bOfferUpgradeService, const TArray<FName>& OfferedUpgradeIds,
+	float UpgradeCostMultiplier)
 {
 	EnsurePortMissionBoardWidget();
 	if (!PortMissionBoardWidget)
@@ -137,6 +139,7 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 			if (Data.bSupportsUpgradeService)
 			{
 				int32 AffordableUpgradeCount = 0;
+				const float SafeUpgradeCostMultiplier = FMath::Max(0.1f, UpgradeCostMultiplier);
 				for (const FName& UpgradeId : OfferedUpgradeIds)
 				{
 					if (const UBoatUpgradeDataAsset* UpgradeData = EconomySubsystem->GetUpgradeAssetById(UpgradeId))
@@ -146,7 +149,8 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 						OfferEntry.UpgradeTitle = UpgradeData->DisplayName.IsEmpty()
 							? FText::FromName(UpgradeData->UpgradeId)
 							: UpgradeData->DisplayName;
-						OfferEntry.CreditCost = FMath::Max(0, UpgradeData->CreditCost);
+						OfferEntry.CreditCost = UPortDataAsset::CalculateAdjustedUpgradeCost(
+							UpgradeData->CreditCost, SafeUpgradeCostMultiplier);
 						OfferEntry.bUnlocked = EconomySubsystem->IsUpgradeUnlocked(UpgradeData->UpgradeId);
 						OfferEntry.bAffordable = EconomySubsystem->GetCredits() >= OfferEntry.CreditCost;
 						Data.OfferedUpgrades.Add(OfferEntry);
@@ -199,6 +203,7 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 	LastMissionBoardRepairCostPerPercentPoint = FMath::Max(0, RepairCostPerPercentPoint);
 	bLastMissionBoardOfferUpgradeService = bOfferUpgradeService;
 	LastMissionBoardOfferedUpgradeIds = OfferedUpgradeIds;
+	LastMissionBoardUpgradeCostMultiplier = FMath::Max(0.1f, UpgradeCostMultiplier);
 
 	GetWorldTimerManager().ClearTimer(MissionBoardHideTimer);
 	GetWorldTimerManager().SetTimer(MissionBoardHideTimer, this, &ASailingHUD::HidePortMissionBoard, 5.0f, false);
@@ -387,17 +392,36 @@ bool ASailingHUD::RequestUpgradePurchaseFromBoard(FName UpgradeId)
 		return true;
 	}
 
-	const bool bPurchased = EconomySubsystem->PurchaseUpgrade(UpgradeData);
-	if (!bPurchased)
+	const int32 AdjustedCost = UPortDataAsset::CalculateAdjustedUpgradeCost(
+		UpgradeData->CreditCost,
+		LastMissionBoardUpgradeCostMultiplier);
+
+	if (!EconomySubsystem->SpendCredits(AdjustedCost))
 	{
-		ShowDiscoveryPopup(FString::Printf(TEXT("Ikke nok kreditter til %s (%d)."), *UpgradeId.ToString(), FMath::Max(0, UpgradeData->CreditCost)));
+		ShowDiscoveryPopup(FString::Printf(TEXT("Ikke nok kreditter til %s (%d)."), *UpgradeId.ToString(), AdjustedCost));
 		return false;
 	}
 
-	ShowDiscoveryPopup(FString::Printf(TEXT("Kjøpt oppgradering: %s"), *UpgradeId.ToString()));
+	EconomySubsystem->SetUnlockedUpgrades(
+		[EconomySubsystem, UpgradeId]()
+		{
+			TArray<FName> UpdatedUpgrades = EconomySubsystem->GetUnlockedUpgradeIds();
+			UpdatedUpgrades.AddUnique(UpgradeId);
+			return UpdatedUpgrades;
+		}());
+
+	const bool bPurchased = EconomySubsystem->IsUpgradeUnlocked(UpgradeId);
+	if (!bPurchased)
+	{
+		ShowDiscoveryPopup(FString::Printf(TEXT("Kunne ikke aktivere oppgradering: %s"), *UpgradeId.ToString()));
+		return false;
+	}
+
+	ShowDiscoveryPopup(FString::Printf(TEXT("Kjøpt oppgradering: %s (%d kreditter)"), *UpgradeId.ToString(), AdjustedCost));
 	if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
 	{
 		TelemetrySubsystem->RecordCounterEvent(TEXT("PortUpgradesPurchased"), 1);
+		TelemetrySubsystem->RecordCounterEvent(TEXT("PortUpgradeCreditsSpent"), AdjustedCost);
 	}
 
 	if (ASailingGameMode* GM = Cast<ASailingGameMode>(UGameplayStatics::GetGameMode(GetWorld())))
@@ -421,6 +445,7 @@ void ASailingHUD::CloseMissionBoard()
 	LastMissionBoardRepairCostPerPercentPoint = 1;
 	bLastMissionBoardOfferUpgradeService = false;
 	LastMissionBoardOfferedUpgradeIds.Reset();
+	LastMissionBoardUpgradeCostMultiplier = 1.0f;
 	LastMissionBoardData = FPortMissionBoardData();
 }
 

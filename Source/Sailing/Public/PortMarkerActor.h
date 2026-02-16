@@ -75,6 +75,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Port|Services", meta = (ClampMin = "0", ClampMax = "10"))
 	int32 MaxOfferedUpgrades = 3;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Port|Services")
+	bool bRotateUpgradeStockByVisits = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Port|Services", meta = (ClampMin = "0.1", ClampMax = "5.0"))
+	float UpgradeCostMultiplier = 1.0f;
+
 private:
 	bool bVisitedInSession = false;
 	float NextMissionBoardAvailableTime = 0.0f;

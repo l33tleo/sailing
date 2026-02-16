@@ -290,6 +290,8 @@ void ASailingGameMode::BeginPlay()
 				PortNord->MissionBoardCooldownSeconds = 12.0f;
 				PortNord->bOfferUpgradeService = true;
 				PortNord->OfferedUpgradeIds = { TEXT("SkrogTrimV1"), TEXT("RorResponsV1") };
+				PortNord->bRotateUpgradeStockByVisits = true;
+				PortNord->UpgradeCostMultiplier = 0.95f;
 				PortDefinitions.Add(PortNord);
 
 				UPortDataAsset* PortVest = NewObject<UPortDataAsset>(this);
@@ -308,6 +310,8 @@ void ASailingGameMode::BeginPlay()
 				PortVest->MissionBoardCooldownSeconds = 12.0f;
 				PortVest->bOfferUpgradeService = true;
 				PortVest->OfferedUpgradeIds = { TEXT("RorResponsV1"), TEXT("RiggeffektivitetV1") };
+				PortVest->bRotateUpgradeStockByVisits = true;
+				PortVest->UpgradeCostMultiplier = 1.05f;
 				PortDefinitions.Add(PortVest);
 
 				UPortDataAsset* PortSor = NewObject<UPortDataAsset>(this);
@@ -327,6 +331,8 @@ void ASailingGameMode::BeginPlay()
 				PortSor->MissionBoardCooldownSeconds = 12.0f;
 				PortSor->bOfferUpgradeService = true;
 				PortSor->OfferedUpgradeIds = { TEXT("SkrogTrimV1"), TEXT("RiggeffektivitetV1") };
+				PortSor->bRotateUpgradeStockByVisits = false;
+				PortSor->UpgradeCostMultiplier = 1.12f;
 				PortDefinitions.Add(PortSor);
 			}
 
@@ -355,6 +361,8 @@ void ASailingGameMode::BeginPlay()
 				PortMarker->bOfferUpgradeService = PortData->bOfferUpgradeService;
 				PortMarker->OfferedUpgradeIds = PortData->OfferedUpgradeIds;
 				PortMarker->MaxOfferedUpgrades = PortData->MaxOfferedUpgrades;
+				PortMarker->bRotateUpgradeStockByVisits = PortData->bRotateUpgradeStockByVisits;
+				PortMarker->UpgradeCostMultiplier = PortData->UpgradeCostMultiplier;
 
 				SpawnedPortMarkers.Add(PortMarker);
 				WorldStreamingSubsystem->RegisterPortPoint(PortData->PortId, PortData->WorldLocation);

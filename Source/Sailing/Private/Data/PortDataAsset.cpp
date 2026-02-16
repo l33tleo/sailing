@@ -56,3 +56,52 @@ TArray<FName> UPortDataAsset::BuildPrioritizedMissionIds(
 
 	return Result;
 }
+
+TArray<FName> UPortDataAsset::BuildRotatedUpgradeIds(
+	const TArray<FName>& InOfferedUpgradeIds,
+	int32 PortVisitCount,
+	int32 MaxOffers,
+	bool bRotateByVisits)
+{
+	TArray<FName> UniqueUpgradeIds;
+	for (const FName& UpgradeId : InOfferedUpgradeIds)
+	{
+		if (!UpgradeId.IsNone())
+		{
+			UniqueUpgradeIds.AddUnique(UpgradeId);
+		}
+	}
+
+	TArray<FName> Result;
+	if (UniqueUpgradeIds.Num() == 0)
+	{
+		return Result;
+	}
+
+	int32 StartIndex = 0;
+	if (bRotateByVisits && UniqueUpgradeIds.Num() > 1)
+	{
+		const int32 SafeVisits = FMath::Max(0, PortVisitCount);
+		StartIndex = SafeVisits % UniqueUpgradeIds.Num();
+	}
+
+	for (int32 Offset = 0; Offset < UniqueUpgradeIds.Num(); ++Offset)
+	{
+		const int32 Index = (StartIndex + Offset) % UniqueUpgradeIds.Num();
+		Result.Add(UniqueUpgradeIds[Index]);
+
+		if (MaxOffers > 0 && Result.Num() >= MaxOffers)
+		{
+			break;
+		}
+	}
+
+	return Result;
+}
+
+int32 UPortDataAsset::CalculateAdjustedUpgradeCost(int32 BaseCost, float CostMultiplier)
+{
+	const int32 SafeBaseCost = FMath::Max(0, BaseCost);
+	const float SafeMultiplier = FMath::Max(0.1f, CostMultiplier);
+	return FMath::Max(0, FMath::RoundToInt(static_cast<float>(SafeBaseCost) * SafeMultiplier));
+}

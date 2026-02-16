@@ -26,7 +26,8 @@ public:
 		const TArray<FName>& OfferedMissionIds, FName CurrentMissionId,
 		bool bMissionBoardOnCooldown, float CooldownRemainingSeconds,
 		bool bAutoRepairAtPort, int32 RepairCostPerPercentPoint,
-		bool bOfferUpgradeService, const TArray<FName>& OfferedUpgradeIds);
+		bool bOfferUpgradeService, const TArray<FName>& OfferedUpgradeIds,
+		float UpgradeCostMultiplier);
 
 	UFUNCTION(BlueprintCallable, Category = "HUD|MissionBoard")
 	bool AcceptMissionFromBoard(FName MissionId);
@@ -151,4 +152,5 @@ private:
 	int32 LastMissionBoardRepairCostPerPercentPoint = 1;
 	bool bLastMissionBoardOfferUpgradeService = false;
 	TArray<FName> LastMissionBoardOfferedUpgradeIds;
+	float LastMissionBoardUpgradeCostMultiplier = 1.0f;
 };

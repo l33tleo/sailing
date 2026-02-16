@@ -357,6 +357,23 @@ bool FSailingPortWeightedOffersTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Fallback should preserve first unique order"), FallbackOnly[0], FName(TEXT("Fallback_1")));
 	TestEqual(TEXT("Fallback should include subsequent unique ids"), FallbackOnly[1], FName(TEXT("Fallback_2")));
 
+	const TArray<FName> RotatedUpgrades = UPortDataAsset::BuildRotatedUpgradeIds(
+		{ TEXT("Upgrade_A"), TEXT("Upgrade_B"), TEXT("Upgrade_C") }, 2, 2, true);
+	TestEqual(TEXT("Upgrade rotation should respect max-offer cap"), RotatedUpgrades.Num(), 2);
+	TestEqual(TEXT("Upgrade rotation should offset by visit count"), RotatedUpgrades[0], FName(TEXT("Upgrade_C")));
+	TestEqual(TEXT("Upgrade rotation should continue circular order"), RotatedUpgrades[1], FName(TEXT("Upgrade_A")));
+
+	const TArray<FName> StaticUpgrades = UPortDataAsset::BuildRotatedUpgradeIds(
+		{ TEXT("Upgrade_A"), TEXT("Upgrade_A"), TEXT("Upgrade_B") }, 5, 0, false);
+	TestEqual(TEXT("Non-rotating upgrade list should deduplicate"), StaticUpgrades.Num(), 2);
+	TestEqual(TEXT("Non-rotating first upgrade should preserve source order"), StaticUpgrades[0], FName(TEXT("Upgrade_A")));
+	TestEqual(TEXT("Non-rotating second upgrade should preserve source order"), StaticUpgrades[1], FName(TEXT("Upgrade_B")));
+
+	TestEqual(TEXT("Adjusted upgrade cost should apply multiplier"),
+		UPortDataAsset::CalculateAdjustedUpgradeCost(1000, 0.85f), 850);
+	TestEqual(TEXT("Adjusted upgrade cost should clamp negative base cost"),
+		UPortDataAsset::CalculateAdjustedUpgradeCost(-100, 1.3f), 0);
+
 	return true;
 }
 

@@ -79,9 +79,23 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Port|Services", meta = (ClampMin = "0", ClampMax = "10"))
 	int32 MaxOfferedUpgrades = 3;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Port|Services")
+	bool bRotateUpgradeStockByVisits = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Port|Services", meta = (ClampMin = "0.1", ClampMax = "5.0"))
+	float UpgradeCostMultiplier = 1.0f;
+
 	static TArray<FName> BuildPrioritizedMissionIds(
 		const TArray<FPortMissionWeightedOffer>& InWeightedOffers,
 		const TArray<FName>& InFallbackOffers,
 		int32 PortVisitCount,
 		int32 MaxOffers);
+
+	static TArray<FName> BuildRotatedUpgradeIds(
+		const TArray<FName>& InOfferedUpgradeIds,
+		int32 PortVisitCount,
+		int32 MaxOffers,
+		bool bRotateByVisits);
+
+	static int32 CalculateAdjustedUpgradeCost(int32 BaseCost, float CostMultiplier);
 };
