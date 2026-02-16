@@ -1,4 +1,6 @@
 #include "Systems/SailingCoreSubsystems.h"
+#include "Data/BoatUpgradeDataAsset.h"
+#include "Data/SailingMissionDataAsset.h"
 
 void USailingSimulationSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -55,6 +57,17 @@ void UMissionSubsystem::Deinitialize()
 	Super::Deinitialize();
 }
 
+bool UMissionSubsystem::ActivateMissionAsset(const USailingMissionDataAsset* MissionData)
+{
+	if (!MissionData || MissionData->MissionId.IsNone())
+	{
+		return false;
+	}
+
+	ActiveMissionId = MissionData->MissionId;
+	return true;
+}
+
 void UEconomySubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
@@ -85,6 +98,27 @@ bool UEconomySubsystem::SpendCredits(int32 Cost)
 	}
 
 	Credits -= Cost;
+	return true;
+}
+
+bool UEconomySubsystem::PurchaseUpgrade(const UBoatUpgradeDataAsset* UpgradeData)
+{
+	if (!UpgradeData || UpgradeData->UpgradeId.IsNone())
+	{
+		return false;
+	}
+
+	if (UnlockedUpgradeIds.Contains(UpgradeData->UpgradeId))
+	{
+		return true;
+	}
+
+	if (!SpendCredits(UpgradeData->CreditCost))
+	{
+		return false;
+	}
+
+	UnlockedUpgradeIds.Add(UpgradeData->UpgradeId);
 	return true;
 }
 

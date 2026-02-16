@@ -4,6 +4,9 @@
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "SailingCoreSubsystems.generated.h"
 
+class UBoatUpgradeDataAsset;
+class USailingMissionDataAsset;
+
 /**
  * Subsystem skeleton for sailing simulation systems.
  * This class intentionally starts lean and is expanded in iterative phases.
@@ -80,6 +83,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Sailing|Mission")
 	void SetActiveMissionId(FName MissionId) { ActiveMissionId = MissionId; }
 
+	UFUNCTION(BlueprintCallable, Category = "Sailing|Mission")
+	bool ActivateMissionAsset(const USailingMissionDataAsset* MissionData);
+
 private:
 	UPROPERTY()
 	FName ActiveMissionId = NAME_None;
@@ -103,9 +109,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Sailing|Economy")
 	bool SpendCredits(int32 Cost);
 
+	UFUNCTION(BlueprintCallable, Category = "Sailing|Economy")
+	bool PurchaseUpgrade(const UBoatUpgradeDataAsset* UpgradeData);
+
+	UFUNCTION(BlueprintPure, Category = "Sailing|Economy")
+	bool IsUpgradeUnlocked(FName UpgradeId) const { return UnlockedUpgradeIds.Contains(UpgradeId); }
+
 private:
 	UPROPERTY()
 	int32 Credits = 0;
+
+	UPROPERTY()
+	TSet<FName> UnlockedUpgradeIds;
 };
 
 UCLASS()
