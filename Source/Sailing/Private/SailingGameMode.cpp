@@ -30,6 +30,10 @@ void ASailingGameMode::BeginPlay()
 	Super::BeginPlay();
 
 	const FVector DeliveryObjectiveLocation(6500.0f, -2500.0f, 120.0f);
+	int32 StartupRegisteredMissionCount = 0;
+	int32 StartupRegisteredUpgradeCount = 0;
+	int32 StartupPortDefinitionCount = 0;
+	int32 StartupSpawnedPortCount = 0;
 
 	USailingGameInstance* GI = Cast<USailingGameInstance>(GetGameInstance());
 	if (GI && GI->bRequestNewGame)
@@ -141,6 +145,7 @@ void ASailingGameMode::BeginPlay()
 					TelemetrySubsystem->RecordCounterEvent(TEXT("RuntimeFallbackUpgrades"), RuntimeFallbackUpgradeCount);
 				}
 			}
+			StartupRegisteredUpgradeCount = EconomySubsystem->GetRegisteredUpgradeIds().Num();
 
 			EconomySubsystem->SetCredits(SaveGame ? SaveGame->PlayerCredits : 0);
 			EconomySubsystem->SetBoatConditionPercent(SaveGame ? SaveGame->BoatConditionPercent : 100);
@@ -219,6 +224,7 @@ void ASailingGameMode::BeginPlay()
 					TelemetrySubsystem->RecordCounterEvent(TEXT("RuntimeFallbackMissions"), RuntimeFallbackMissionCount);
 				}
 			}
+			StartupRegisteredMissionCount = MissionSubsystem->GetRegisteredMissionIds().Num();
 
 			MissionSubsystem->SetCompletedMissionIds(SaveGame ? SaveGame->CompletedMissionIds : TArray<FName>());
 			MissionSubsystem->SetMissionBoardSelectionHistory(SaveGame ? SaveGame->MissionBoardSelectionHistory : TArray<FMissionBoardSelectionEntry>());
@@ -465,6 +471,7 @@ void ASailingGameMode::BeginPlay()
 			{
 				UE_LOG(LogTemp, Warning, TEXT("SailingGameMode: Ingen port-data funnet og runtime fallback er deaktivert."));
 			}
+			StartupPortDefinitionCount = PortDefinitions.Num();
 
 			if (RuntimeFallbackPortCount > 0)
 			{
@@ -617,9 +624,38 @@ void ASailingGameMode::BeginPlay()
 				}
 			}
 
+			StartupSpawnedPortCount = SpawnedPortMarkers.Num();
 			UE_LOG(LogTemp, Log, TEXT("SailingGameMode: Spawned %d harbor markers."), SpawnedPortMarkers.Num());
 		}
 	}
+
+	if (GI)
+	{
+		if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
+		{
+			TelemetrySubsystem->SetCounterValue(TEXT("StartupRegisteredMissions"), FMath::Max(0, StartupRegisteredMissionCount));
+			TelemetrySubsystem->SetCounterValue(TEXT("StartupRegisteredUpgrades"), FMath::Max(0, StartupRegisteredUpgradeCount));
+			TelemetrySubsystem->SetCounterValue(TEXT("StartupPortDefinitions"), FMath::Max(0, StartupPortDefinitionCount));
+			TelemetrySubsystem->SetCounterValue(TEXT("StartupSpawnedPorts"), FMath::Max(0, StartupSpawnedPortCount));
+			TelemetrySubsystem->SetCounterValue(TEXT("RuntimeFallbackEnabled"), bEnableRuntimeFallbackContent ? 1 : 0);
+			if (!bEnableRuntimeFallbackContent && StartupRegisteredMissionCount == 0)
+			{
+				TelemetrySubsystem->RecordCounterEvent(TEXT("AssetOnlyStartupMissingMissions"), 1);
+			}
+			if (!bEnableRuntimeFallbackContent && StartupRegisteredUpgradeCount == 0)
+			{
+				TelemetrySubsystem->RecordCounterEvent(TEXT("AssetOnlyStartupMissingUpgrades"), 1);
+			}
+		}
+	}
+
+	UE_LOG(LogTemp, Log,
+		TEXT("SailingGameMode: Startup content summary Missions=%d Upgrades=%d PortDefs=%d SpawnedPorts=%d RuntimeFallback=%s"),
+		StartupRegisteredMissionCount,
+		StartupRegisteredUpgradeCount,
+		StartupPortDefinitionCount,
+		StartupSpawnedPortCount,
+		bEnableRuntimeFallbackContent ? TEXT("ON") : TEXT("OFF"));
 
 	// Teleporter pawn til siste posisjon ved Fortsett (etter at pawn er spawnet)
 	if (SaveGame && SaveGame->LastPlayerLocation != FVector::ZeroVector)
