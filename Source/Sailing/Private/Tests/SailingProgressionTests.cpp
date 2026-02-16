@@ -239,6 +239,10 @@ bool FSailingMissionObjectiveMarkerConfigTest::RunTest(const FString& Parameters
 	ObjectiveType = ESailingMissionType::Delivery;
 	TestFalse(TEXT("Non-location mission should not request objective marker"),
 		MissionSubsystem->GetMissionObjectiveMarkerConfig(OptionalMission->MissionId, ObjectiveLocation, ObjectiveType));
+	MissionSubsystem->SetActiveMissionId(DeliveryMission->MissionId);
+	TestTrue(TEXT("Active mission objective lookup should include delivery missions"),
+		MissionSubsystem->GetActiveMissionObjectiveLocation(ObjectiveLocation));
+	TestEqual(TEXT("Active mission objective location should match delivery mission"), ObjectiveLocation, DeliveryMission->EndWorldLocation);
 
 	ObjectiveLocation = FVector::ZeroVector;
 	ObjectiveType = ESailingMissionType::Delivery;
