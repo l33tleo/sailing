@@ -490,6 +490,31 @@ void ASailingHUD::DrawOverviewMap()
 	// 2b. Aktivt oppdragsmål (hvis lokasjonsbasert)
 	if (UGameInstance* GI = GetWorld()->GetGameInstance())
 	{
+		// Port markers
+		if (UWorldStreamingSubsystem* WorldSubsystem = GI->GetSubsystem<UWorldStreamingSubsystem>())
+		{
+			for (const FName& PortId : WorldSubsystem->GetRegisteredPortIds())
+			{
+				FVector PortLoc;
+				if (!WorldSubsystem->GetPortLocation(PortId, PortLoc))
+				{
+					continue;
+				}
+
+				const float Dx = PortLoc.X - PlayerX;
+				const float Dy = PortLoc.Y - PlayerY;
+				if (FMath::Sqrt(Dx * Dx + Dy * Dy) > MapWorldRadius)
+				{
+					continue;
+				}
+
+				const float Px = MapCenterX + Dx * Scale;
+				const float Py = MapCenterY - Dy * Scale;
+				const float DotSize = 5.0f;
+				DrawRect(MapPortColor, Px - DotSize * 0.5f, Py - DotSize * 0.5f, DotSize, DotSize);
+			}
+		}
+
 		if (UMissionSubsystem* MissionSubsystem = GI->GetSubsystem<UMissionSubsystem>())
 		{
 			FVector ObjectiveLoc;

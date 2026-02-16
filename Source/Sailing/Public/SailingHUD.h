@@ -47,6 +47,8 @@ public:
 	FLinearColor MapPlayerColor = FLinearColor(1.0f, 0.9f, 0.2f, 1.0f);
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HUD|Map")
 	FLinearColor MapMissionColor = FLinearColor(1.0f, 0.8f, 0.1f, 1.0f);
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HUD|Map")
+	FLinearColor MapPortColor = FLinearColor(0.8f, 0.6f, 1.0f, 1.0f);
 
 	/** Optional UMG overlay class used in parallel while Canvas HUD is active. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HUD|UMG")
