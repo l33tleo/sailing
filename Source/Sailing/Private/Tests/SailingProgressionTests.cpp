@@ -117,4 +117,34 @@ bool FSailingMissionLocationCompletionTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSailingMissionChainProgressionTest,
+	"Sailing.Progression.Mission.FollowUpActivation",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSailingMissionChainProgressionTest::RunTest(const FString& Parameters)
+{
+	UMissionSubsystem* MissionSubsystem = NewObject<UMissionSubsystem>();
+
+	USailingMissionDataAsset* MissionA = NewObject<USailingMissionDataAsset>();
+	MissionA->MissionId = TEXT("Mission_A");
+	MissionA->MissionType = ESailingMissionType::NavigationChallenge;
+	MissionA->RewardCredits = 100;
+	MissionA->NextMissionId = TEXT("Mission_B");
+
+	USailingMissionDataAsset* MissionB = NewObject<USailingMissionDataAsset>();
+	MissionB->MissionId = TEXT("Mission_B");
+	MissionB->MissionType = ESailingMissionType::Delivery;
+	MissionB->RewardCredits = 200;
+
+	TestTrue(TEXT("Mission A registration should succeed"), MissionSubsystem->RegisterMissionAsset(MissionA));
+	TestTrue(TEXT("Mission B registration should succeed"), MissionSubsystem->RegisterMissionAsset(MissionB));
+	TestTrue(TEXT("Mission A activation should succeed"), MissionSubsystem->ActivateMissionAsset(MissionA));
+
+	const int32 Reward = MissionSubsystem->CompleteActiveMissionByTrigger(ESailingMissionType::NavigationChallenge);
+	TestEqual(TEXT("Mission A reward should be returned"), Reward, 100);
+	TestEqual(TEXT("Mission B should auto-activate as follow-up"), MissionSubsystem->GetActiveMissionId(), MissionB->MissionId);
+	return true;
+}
+
 #endif

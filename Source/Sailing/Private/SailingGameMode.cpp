@@ -66,6 +66,7 @@ void ASailingGameMode::BeginPlay()
 			StarterDiscoveryMission->MissionType = ESailingMissionType::NavigationChallenge;
 			StarterDiscoveryMission->RewardCredits = 250;
 			StarterDiscoveryMission->bRepeatable = false;
+			StarterDiscoveryMission->NextMissionId = TEXT("LeveringTilBoye");
 			MissionSubsystem->RegisterMissionAsset(StarterDiscoveryMission);
 
 			USailingMissionDataAsset* StarterDeliveryMission = NewObject<USailingMissionDataAsset>(this);

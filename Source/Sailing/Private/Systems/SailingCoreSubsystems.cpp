@@ -168,8 +168,20 @@ int32 UMissionSubsystem::CompleteActiveMissionAtLocation(ESailingMissionType Tri
 	}
 
 	const int32 RewardCredits = FMath::Max(0, ActiveMission->RewardCredits);
-	CompletedMissionIds.Add(ActiveMissionId);
-	ActiveMissionId = NAME_None;
+	const FName CompletedMissionId = ActiveMissionId;
+	CompletedMissionIds.Add(CompletedMissionId);
+
+	if (!ActiveMission->NextMissionId.IsNone() && RegisteredMissions.Contains(ActiveMission->NextMissionId))
+	{
+		ActiveMissionId = ActiveMission->NextMissionId;
+	}
+	else
+	{
+		ActiveMissionId = NAME_None;
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("MissionSubsystem: Completed '%s', next='%s', reward=%d"),
+		*CompletedMissionId.ToString(), *ActiveMissionId.ToString(), RewardCredits);
 	return RewardCredits;
 }
 

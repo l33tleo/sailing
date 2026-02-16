@@ -54,4 +54,7 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mission")
 	bool bRepeatable = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mission")
+	FName NextMissionId = NAME_None;
 };
