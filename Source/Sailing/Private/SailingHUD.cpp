@@ -309,6 +309,10 @@ bool ASailingHUD::AcceptMissionFromBoard(FName MissionId)
 	LastMissionBoardData.CurrentMissionId = CurrentMissionId;
 	if (!CurrentMissionId.IsNone() && CurrentMissionId == MissionId)
 	{
+		if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
+		{
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardMissionAcceptAlreadyActive"), 1);
+		}
 		ShowDiscoveryPopup(FString::Printf(TEXT("Oppdraget '%s' er allerede aktivt."), *MissionId.ToString()));
 		CloseMissionBoard();
 		return true;
@@ -317,6 +321,22 @@ bool ASailingHUD::AcceptMissionFromBoard(FName MissionId)
 	FText BlockedReason;
 	if (!UPortMissionBoardWidget::CanRequestMissionAccept(LastMissionBoardData, MissionId, BlockedReason))
 	{
+		if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
+		{
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardMissionAcceptBlocked"), 1);
+			if (!LastMissionBoardData.bSupportsMissionBoard)
+			{
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardMissionAcceptBlocked_Disabled"), 1);
+			}
+			else if (LastMissionBoardData.bMissionBoardOnCooldown)
+			{
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardMissionAcceptBlocked_Cooldown"), 1);
+			}
+			else if (LastMissionBoardData.OfferedMissionIds.Num() > 0 && !LastMissionBoardData.OfferedMissionIds.Contains(MissionId))
+			{
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardMissionAcceptBlocked_NotOffered"), 1);
+			}
+		}
 		if (!BlockedReason.IsEmpty())
 		{
 			LastMissionBoardData.AvailabilityStatus = BlockedReason;
@@ -389,9 +409,30 @@ bool ASailingHUD::AcceptMissionFromBoard(FName MissionId)
 
 bool ASailingHUD::RequestRepairFromBoard()
 {
+	UGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
+
 	FText BlockedReason;
 	if (!UPortMissionBoardWidget::CanRequestRepairService(LastMissionBoardData, BlockedReason))
 	{
+		if (GI)
+		{
+			if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
+			{
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardRepairBlocked"), 1);
+				if (!LastMissionBoardData.bSupportsRepairService)
+				{
+					TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardRepairBlocked_NoService"), 1);
+				}
+				else if (FMath::Clamp(LastMissionBoardData.CurrentBoatConditionPercent, 0, 100) >= 100)
+				{
+					TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardRepairBlocked_FullCondition"), 1);
+				}
+				else if (!LastMissionBoardData.bCanAffordRepair)
+				{
+					TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardRepairBlocked_NoCredits"), 1);
+				}
+			}
+		}
 		if (!BlockedReason.IsEmpty())
 		{
 			ShowDiscoveryPopup(BlockedReason.ToString());
@@ -399,7 +440,6 @@ bool ASailingHUD::RequestRepairFromBoard()
 		return FMath::Clamp(LastMissionBoardData.CurrentBoatConditionPercent, 0, 100) >= 100;
 	}
 
-	UGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
 	if (!GI)
 	{
 		return false;
@@ -445,9 +485,45 @@ bool ASailingHUD::RequestRepairFromBoard()
 
 bool ASailingHUD::RequestUpgradePurchaseFromBoard(FName UpgradeId)
 {
+	UGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
+
 	FText BlockedReason;
 	if (!UPortMissionBoardWidget::CanRequestUpgradePurchase(LastMissionBoardData, UpgradeId, BlockedReason))
 	{
+		if (GI)
+		{
+			if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
+			{
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardUpgradePurchaseBlocked"), 1);
+				if (!LastMissionBoardData.bSupportsUpgradeService)
+				{
+					TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardUpgradePurchaseBlocked_ServiceDisabled"), 1);
+				}
+				else if (LastMissionBoardData.OfferedUpgradeIds.Num() > 0 && !LastMissionBoardData.OfferedUpgradeIds.Contains(UpgradeId))
+				{
+					TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardUpgradePurchaseBlocked_NotOffered"), 1);
+				}
+				else if (const FPortUpgradeOfferEntry* OfferEntry = LastMissionBoardData.OfferedUpgrades.FindByPredicate(
+					[UpgradeId](const FPortUpgradeOfferEntry& Entry)
+					{
+						return Entry.UpgradeId == UpgradeId;
+					}))
+				{
+					if (OfferEntry->bUnlocked)
+					{
+						TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardUpgradePurchaseBlocked_Unlocked"), 1);
+					}
+					else if (!OfferEntry->bVisitGateSatisfied)
+					{
+						TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardUpgradePurchaseBlocked_VisitGate"), 1);
+					}
+					else if (!OfferEntry->bAffordable)
+					{
+						TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardUpgradePurchaseBlocked_NoCredits"), 1);
+					}
+				}
+			}
+		}
 		if (!BlockedReason.IsEmpty())
 		{
 			ShowDiscoveryPopup(BlockedReason.ToString());
@@ -455,7 +531,6 @@ bool ASailingHUD::RequestUpgradePurchaseFromBoard(FName UpgradeId)
 		return false;
 	}
 
-	UGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
 	if (!GI)
 	{
 		return false;
@@ -551,9 +626,29 @@ void ASailingHUD::RefreshCurrentMissionBoard()
 		return;
 	}
 
+	UGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
 	FText RefreshBlockedReason;
 	if (!UPortMissionBoardWidget::CanRequestManualRefresh(LastMissionBoardData, RefreshBlockedReason))
 	{
+		if (GI)
+		{
+			if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
+			{
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardManualRefreshBlocked"), 1);
+				if (!LastMissionBoardData.bSupportsManualRefresh)
+				{
+					TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardManualRefreshBlocked_Disabled"), 1);
+				}
+				else if (LastMissionBoardData.bManualRefreshOnCooldown)
+				{
+					TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardManualRefreshBlocked_Cooldown"), 1);
+				}
+				else if (!LastMissionBoardData.bCanAffordManualRefresh)
+				{
+					TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardManualRefreshBlocked_NoCredits"), 1);
+				}
+			}
+		}
 		LastMissionBoardData.ManualRefreshStatus = RefreshBlockedReason;
 		if (LastMissionBoardData.bManualRefreshOnCooldown)
 		{
@@ -570,7 +665,6 @@ void ASailingHUD::RefreshCurrentMissionBoard()
 	}
 
 	const float CurrentTimeSeconds = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
-	UGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
 	UEconomySubsystem* EconomySubsystem = GI ? GI->GetSubsystem<UEconomySubsystem>() : nullptr;
 	const int32 RefreshCost = FMath::Max(0, LastMissionBoardManualRefreshCreditCost);
 	if (RefreshCost > 0 && !EconomySubsystem)
