@@ -315,6 +315,7 @@ void ASailingGameMode::BeginPlay()
 					PortNord->WeightedOfferedUpgrades.Add(WeightedRudder);
 				}
 				PortNord->bRotateUpgradeStockByVisits = true;
+				PortNord->bHideUnlockedUpgradesOnBoard = true;
 				PortNord->UpgradeCostMultiplier = 0.95f;
 				PortDefinitions.Add(PortNord);
 
@@ -347,6 +348,7 @@ void ASailingGameMode::BeginPlay()
 					PortVest->WeightedOfferedUpgrades.Add(WeightedRig);
 				}
 				PortVest->bRotateUpgradeStockByVisits = true;
+				PortVest->bHideUnlockedUpgradesOnBoard = false;
 				PortVest->UpgradeCostMultiplier = 1.05f;
 				PortDefinitions.Add(PortVest);
 
@@ -380,6 +382,7 @@ void ASailingGameMode::BeginPlay()
 					PortSor->WeightedOfferedUpgrades.Add(WeightedTrim);
 				}
 				PortSor->bRotateUpgradeStockByVisits = false;
+				PortSor->bHideUnlockedUpgradesOnBoard = true;
 				PortSor->UpgradeCostMultiplier = 1.12f;
 				PortDefinitions.Add(PortSor);
 			}
@@ -415,6 +418,7 @@ void ASailingGameMode::BeginPlay()
 				PortMarker->WeightedOfferedUpgrades = PortData->WeightedOfferedUpgrades;
 				PortMarker->MaxOfferedUpgrades = PortData->MaxOfferedUpgrades;
 				PortMarker->bRotateUpgradeStockByVisits = PortData->bRotateUpgradeStockByVisits;
+				PortMarker->bHideUnlockedUpgradesOnBoard = PortData->bHideUnlockedUpgradesOnBoard;
 				PortMarker->UpgradeCostMultiplier = PortData->UpgradeCostMultiplier;
 
 				SpawnedPortMarkers.Add(PortMarker);

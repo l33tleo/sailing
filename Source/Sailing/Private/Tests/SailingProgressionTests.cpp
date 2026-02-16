@@ -400,6 +400,17 @@ bool FSailingPortWeightedOffersTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Weighted upgrade fallback should respect source order"),
 		FallbackWeightedUpgrades[0], FName(TEXT("Fallback_Upgrade_A")));
 
+	TSet<FName> UnlockedUpgradeIds;
+	UnlockedUpgradeIds.Add(TEXT("Upgrade_A"));
+	const TArray<FName> FilteredLockedOnly = UPortDataAsset::FilterUpgradeIdsByUnlockedState(
+		{ TEXT("Upgrade_A"), TEXT("Upgrade_B"), TEXT("Upgrade_B") }, UnlockedUpgradeIds, true);
+	TestEqual(TEXT("Upgrade filter should remove unlocked upgrades when requested"), FilteredLockedOnly.Num(), 1);
+	TestEqual(TEXT("Upgrade filter should keep locked upgrades"), FilteredLockedOnly[0], FName(TEXT("Upgrade_B")));
+
+	const TArray<FName> FilteredAll = UPortDataAsset::FilterUpgradeIdsByUnlockedState(
+		{ TEXT("Upgrade_A"), TEXT("Upgrade_B") }, UnlockedUpgradeIds, false);
+	TestEqual(TEXT("Upgrade filter should keep all upgrades when hide-unlocked disabled"), FilteredAll.Num(), 2);
+
 	const TArray<FName> StaticUpgrades = UPortDataAsset::BuildRotatedUpgradeIds(
 		{ TEXT("Upgrade_A"), TEXT("Upgrade_A"), TEXT("Upgrade_B") }, 5, 0, false);
 	TestEqual(TEXT("Non-rotating upgrade list should deduplicate"), StaticUpgrades.Num(), 2);

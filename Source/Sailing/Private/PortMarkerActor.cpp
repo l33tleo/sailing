@@ -75,6 +75,21 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 			PortVisitCount,
 			MaxOfferedUpgrades,
 			bRotateUpgradeStockByVisits);
+		if (UEconomySubsystem* EconomySubsystem = GI->GetSubsystem<UEconomySubsystem>())
+		{
+			TSet<FName> UnlockedUpgradeSet;
+			for (const FName& UpgradeId : EconomySubsystem->GetUnlockedUpgradeIds())
+			{
+				if (!UpgradeId.IsNone())
+				{
+					UnlockedUpgradeSet.Add(UpgradeId);
+				}
+			}
+			EffectiveOfferedUpgradeIds = UPortDataAsset::FilterUpgradeIdsByUnlockedState(
+				EffectiveOfferedUpgradeIds,
+				UnlockedUpgradeSet,
+				bHideUnlockedUpgradesOnBoard);
+		}
 
 		if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
 		{

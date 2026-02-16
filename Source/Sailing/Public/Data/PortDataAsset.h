@@ -100,6 +100,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Port|Services")
 	bool bRotateUpgradeStockByVisits = true;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Port|Services")
+	bool bHideUnlockedUpgradesOnBoard = false;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Port|Services", meta = (ClampMin = "0.1", ClampMax = "5.0"))
 	float UpgradeCostMultiplier = 1.0f;
 
@@ -121,6 +124,11 @@ public:
 		int32 PortVisitCount,
 		int32 MaxOffers,
 		bool bRotateByVisits);
+
+	static TArray<FName> FilterUpgradeIdsByUnlockedState(
+		const TArray<FName>& InUpgradeIds,
+		const TSet<FName>& InUnlockedUpgradeIds,
+		bool bHideUnlockedUpgrades);
 
 	static int32 CalculateAdjustedUpgradeCost(int32 BaseCost, float CostMultiplier);
 };

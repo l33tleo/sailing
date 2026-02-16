@@ -146,6 +146,30 @@ TArray<FName> UPortDataAsset::BuildPrioritizedUpgradeIds(
 	return BuildRotatedUpgradeIds(InFallbackOffers, PortVisitCount, MaxOffers, bRotateByVisits);
 }
 
+TArray<FName> UPortDataAsset::FilterUpgradeIdsByUnlockedState(
+	const TArray<FName>& InUpgradeIds,
+	const TSet<FName>& InUnlockedUpgradeIds,
+	bool bHideUnlockedUpgrades)
+{
+	TArray<FName> Result;
+	for (const FName& UpgradeId : InUpgradeIds)
+	{
+		if (UpgradeId.IsNone())
+		{
+			continue;
+		}
+
+		if (bHideUnlockedUpgrades && InUnlockedUpgradeIds.Contains(UpgradeId))
+		{
+			continue;
+		}
+
+		Result.AddUnique(UpgradeId);
+	}
+
+	return Result;
+}
+
 int32 UPortDataAsset::CalculateAdjustedUpgradeCost(int32 BaseCost, float CostMultiplier)
 {
 	const int32 SafeBaseCost = FMath::Max(0, BaseCost);
