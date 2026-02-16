@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/HUD.h"
+#include "Data/PortDataAsset.h"
 #include "UI/PortMissionBoardWidget.h"
 #include "SailingHUD.generated.h"
 
@@ -27,7 +28,8 @@ public:
 		bool bMissionBoardOnCooldown, float CooldownRemainingSeconds,
 		bool bAutoRepairAtPort, int32 RepairCostPerPercentPoint,
 		bool bOfferUpgradeService, const TArray<FName>& OfferedUpgradeIds,
-		float UpgradeCostMultiplier);
+		float UpgradeCostMultiplier, int32 CurrentPortVisitCount,
+		const TArray<FPortUpgradeWeightedOffer>& WeightedOfferedUpgradeRules);
 
 	UFUNCTION(BlueprintCallable, Category = "HUD|MissionBoard")
 	bool AcceptMissionFromBoard(FName MissionId);

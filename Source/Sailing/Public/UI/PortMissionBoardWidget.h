@@ -44,6 +44,15 @@ struct SAILING_API FPortUpgradeOfferEntry
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
 	bool bAffordable = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	float PriorityWeight = 1.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	int32 MinPortVisits = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	bool bVisitGateSatisfied = true;
 };
 
 USTRUCT(BlueprintType)
@@ -85,6 +94,9 @@ struct SAILING_API FPortMissionBoardData
 	FText AvailabilityStatus;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	int32 PortVisitCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
 	bool bAwaitingMissionSwitchConfirmation = false;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
@@ -101,6 +113,9 @@ struct SAILING_API FPortMissionBoardData
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
 	TArray<FPortUpgradeOfferEntry> OfferedUpgrades;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	bool bHasWeightedUpgradeRules = false;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
 	FText UpgradeStatus;

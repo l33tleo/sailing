@@ -64,7 +64,8 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 	bool bMissionBoardOnCooldown, float CooldownRemainingSeconds,
 	bool bAutoRepairAtPort, int32 RepairCostPerPercentPoint,
 	bool bOfferUpgradeService, const TArray<FName>& OfferedUpgradeIds,
-	float UpgradeCostMultiplier)
+	float UpgradeCostMultiplier, int32 CurrentPortVisitCount,
+	const TArray<FPortUpgradeWeightedOffer>& WeightedOfferedUpgradeRules)
 {
 	EnsurePortMissionBoardWidget();
 	if (!PortMissionBoardWidget)
@@ -81,11 +82,13 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 	Data.CurrentMissionId = CurrentMissionId;
 	Data.bMissionBoardOnCooldown = bMissionBoardOnCooldown;
 	Data.CooldownRemainingSeconds = FMath::Max(0.0f, CooldownRemainingSeconds);
+	Data.PortVisitCount = FMath::Max(0, CurrentPortVisitCount);
 	Data.bAwaitingMissionSwitchConfirmation = false;
 	Data.PendingMissionSwitchId = NAME_None;
 	Data.MissionSwitchConfirmationStatus = FText::GetEmpty();
 	Data.bSupportsUpgradeService = bOfferUpgradeService;
 	Data.OfferedUpgradeIds = OfferedUpgradeIds;
+	Data.bHasWeightedUpgradeRules = WeightedOfferedUpgradeRules.Num() > 0;
 	Data.UpgradeCostMultiplier = FMath::Max(0.1f, UpgradeCostMultiplier);
 	Data.UpgradeStatus = bOfferUpgradeService
 		? FText::FromString(TEXT("Tilgjengelige oppgraderinger i denne havnen."))
@@ -161,6 +164,16 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 							UpgradeData->CreditCost, SafeUpgradeCostMultiplier);
 						OfferEntry.bUnlocked = EconomySubsystem->IsUpgradeUnlocked(UpgradeData->UpgradeId);
 						OfferEntry.bAffordable = EconomySubsystem->GetCredits() >= OfferEntry.CreditCost;
+						if (const FPortUpgradeWeightedOffer* WeightedRule = WeightedOfferedUpgradeRules.FindByPredicate(
+							[UpgradeId](const FPortUpgradeWeightedOffer& Candidate)
+							{
+								return Candidate.UpgradeId == UpgradeId;
+							}))
+						{
+							OfferEntry.PriorityWeight = FMath::Max(0.0f, WeightedRule->PriorityWeight);
+							OfferEntry.MinPortVisits = FMath::Max(0, WeightedRule->MinPortVisits);
+						}
+						OfferEntry.bVisitGateSatisfied = Data.PortVisitCount >= OfferEntry.MinPortVisits;
 						Data.OfferedUpgrades.Add(OfferEntry);
 
 						if (!OfferEntry.bUnlocked && OfferEntry.bAffordable)

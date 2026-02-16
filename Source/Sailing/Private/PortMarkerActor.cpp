@@ -208,7 +208,7 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 					bMissionBoardOnCooldown, MissionBoardCooldownRemaining,
 					bAutoRepairAtPort, RepairCostPerPercentPoint,
 					bOfferUpgradeService, EffectiveOfferedUpgradeIds,
-					UpgradeCostMultiplier);
+					UpgradeCostMultiplier, PortVisitCount, WeightedOfferedUpgrades);
 			}
 		}
 	}
