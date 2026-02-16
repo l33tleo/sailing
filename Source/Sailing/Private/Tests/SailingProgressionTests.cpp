@@ -807,6 +807,20 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 	TestEqual(TEXT("Annotated board should preserve upgrade offer count"), AnnotatedResult.OfferedUpgrades.Num(), 1);
 	TestFalse(TEXT("Annotated board should mark unaffordable upgrade as non-purchasable"), AnnotatedResult.OfferedUpgrades[0].bPurchasable);
 	TestEqual(TEXT("Annotated board should include upgrade blocked reason"), AnnotatedResult.OfferedUpgrades[0].PurchaseBlockedReason.ToString(), FString(TEXT("Ikke nok kreditter (300 kreves).")));
+
+	UPortMissionBoardWidget* Widget = NewObject<UPortMissionBoardWidget>();
+	TestNotNull(TEXT("Widget object should be created for annotation push test"), Widget);
+	if (Widget)
+	{
+		Widget->PushMissionBoardData(AnnotatedBoardData);
+		const FPortMissionBoardData& LastData = Widget->GetLastData();
+		TestEqual(TEXT("PushMissionBoardData should preserve mission offer count"), LastData.OfferedMissions.Num(), 1);
+		TestFalse(TEXT("PushMissionBoardData should auto-annotate mission selection state"), LastData.OfferedMissions[0].bSelectable);
+		TestEqual(TEXT("PushMissionBoardData should include mission blocked reason"), LastData.OfferedMissions[0].SelectionBlockedReason.ToString(), FString(TEXT("Oppdraget er allerede aktivt.")));
+		TestEqual(TEXT("PushMissionBoardData should preserve upgrade offer count"), LastData.OfferedUpgrades.Num(), 1);
+		TestFalse(TEXT("PushMissionBoardData should auto-annotate upgrade purchase state"), LastData.OfferedUpgrades[0].bPurchasable);
+		TestEqual(TEXT("PushMissionBoardData should include upgrade blocked reason"), LastData.OfferedUpgrades[0].PurchaseBlockedReason.ToString(), FString(TEXT("Ikke nok kreditter (300 kreves).")));
+	}
 	return true;
 }
 
