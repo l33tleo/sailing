@@ -2,8 +2,8 @@
 
 void UPortMissionBoardWidget::PushMissionBoardData(const FPortMissionBoardData& InData)
 {
-	LastData = InData;
-	OnMissionBoardDataUpdated(InData);
+	LastData = BuildActionStateAnnotatedBoardData(InData);
+	OnMissionBoardDataUpdated(LastData);
 }
 
 void UPortMissionBoardWidget::RequestAcceptMission(FName MissionId)
