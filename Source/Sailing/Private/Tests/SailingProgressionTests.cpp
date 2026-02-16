@@ -4,6 +4,7 @@
 #include "SaveGameSailing.h"
 #include "Systems/SailingCoreSubsystems.h"
 #include "Data/BoatUpgradeDataAsset.h"
+#include "Data/SailingMissionDataAsset.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FSailingSaveMigrationRecountsDiscoveredIslandsTest,
@@ -81,6 +82,38 @@ bool FSailingTelemetryCounterSanitizationTest::RunTest(const FString& Parameters
 
 	TestEqual(TEXT("SetAllCounters should sanitize negatives"), Telemetry->GetCounterValue(TEXT("CreditsGranted")), 0);
 	TestEqual(TEXT("RecordCounterEvent should increment stored values"), Telemetry->GetCounterValue(TEXT("IslandDiscovered")), 5);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSailingMissionLocationCompletionTest,
+	"Sailing.Progression.Mission.LocationAwareCompletion",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSailingMissionLocationCompletionTest::RunTest(const FString& Parameters)
+{
+	UMissionSubsystem* MissionSubsystem = NewObject<UMissionSubsystem>();
+	USailingMissionDataAsset* Mission = NewObject<USailingMissionDataAsset>();
+	Mission->MissionId = TEXT("Delivery_A");
+	Mission->MissionType = ESailingMissionType::Delivery;
+	Mission->RewardCredits = 450;
+	Mission->EndWorldLocation = FVector(1000.0f, 0.0f, 0.0f);
+	Mission->bRequireLocationMatch = true;
+	Mission->CompletionRadius = 500.0f;
+
+	TestTrue(TEXT("Mission registration should succeed"), MissionSubsystem->RegisterMissionAsset(Mission));
+	TestTrue(TEXT("Mission activation should succeed"), MissionSubsystem->ActivateMissionAsset(Mission));
+
+	const int32 WrongLocationReward = MissionSubsystem->CompleteActiveMissionAtLocation(
+		ESailingMissionType::Delivery, FVector(3000.0f, 0.0f, 0.0f));
+	TestEqual(TEXT("Wrong location should not complete mission"), WrongLocationReward, 0);
+	TestEqual(TEXT("Active mission should still be set"), MissionSubsystem->GetActiveMissionId(), Mission->MissionId);
+
+	const int32 CorrectLocationReward = MissionSubsystem->CompleteActiveMissionAtLocation(
+		ESailingMissionType::Delivery, FVector(1200.0f, 10.0f, 0.0f));
+	TestEqual(TEXT("Correct location should pay reward"), CorrectLocationReward, 450);
+	TestEqual(TEXT("Mission should be cleared after completion"), MissionSubsystem->GetActiveMissionId(), NAME_None);
+
 	return true;
 }
 
