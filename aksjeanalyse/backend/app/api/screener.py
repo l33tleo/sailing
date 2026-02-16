@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/screener", tags=["Screener"])
 
 
-@router.get("/")
+@router.get("")
 async def screen_stocks(
     market: str = Query("all", description="Market: oslo, global, all"),
     min_pe: float | None = Query(None, description="Minimum P/E ratio"),
@@ -82,32 +82,3 @@ async def screen_stocks(
     return results
 
 
-@router.get("/indices")
-async def get_market_indices():
-    """Hent hovedindekser (OBX, S&P 500, Nasdaq, etc.)."""
-    indices = [
-        ("^GSPC", "S&P 500"),
-        ("^IXIC", "Nasdaq Composite"),
-        ("^DJI", "Dow Jones"),
-        ("^OBX", "Oslo Børs OBX"),
-        ("^STOXX50E", "Euro Stoxx 50"),
-    ]
-
-    results = []
-    for ticker, display_name in indices:
-        try:
-            quote = get_stock_quote(ticker)
-            if quote:
-                results.append({
-                    "ticker": ticker,
-                    "name": display_name,
-                    "price": quote.price,
-                    "change": quote.change,
-                    "change_percent": quote.change_percent,
-                    "currency": quote.currency,
-                })
-        except Exception as e:
-            logger.error(f"Index error for {ticker}: {e}")
-            continue
-
-    return results
