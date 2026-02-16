@@ -228,11 +228,20 @@ struct SAILING_API FPortMissionBoardData
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
 	int32 BlockedMissionOfferCount = 0;
 
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	bool bHasSelectableMissionOffers = false;
+
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
 	int32 PurchasableUpgradeOfferCount = 0;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
 	int32 BlockedUpgradeOfferCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	bool bHasPurchasableUpgradeOffers = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	bool bHasAnyImmediateActions = false;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
 	FText OfferActionSummaryStatus;

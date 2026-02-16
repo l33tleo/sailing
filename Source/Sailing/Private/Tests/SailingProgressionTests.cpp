@@ -860,11 +860,14 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 	TestEqual(TEXT("Annotated board should include mission blocked reason"), AnnotatedResult.OfferedMissions[0].SelectionBlockedReason.ToString(), FString(TEXT("Oppdraget er allerede aktivt.")));
 	TestEqual(TEXT("Annotated board should track selectable mission count"), AnnotatedResult.SelectableMissionOfferCount, 0);
 	TestEqual(TEXT("Annotated board should track blocked mission count"), AnnotatedResult.BlockedMissionOfferCount, 1);
+	TestFalse(TEXT("Annotated board should mark no selectable missions"), AnnotatedResult.bHasSelectableMissionOffers);
 	TestEqual(TEXT("Annotated board should preserve upgrade offer count"), AnnotatedResult.OfferedUpgrades.Num(), 1);
 	TestFalse(TEXT("Annotated board should mark unaffordable upgrade as non-purchasable"), AnnotatedResult.OfferedUpgrades[0].bPurchasable);
 	TestEqual(TEXT("Annotated board should include upgrade blocked reason"), AnnotatedResult.OfferedUpgrades[0].PurchaseBlockedReason.ToString(), FString(TEXT("Ikke nok kreditter (300 kreves).")));
 	TestEqual(TEXT("Annotated board should track purchasable upgrade count"), AnnotatedResult.PurchasableUpgradeOfferCount, 0);
 	TestEqual(TEXT("Annotated board should track blocked upgrade count"), AnnotatedResult.BlockedUpgradeOfferCount, 1);
+	TestFalse(TEXT("Annotated board should mark no purchasable upgrades"), AnnotatedResult.bHasPurchasableUpgradeOffers);
+	TestFalse(TEXT("Annotated board should mark no immediate actions"), AnnotatedResult.bHasAnyImmediateActions);
 	TestEqual(TEXT("Annotated board should include action summary text"),
 		AnnotatedResult.OfferActionSummaryStatus.ToString(),
 		FString(TEXT("Valgbare oppdrag: 0 (1 blokkert) | Kjøpbare oppgraderinger: 0 (1 blokkert)")));
@@ -926,8 +929,11 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 	const FPortMissionBoardData MixedAnnotatedResult = UPortMissionBoardWidget::BuildActionStateAnnotatedBoardData(MixedBoardData);
 	TestEqual(TEXT("Mixed annotated board should count selectable missions"), MixedAnnotatedResult.SelectableMissionOfferCount, 1);
 	TestEqual(TEXT("Mixed annotated board should count blocked missions"), MixedAnnotatedResult.BlockedMissionOfferCount, 1);
+	TestTrue(TEXT("Mixed annotated board should mark selectable missions"), MixedAnnotatedResult.bHasSelectableMissionOffers);
 	TestEqual(TEXT("Mixed annotated board should count purchasable upgrades"), MixedAnnotatedResult.PurchasableUpgradeOfferCount, 1);
 	TestEqual(TEXT("Mixed annotated board should count blocked upgrades"), MixedAnnotatedResult.BlockedUpgradeOfferCount, 1);
+	TestTrue(TEXT("Mixed annotated board should mark purchasable upgrades"), MixedAnnotatedResult.bHasPurchasableUpgradeOffers);
+	TestTrue(TEXT("Mixed annotated board should mark immediate actions"), MixedAnnotatedResult.bHasAnyImmediateActions);
 	TestEqual(TEXT("Mixed annotated board should summarize mixed counts"),
 		MixedAnnotatedResult.OfferActionSummaryStatus.ToString(),
 		FString(TEXT("Valgbare oppdrag: 1 (1 blokkert) | Kjøpbare oppgraderinger: 1 (1 blokkert)")));

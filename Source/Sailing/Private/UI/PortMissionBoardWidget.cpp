@@ -581,6 +581,9 @@ FPortMissionBoardData UPortMissionBoardWidget::BuildActionStateAnnotatedBoardDat
 		}
 	}
 
+	Result.bHasSelectableMissionOffers = Result.SelectableMissionOfferCount > 0;
+	Result.bHasPurchasableUpgradeOffers = Result.PurchasableUpgradeOfferCount > 0;
+	Result.bHasAnyImmediateActions = Result.bHasSelectableMissionOffers || Result.bHasPurchasableUpgradeOffers;
 	Result.OfferActionSummaryStatus = BuildOfferActionSummaryStatusText(Result);
 	return Result;
 }
