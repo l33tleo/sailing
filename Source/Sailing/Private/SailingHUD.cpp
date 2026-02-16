@@ -273,7 +273,24 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 		Data.bCanAffordManualRefresh);
 	LastMissionBoardData = Data;
 	PortMissionBoardWidget->PushMissionBoardData(LastMissionBoardData);
+	LastMissionBoardData = PortMissionBoardWidget->GetLastData();
 	PortMissionBoardWidget->SetVisibility(ESlateVisibility::Visible);
+
+	if (UGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance() : nullptr)
+	{
+		if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
+		{
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardShown"), 1);
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardSelectableMissionOffers"), LastMissionBoardData.SelectableMissionOfferCount);
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardBlockedMissionOffers"), LastMissionBoardData.BlockedMissionOfferCount);
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardPurchasableUpgradeOffers"), LastMissionBoardData.PurchasableUpgradeOfferCount);
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardBlockedUpgradeOffers"), LastMissionBoardData.BlockedUpgradeOfferCount);
+			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastSelectableMissionOffers"), LastMissionBoardData.SelectableMissionOfferCount);
+			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastBlockedMissionOffers"), LastMissionBoardData.BlockedMissionOfferCount);
+			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastPurchasableUpgradeOffers"), LastMissionBoardData.PurchasableUpgradeOfferCount);
+			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastBlockedUpgradeOffers"), LastMissionBoardData.BlockedUpgradeOfferCount);
+		}
+	}
 
 	LastMissionBoardPortId = PortId;
 	LastMissionBoardPortDisplayName = PortDisplayName;
@@ -344,6 +361,7 @@ bool ASailingHUD::AcceptMissionFromBoard(FName MissionId)
 			if (PortMissionBoardWidget)
 			{
 				PortMissionBoardWidget->PushMissionBoardData(LastMissionBoardData);
+				LastMissionBoardData = PortMissionBoardWidget->GetLastData();
 			}
 			ShowDiscoveryPopup(BlockedReason.ToString());
 		}
@@ -375,6 +393,7 @@ bool ASailingHUD::AcceptMissionFromBoard(FName MissionId)
 		if (PortMissionBoardWidget)
 		{
 			PortMissionBoardWidget->PushMissionBoardData(LastMissionBoardData);
+			LastMissionBoardData = PortMissionBoardWidget->GetLastData();
 		}
 
 		ShowDiscoveryPopup(FString::Printf(TEXT("Bekreft bytte til oppdrag: %s"), *RequestedMissionTitle.ToString()));
@@ -404,6 +423,7 @@ bool ASailingHUD::AcceptMissionFromBoard(FName MissionId)
 	else if (PortMissionBoardWidget)
 	{
 		PortMissionBoardWidget->PushMissionBoardData(LastMissionBoardData);
+		LastMissionBoardData = PortMissionBoardWidget->GetLastData();
 	}
 	return bActivated;
 }
@@ -575,6 +595,7 @@ bool ASailingHUD::RequestUpgradePurchaseFromBoard(FName UpgradeId)
 		if (PortMissionBoardWidget)
 		{
 			PortMissionBoardWidget->PushMissionBoardData(LastMissionBoardData);
+			LastMissionBoardData = PortMissionBoardWidget->GetLastData();
 		}
 
 		ShowDiscoveryPopup(FString::Printf(TEXT("Bekreft kjøp av oppgradering: %s"), *UpgradeTitle.ToString()));
@@ -658,6 +679,7 @@ void ASailingHUD::RefreshCurrentMissionBoard()
 				LastMissionBoardData.RefreshContext);
 		}
 		PortMissionBoardWidget->PushMissionBoardData(LastMissionBoardData);
+		LastMissionBoardData = PortMissionBoardWidget->GetLastData();
 		if (!RefreshBlockedReason.IsEmpty())
 		{
 			ShowDiscoveryPopup(RefreshBlockedReason.ToString());
@@ -685,6 +707,7 @@ void ASailingHUD::RefreshCurrentMissionBoard()
 				RefreshCost,
 				false);
 			PortMissionBoardWidget->PushMissionBoardData(LastMissionBoardData);
+			LastMissionBoardData = PortMissionBoardWidget->GetLastData();
 			ShowDiscoveryPopup(FString::Printf(TEXT("Ikke nok kreditter til oppfriskning (%d)."), RefreshCost));
 			return;
 		}
@@ -759,6 +782,18 @@ void ASailingHUD::RefreshCurrentMissionBoard()
 	LastMissionBoardData.RefreshContextStatus = UPortMissionBoardWidget::BuildRefreshContextStatusText(
 		LastMissionBoardData.RefreshContext);
 	PortMissionBoardWidget->PushMissionBoardData(LastMissionBoardData);
+	LastMissionBoardData = PortMissionBoardWidget->GetLastData();
+
+	if (GI)
+	{
+		if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
+		{
+			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastSelectableMissionOffers"), LastMissionBoardData.SelectableMissionOfferCount);
+			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastBlockedMissionOffers"), LastMissionBoardData.BlockedMissionOfferCount);
+			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastPurchasableUpgradeOffers"), LastMissionBoardData.PurchasableUpgradeOfferCount);
+			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastBlockedUpgradeOffers"), LastMissionBoardData.BlockedUpgradeOfferCount);
+		}
+	}
 
 	GetWorldTimerManager().ClearTimer(MissionBoardHideTimer);
 	GetWorldTimerManager().SetTimer(MissionBoardHideTimer, this, &ASailingHUD::HidePortMissionBoard, 5.0f, false);
