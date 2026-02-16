@@ -44,6 +44,15 @@ private:
 	UPROPERTY(EditAnywhere, Category = "World|Ports")
 	FName PortAssetScanPath = TEXT("/Game");
 
+	UPROPERTY(EditAnywhere, Category = "World|ContentValidation")
+	TArray<FName> RequiredStartupMissionIds;
+
+	UPROPERTY(EditAnywhere, Category = "World|ContentValidation")
+	TArray<FName> RequiredStartupUpgradeIds;
+
+	UPROPERTY(EditAnywhere, Category = "World|ContentValidation")
+	TArray<FName> RequiredStartupPortIds;
+
 	UPROPERTY()
 	TObjectPtr<AActor> SpawnedWind;
 

@@ -23,6 +23,9 @@ ASailingGameMode::ASailingGameMode()
 	DefaultPawnClass = ASailboatPawn::StaticClass();
 	PlayerControllerClass = ASailingPlayerController::StaticClass();
 	HUDClass = ASailingHUD::StaticClass();
+	RequiredStartupMissionIds = { TEXT("OppdagForsteOy"), TEXT("LeveringTilBoye") };
+	RequiredStartupUpgradeIds = { TEXT("SkrogTrimV1"), TEXT("RorResponsV1"), TEXT("RiggeffektivitetV1") };
+	RequiredStartupPortIds = { TEXT("HavnNord"), TEXT("HavnVest"), TEXT("HavnSor") };
 }
 
 void ASailingGameMode::BeginPlay()
@@ -39,6 +42,9 @@ void ASailingGameMode::BeginPlay()
 	int32 StartupRegisteredUpgradeCount = 0;
 	int32 StartupPortDefinitionCount = 0;
 	int32 StartupSpawnedPortCount = 0;
+	int32 MissingRequiredStartupMissionCount = 0;
+	int32 MissingRequiredStartupUpgradeCount = 0;
+	int32 MissingRequiredStartupPortCount = 0;
 
 	USailingGameInstance* GI = Cast<USailingGameInstance>(GetGameInstance());
 	if (GI && GI->bRequestNewGame)
@@ -151,6 +157,37 @@ void ASailingGameMode::BeginPlay()
 				}
 			}
 			StartupRegisteredUpgradeCount = EconomySubsystem->GetRegisteredUpgradeIds().Num();
+			if (RequiredStartupUpgradeIds.Num() > 0)
+			{
+				TSet<FName> RegisteredUpgradeIdSet;
+				for (const FName& UpgradeId : EconomySubsystem->GetRegisteredUpgradeIds())
+				{
+					if (!UpgradeId.IsNone())
+					{
+						RegisteredUpgradeIdSet.Add(UpgradeId);
+					}
+				}
+
+				TArray<FString> MissingRequiredUpgradeNames;
+				for (const FName& RequiredUpgradeId : RequiredStartupUpgradeIds)
+				{
+					if (RequiredUpgradeId.IsNone() || RegisteredUpgradeIdSet.Contains(RequiredUpgradeId))
+					{
+						continue;
+					}
+
+					MissingRequiredStartupUpgradeCount++;
+					MissingRequiredUpgradeNames.Add(RequiredUpgradeId.ToString());
+				}
+
+				if (MissingRequiredUpgradeNames.Num() > 0)
+				{
+					UE_LOG(LogTemp, Warning,
+						TEXT("SailingGameMode: Mangler %d påkrevde startup-oppgraderinger: %s"),
+						MissingRequiredStartupUpgradeCount,
+						*FString::Join(MissingRequiredUpgradeNames, TEXT(", ")));
+				}
+			}
 
 			EconomySubsystem->SetCredits(SaveGame ? SaveGame->PlayerCredits : 0);
 			EconomySubsystem->SetBoatConditionPercent(SaveGame ? SaveGame->BoatConditionPercent : 100);
@@ -255,6 +292,37 @@ void ASailingGameMode::BeginPlay()
 				}
 			}
 			StartupRegisteredMissionCount = MissionSubsystem->GetRegisteredMissionIds().Num();
+			if (RequiredStartupMissionIds.Num() > 0)
+			{
+				TSet<FName> RegisteredMissionIdSet;
+				for (const FName& MissionId : MissionSubsystem->GetRegisteredMissionIds())
+				{
+					if (!MissionId.IsNone())
+					{
+						RegisteredMissionIdSet.Add(MissionId);
+					}
+				}
+
+				TArray<FString> MissingRequiredMissionNames;
+				for (const FName& RequiredMissionId : RequiredStartupMissionIds)
+				{
+					if (RequiredMissionId.IsNone() || RegisteredMissionIdSet.Contains(RequiredMissionId))
+					{
+						continue;
+					}
+
+					MissingRequiredStartupMissionCount++;
+					MissingRequiredMissionNames.Add(RequiredMissionId.ToString());
+				}
+
+				if (MissingRequiredMissionNames.Num() > 0)
+				{
+					UE_LOG(LogTemp, Warning,
+						TEXT("SailingGameMode: Mangler %d påkrevde startup-oppdrag: %s"),
+						MissingRequiredStartupMissionCount,
+						*FString::Join(MissingRequiredMissionNames, TEXT(", ")));
+				}
+			}
 
 			MissionSubsystem->SetCompletedMissionIds(SaveGame ? SaveGame->CompletedMissionIds : TArray<FName>());
 			MissionSubsystem->SetMissionBoardSelectionHistory(SaveGame ? SaveGame->MissionBoardSelectionHistory : TArray<FMissionBoardSelectionEntry>());
@@ -664,6 +732,28 @@ void ASailingGameMode::BeginPlay()
 			{
 				UE_LOG(LogTemp, Warning, TEXT("SailingGameMode: Filtrerte bort %d ugyldige oppgraderingsreferanser fra portinnhold."), RejectedUpgradeReferenceCount);
 			}
+			if (RequiredStartupPortIds.Num() > 0)
+			{
+				TArray<FString> MissingRequiredPortNames;
+				for (const FName& RequiredPortId : RequiredStartupPortIds)
+				{
+					if (RequiredPortId.IsNone() || SpawnedPortIds.Contains(RequiredPortId))
+					{
+						continue;
+					}
+
+					MissingRequiredStartupPortCount++;
+					MissingRequiredPortNames.Add(RequiredPortId.ToString());
+				}
+
+				if (MissingRequiredPortNames.Num() > 0)
+				{
+					UE_LOG(LogTemp, Warning,
+						TEXT("SailingGameMode: Mangler %d påkrevde startup-havner: %s"),
+						MissingRequiredStartupPortCount,
+						*FString::Join(MissingRequiredPortNames, TEXT(", ")));
+				}
+			}
 			if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
 			{
 				if (InvalidPortDefinitionCount > 0)
@@ -701,24 +791,34 @@ void ASailingGameMode::BeginPlay()
 			TelemetrySubsystem->SetCounterValue(TEXT("StartupRegisteredUpgrades"), FMath::Max(0, StartupRegisteredUpgradeCount));
 			TelemetrySubsystem->SetCounterValue(TEXT("StartupPortDefinitions"), FMath::Max(0, StartupPortDefinitionCount));
 			TelemetrySubsystem->SetCounterValue(TEXT("StartupSpawnedPorts"), FMath::Max(0, StartupSpawnedPortCount));
+			TelemetrySubsystem->SetCounterValue(TEXT("StartupMissingRequiredMissions"), FMath::Max(0, MissingRequiredStartupMissionCount));
+			TelemetrySubsystem->SetCounterValue(TEXT("StartupMissingRequiredUpgrades"), FMath::Max(0, MissingRequiredStartupUpgradeCount));
+			TelemetrySubsystem->SetCounterValue(TEXT("StartupMissingRequiredPorts"), FMath::Max(0, MissingRequiredStartupPortCount));
 			TelemetrySubsystem->SetCounterValue(TEXT("RuntimeFallbackEnabled"), bEnableRuntimeFallbackContent ? 1 : 0);
-			if (!bEnableRuntimeFallbackContent && StartupRegisteredMissionCount == 0)
+			if (!bEnableRuntimeFallbackContent && (StartupRegisteredMissionCount == 0 || MissingRequiredStartupMissionCount > 0))
 			{
 				TelemetrySubsystem->RecordCounterEvent(TEXT("AssetOnlyStartupMissingMissions"), 1);
 			}
-			if (!bEnableRuntimeFallbackContent && StartupRegisteredUpgradeCount == 0)
+			if (!bEnableRuntimeFallbackContent && (StartupRegisteredUpgradeCount == 0 || MissingRequiredStartupUpgradeCount > 0))
 			{
 				TelemetrySubsystem->RecordCounterEvent(TEXT("AssetOnlyStartupMissingUpgrades"), 1);
+			}
+			if (!bEnableRuntimeFallbackContent && (StartupSpawnedPortCount == 0 || MissingRequiredStartupPortCount > 0))
+			{
+				TelemetrySubsystem->RecordCounterEvent(TEXT("AssetOnlyStartupMissingPorts"), 1);
 			}
 		}
 	}
 
 	UE_LOG(LogTemp, Log,
-		TEXT("SailingGameMode: Startup content summary Missions=%d Upgrades=%d PortDefs=%d SpawnedPorts=%d RuntimeFallback=%s"),
+		TEXT("SailingGameMode: Startup content summary Missions=%d (MissingRequired=%d) Upgrades=%d (MissingRequired=%d) PortDefs=%d SpawnedPorts=%d (MissingRequired=%d) RuntimeFallback=%s"),
 		StartupRegisteredMissionCount,
+		MissingRequiredStartupMissionCount,
 		StartupRegisteredUpgradeCount,
+		MissingRequiredStartupUpgradeCount,
 		StartupPortDefinitionCount,
 		StartupSpawnedPortCount,
+		MissingRequiredStartupPortCount,
 		bEnableRuntimeFallbackContent ? TEXT("ON") : TEXT("OFF"));
 
 	// Teleporter pawn til siste posisjon ved Fortsett (etter at pawn er spawnet)
