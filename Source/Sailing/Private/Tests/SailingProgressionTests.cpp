@@ -893,9 +893,36 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 	SummaryBoardData.BlockedMissionOfferCount = 1;
 	SummaryBoardData.PurchasableUpgradeOfferCount = 3;
 	SummaryBoardData.BlockedUpgradeOfferCount = 2;
+	SummaryBoardData.bSupportsMissionBoard = true;
+	SummaryBoardData.bSupportsUpgradeService = true;
 	TestEqual(TEXT("Action summary helper should render compact counts"),
 		UPortMissionBoardWidget::BuildOfferActionSummaryStatusText(SummaryBoardData).ToString(),
 		FString(TEXT("Valgbare oppdrag: 2 (1 blokkert) | Kjøpbare oppgraderinger: 3 (2 blokkert)")));
+
+	FPortMissionBoardData MissionOnlySummaryData;
+	MissionOnlySummaryData.bSupportsMissionBoard = true;
+	MissionOnlySummaryData.bSupportsUpgradeService = false;
+	MissionOnlySummaryData.SelectableMissionOfferCount = 1;
+	MissionOnlySummaryData.BlockedMissionOfferCount = 2;
+	TestEqual(TEXT("Action summary helper should render mission-only status"),
+		UPortMissionBoardWidget::BuildOfferActionSummaryStatusText(MissionOnlySummaryData).ToString(),
+		FString(TEXT("Valgbare oppdrag: 1 (2 blokkert)")));
+
+	FPortMissionBoardData UpgradeOnlySummaryData;
+	UpgradeOnlySummaryData.bSupportsMissionBoard = false;
+	UpgradeOnlySummaryData.bSupportsUpgradeService = true;
+	UpgradeOnlySummaryData.PurchasableUpgradeOfferCount = 4;
+	UpgradeOnlySummaryData.BlockedUpgradeOfferCount = 1;
+	TestEqual(TEXT("Action summary helper should render upgrade-only status"),
+		UPortMissionBoardWidget::BuildOfferActionSummaryStatusText(UpgradeOnlySummaryData).ToString(),
+		FString(TEXT("Kjøpbare oppgraderinger: 4 (1 blokkert)")));
+
+	FPortMissionBoardData NoActionSummaryData;
+	NoActionSummaryData.bSupportsMissionBoard = false;
+	NoActionSummaryData.bSupportsUpgradeService = false;
+	TestEqual(TEXT("Action summary helper should render no-action status"),
+		UPortMissionBoardWidget::BuildOfferActionSummaryStatusText(NoActionSummaryData).ToString(),
+		FString(TEXT("Ingen handlinger tilgjengelig i denne havnen.")));
 
 	FPortMissionBoardData MixedBoardData;
 	MixedBoardData.bSupportsMissionBoard = true;

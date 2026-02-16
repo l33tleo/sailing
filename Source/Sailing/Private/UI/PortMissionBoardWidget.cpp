@@ -595,12 +595,33 @@ FText UPortMissionBoardWidget::BuildOfferActionSummaryStatusText(const FPortMiss
 	const int32 PurchasableUpgradeCount = FMath::Max(0, BoardData.PurchasableUpgradeOfferCount);
 	const int32 BlockedUpgradeCount = FMath::Max(0, BoardData.BlockedUpgradeOfferCount);
 
-	return FText::FromString(FString::Printf(
-		TEXT("Valgbare oppdrag: %d (%d blokkert) | Kjøpbare oppgraderinger: %d (%d blokkert)"),
-		SelectableMissionCount,
-		BlockedMissionCount,
-		PurchasableUpgradeCount,
-		BlockedUpgradeCount));
+	if (BoardData.bSupportsMissionBoard && BoardData.bSupportsUpgradeService)
+	{
+		return FText::FromString(FString::Printf(
+			TEXT("Valgbare oppdrag: %d (%d blokkert) | Kjøpbare oppgraderinger: %d (%d blokkert)"),
+			SelectableMissionCount,
+			BlockedMissionCount,
+			PurchasableUpgradeCount,
+			BlockedUpgradeCount));
+	}
+
+	if (BoardData.bSupportsMissionBoard)
+	{
+		return FText::FromString(FString::Printf(
+			TEXT("Valgbare oppdrag: %d (%d blokkert)"),
+			SelectableMissionCount,
+			BlockedMissionCount));
+	}
+
+	if (BoardData.bSupportsUpgradeService)
+	{
+		return FText::FromString(FString::Printf(
+			TEXT("Kjøpbare oppgraderinger: %d (%d blokkert)"),
+			PurchasableUpgradeCount,
+			BlockedUpgradeCount));
+	}
+
+	return FText::FromString(TEXT("Ingen handlinger tilgjengelig i denne havnen."));
 }
 
 void UPortMissionBoardWidget::RequestCloseBoard()
