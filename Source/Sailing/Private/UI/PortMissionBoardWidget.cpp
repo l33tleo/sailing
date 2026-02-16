@@ -8,8 +8,13 @@ void UPortMissionBoardWidget::PushMissionBoardData(const FPortMissionBoardData& 
 
 void UPortMissionBoardWidget::RequestAcceptMission(FName MissionId)
 {
-	if (MissionId.IsNone())
+	FText BlockedReason;
+	if (!CanRequestMissionAccept(LastData, MissionId, BlockedReason))
 	{
+		if (!BlockedReason.IsEmpty())
+		{
+			OnActionBlocked.Broadcast(BlockedReason);
+		}
 		return;
 	}
 
@@ -545,18 +550,43 @@ void UPortMissionBoardWidget::RequestCloseBoard()
 
 void UPortMissionBoardWidget::RequestRefreshBoard()
 {
+	FText BlockedReason;
+	if (!CanRequestManualRefresh(LastData, BlockedReason))
+	{
+		if (!BlockedReason.IsEmpty())
+		{
+			OnActionBlocked.Broadcast(BlockedReason);
+		}
+		return;
+	}
+
 	OnRefreshRequested.Broadcast();
 }
 
 void UPortMissionBoardWidget::RequestRepairService()
 {
+	FText BlockedReason;
+	if (!CanRequestRepairService(LastData, BlockedReason))
+	{
+		if (!BlockedReason.IsEmpty())
+		{
+			OnActionBlocked.Broadcast(BlockedReason);
+		}
+		return;
+	}
+
 	OnRepairRequested.Broadcast();
 }
 
 void UPortMissionBoardWidget::RequestPurchaseUpgrade(FName UpgradeId)
 {
-	if (UpgradeId.IsNone())
+	FText BlockedReason;
+	if (!CanRequestUpgradePurchase(LastData, UpgradeId, BlockedReason))
 	{
+		if (!BlockedReason.IsEmpty())
+		{
+			OnActionBlocked.Broadcast(BlockedReason);
+		}
 		return;
 	}
 

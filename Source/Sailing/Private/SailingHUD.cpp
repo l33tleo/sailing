@@ -80,6 +80,7 @@ void ASailingHUD::EnsurePortMissionBoardWidget()
 		PortMissionBoardWidget->OnRefreshRequested.AddDynamic(this, &ASailingHUD::HandleMissionBoardRefreshRequest);
 		PortMissionBoardWidget->OnRepairRequested.AddDynamic(this, &ASailingHUD::HandleRepairRequest);
 		PortMissionBoardWidget->OnUpgradePurchaseRequested.AddDynamic(this, &ASailingHUD::HandleUpgradePurchaseRequest);
+		PortMissionBoardWidget->OnActionBlocked.AddDynamic(this, &ASailingHUD::HandleMissionBoardActionBlocked);
 		PortMissionBoardWidget->AddToViewport(2);
 		PortMissionBoardWidget->SetVisibility(ESlateVisibility::Hidden);
 	}
@@ -842,6 +843,14 @@ void ASailingHUD::HandleRepairRequest()
 void ASailingHUD::HandleUpgradePurchaseRequest(FName UpgradeId)
 {
 	RequestUpgradePurchaseFromBoard(UpgradeId);
+}
+
+void ASailingHUD::HandleMissionBoardActionBlocked(const FText& Reason)
+{
+	if (!Reason.IsEmpty())
+	{
+		ShowDiscoveryPopup(Reason.ToString());
+	}
 }
 
 void ASailingHUD::PushOverlayData(int32 DiscoveredIslands, int32 Credits, FName ActiveMissionId,

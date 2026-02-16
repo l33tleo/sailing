@@ -10,6 +10,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPortMissionBoardCloseRequested);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPortMissionBoardRefreshRequested);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPortRepairRequested);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPortUpgradePurchaseRequested, FName, UpgradeId);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPortBoardActionBlocked, FText, Reason);
 
 UENUM(BlueprintType)
 enum class EPortMissionAvailabilityReason : uint8
@@ -431,6 +432,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "MissionBoard|Service")
 	FOnPortUpgradePurchaseRequested OnUpgradePurchaseRequested;
+
+	UPROPERTY(BlueprintAssignable, Category = "MissionBoard")
+	FOnPortBoardActionBlocked OnActionBlocked;
 
 protected:
 	UFUNCTION(BlueprintImplementableEvent, Category = "MissionBoard")
