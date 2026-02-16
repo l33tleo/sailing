@@ -48,6 +48,12 @@ struct SAILING_API FPortMissionBoardData
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
 	TArray<FMissionBoardSelectionEntry> RecentSelections;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	bool bHasAnyOffers = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	FText AvailabilityStatus;
 };
 
 /**

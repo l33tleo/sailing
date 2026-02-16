@@ -68,9 +68,22 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 	Data.PortId = PortId;
 	Data.PortDisplayName = PortDisplayName;
 	Data.OfferedMissionIds = OfferedMissionIds;
+	Data.bHasAnyOffers = OfferedMissionIds.Num() > 0;
 	Data.CurrentMissionId = CurrentMissionId;
 	Data.bMissionBoardOnCooldown = bMissionBoardOnCooldown;
 	Data.CooldownRemainingSeconds = FMath::Max(0.0f, CooldownRemainingSeconds);
+	if (Data.bMissionBoardOnCooldown)
+	{
+		Data.AvailabilityStatus = FText::FromString(FString::Printf(TEXT("Tavlen oppdateres om %.0f sekunder"), Data.CooldownRemainingSeconds));
+	}
+	else if (!Data.bHasAnyOffers)
+	{
+		Data.AvailabilityStatus = FText::FromString(TEXT("Ingen tilgjengelige oppdrag i denne havnen."));
+	}
+	else
+	{
+		Data.AvailabilityStatus = FText::FromString(TEXT("Velg et oppdrag fra havnetavlen."));
+	}
 	if (UGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance() : nullptr)
 	{
 		if (UMissionSubsystem* MissionSubsystem = GI->GetSubsystem<UMissionSubsystem>())
