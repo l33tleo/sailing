@@ -160,6 +160,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "MissionBoard|Service")
 	static bool RequiresUpgradePurchaseConfirmation(FName RequestedUpgradeId, FName PendingUpgradePurchaseId);
 
+	UFUNCTION(BlueprintPure, Category = "MissionBoard|Service")
+	static FText BuildUpgradePricingStatusText(bool bSupportsUpgradeService, float UpgradeCostMultiplier);
+
 	UFUNCTION(BlueprintCallable, Category = "MissionBoard")
 	void RequestCloseBoard();
 

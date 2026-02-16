@@ -468,6 +468,18 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 		UPortMissionBoardWidget::RequiresUpgradePurchaseConfirmation(TEXT("Upgrade_A"), TEXT("Upgrade_A")));
 	TestTrue(TEXT("Switching pending upgrade should require new confirmation"),
 		UPortMissionBoardWidget::RequiresUpgradePurchaseConfirmation(TEXT("Upgrade_B"), TEXT("Upgrade_A")));
+	TestEqual(TEXT("Pricing helper should return unavailable text when service disabled"),
+		UPortMissionBoardWidget::BuildUpgradePricingStatusText(false, 1.0f).ToString(),
+		FString(TEXT("Ingen oppgraderingspriser tilgjengelig.")));
+	TestEqual(TEXT("Pricing helper should return standard label for multiplier 1.0"),
+		UPortMissionBoardWidget::BuildUpgradePricingStatusText(true, 1.0f).ToString(),
+		FString(TEXT("Standardpriser aktiv.")));
+	TestEqual(TEXT("Pricing helper should return discount label when multiplier below 1"),
+		UPortMissionBoardWidget::BuildUpgradePricingStatusText(true, 0.9f).ToString(),
+		FString(TEXT("Havnerabatt: x0.90")));
+	TestEqual(TEXT("Pricing helper should return surcharge label when multiplier above 1"),
+		UPortMissionBoardWidget::BuildUpgradePricingStatusText(true, 1.1f).ToString(),
+		FString(TEXT("Havnepåslag: x1.10")));
 	return true;
 }
 

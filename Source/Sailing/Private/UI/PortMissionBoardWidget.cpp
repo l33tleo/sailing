@@ -59,6 +59,29 @@ bool UPortMissionBoardWidget::RequiresUpgradePurchaseConfirmation(
 	return PendingUpgradePurchaseId != RequestedUpgradeId;
 }
 
+FText UPortMissionBoardWidget::BuildUpgradePricingStatusText(
+	bool bSupportsUpgradeService,
+	float UpgradeCostMultiplier)
+{
+	if (!bSupportsUpgradeService)
+	{
+		return FText::FromString(TEXT("Ingen oppgraderingspriser tilgjengelig."));
+	}
+
+	const float SafeMultiplier = FMath::Max(0.1f, UpgradeCostMultiplier);
+	if (FMath::IsNearlyEqual(SafeMultiplier, 1.0f))
+	{
+		return FText::FromString(TEXT("Standardpriser aktiv."));
+	}
+
+	if (SafeMultiplier < 1.0f)
+	{
+		return FText::FromString(FString::Printf(TEXT("Havnerabatt: x%.2f"), SafeMultiplier));
+	}
+
+	return FText::FromString(FString::Printf(TEXT("Havnepåslag: x%.2f"), SafeMultiplier));
+}
+
 void UPortMissionBoardWidget::RequestCloseBoard()
 {
 	OnCloseRequested.Broadcast();
