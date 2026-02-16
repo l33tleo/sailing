@@ -364,6 +364,26 @@ bool FSailingMissionSwitchConfirmationPolicyTest::RunTest(const FString& Paramet
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSailingUpgradePurchaseRequestValidationTest,
+	"Sailing.Progression.Port.UpgradePurchaseRequestValidation",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parameters)
+{
+	TestFalse(TEXT("Upgrade request should be rejected when service disabled"),
+		UPortMissionBoardWidget::IsUpgradePurchaseRequestValid(false, { TEXT("Upgrade_A") }, TEXT("Upgrade_A")));
+	TestFalse(TEXT("Upgrade request should reject None id"),
+		UPortMissionBoardWidget::IsUpgradePurchaseRequestValid(true, { TEXT("Upgrade_A") }, NAME_None));
+	TestTrue(TEXT("Empty offered-list should allow any request when service enabled"),
+		UPortMissionBoardWidget::IsUpgradePurchaseRequestValid(true, {}, TEXT("Upgrade_A")));
+	TestTrue(TEXT("Configured offered upgrade should be accepted"),
+		UPortMissionBoardWidget::IsUpgradePurchaseRequestValid(true, { TEXT("Upgrade_A"), TEXT("Upgrade_B") }, TEXT("Upgrade_B")));
+	TestFalse(TEXT("Unconfigured upgrade should be rejected when list is present"),
+		UPortMissionBoardWidget::IsUpgradePurchaseRequestValid(true, { TEXT("Upgrade_A"), TEXT("Upgrade_B") }, TEXT("Upgrade_C")));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FSailingMissionDisplayNameLookupTest,
 	"Sailing.Progression.Mission.DisplayNameLookup",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

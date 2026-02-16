@@ -354,12 +354,10 @@ bool ASailingHUD::RequestRepairFromBoard()
 
 bool ASailingHUD::RequestUpgradePurchaseFromBoard(FName UpgradeId)
 {
-	if (!bLastMissionBoardOfferUpgradeService || UpgradeId.IsNone())
-	{
-		return false;
-	}
-
-	if (LastMissionBoardOfferedUpgradeIds.Num() > 0 && !LastMissionBoardOfferedUpgradeIds.Contains(UpgradeId))
+	if (!UPortMissionBoardWidget::IsUpgradePurchaseRequestValid(
+		bLastMissionBoardOfferUpgradeService,
+		LastMissionBoardOfferedUpgradeIds,
+		UpgradeId))
 	{
 		return false;
 	}

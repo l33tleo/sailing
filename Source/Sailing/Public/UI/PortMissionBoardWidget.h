@@ -136,6 +136,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "MissionBoard")
 	static bool RequiresMissionSwitchConfirmation(FName CurrentMissionId, FName RequestedMissionId, FName PendingConfirmationMissionId);
 
+	UFUNCTION(BlueprintPure, Category = "MissionBoard|Service")
+	static bool IsUpgradePurchaseRequestValid(bool bSupportsUpgradeService, const TArray<FName>& InOfferedUpgradeIds, FName RequestedUpgradeId);
+
 	UFUNCTION(BlueprintCallable, Category = "MissionBoard")
 	void RequestCloseBoard();
 

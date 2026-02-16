@@ -29,6 +29,24 @@ bool UPortMissionBoardWidget::RequiresMissionSwitchConfirmation(
 	return PendingConfirmationMissionId != RequestedMissionId;
 }
 
+bool UPortMissionBoardWidget::IsUpgradePurchaseRequestValid(
+	bool bSupportsUpgradeService,
+	const TArray<FName>& InOfferedUpgradeIds,
+	FName RequestedUpgradeId)
+{
+	if (!bSupportsUpgradeService || RequestedUpgradeId.IsNone())
+	{
+		return false;
+	}
+
+	if (InOfferedUpgradeIds.Num() == 0)
+	{
+		return true;
+	}
+
+	return InOfferedUpgradeIds.Contains(RequestedUpgradeId);
+}
+
 void UPortMissionBoardWidget::RequestCloseBoard()
 {
 	OnCloseRequested.Broadcast();
