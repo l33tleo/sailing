@@ -451,6 +451,28 @@ void ASailingHUD::DrawOverviewMap()
 		DrawRect(MapIslandColor, Px - DotSize * 0.5f, Py - DotSize * 0.5f, DotSize, DotSize);
 	}
 
+	// 2b. Aktivt oppdragsmål (hvis lokasjonsbasert)
+	if (UGameInstance* GI = GetWorld()->GetGameInstance())
+	{
+		if (UMissionSubsystem* MissionSubsystem = GI->GetSubsystem<UMissionSubsystem>())
+		{
+			FVector ObjectiveLoc;
+			if (MissionSubsystem->GetActiveMissionObjectiveLocation(ObjectiveLoc))
+			{
+				const float Dx = ObjectiveLoc.X - PlayerX;
+				const float Dy = ObjectiveLoc.Y - PlayerY;
+				const float Dist = FMath::Sqrt(Dx * Dx + Dy * Dy);
+				if (Dist <= MapWorldRadius)
+				{
+					const float Px = MapCenterX + Dx * Scale;
+					const float Py = MapCenterY - Dy * Scale;
+					const float DotSize = 7.0f;
+					DrawRect(MapMissionColor, Px - DotSize * 0.5f, Py - DotSize * 0.5f, DotSize, DotSize);
+				}
+			}
+		}
+	}
+
 	// 3. Spiller som liten trekant (retning fra GetActorForwardVector)
 	FVector Forward = Pawn->GetActorForwardVector();
 	float Angle = FMath::Atan2(Forward.X, Forward.Y); // vinkel fra nord (verden +Y)
