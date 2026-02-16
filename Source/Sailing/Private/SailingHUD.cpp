@@ -6,6 +6,7 @@
 #include "SailingPlayerController.h"
 #include "SaveGameSailing.h"
 #include "Systems/SailingCoreSubsystems.h"
+#include "UI/SailingHUDOverlayWidget.h"
 #include "Engine/Canvas.h"
 #include "Engine/Font.h"
 #include "Kismet/GameplayStatics.h"
@@ -13,10 +14,40 @@
 void ASailingHUD::BeginPlay()
 {
 	Super::BeginPlay();
+	EnsureOverlayWidget();
 
 	// Defer binding to allow islands to spawn
 	FTimerHandle TimerHandle;
 	GetWorldTimerManager().SetTimer(TimerHandle, this, &ASailingHUD::BindToIslandDiscoveries, 1.0f, false);
+}
+
+void ASailingHUD::EnsureOverlayWidget()
+{
+	if (OverlayWidget || !OverlayWidgetClass || !PlayerOwner)
+	{
+		return;
+	}
+
+	OverlayWidget = CreateWidget<USailingHUDOverlayWidget>(PlayerOwner, OverlayWidgetClass);
+	if (OverlayWidget)
+	{
+		OverlayWidget->AddToViewport(1);
+	}
+}
+
+void ASailingHUD::PushOverlayData(int32 DiscoveredIslands, int32 Credits, FName ActiveMissionId)
+{
+	EnsureOverlayWidget();
+	if (!OverlayWidget)
+	{
+		return;
+	}
+
+	FSailingHUDOverlayData OverlayData;
+	OverlayData.DiscoveredIslands = DiscoveredIslands;
+	OverlayData.Credits = Credits;
+	OverlayData.ActiveMissionId = ActiveMissionId;
+	OverlayWidget->PushOverlayData(OverlayData);
 }
 
 void ASailingHUD::BindToIslandDiscoveries()
@@ -475,6 +506,8 @@ void ASailingHUD::DrawDiscoveryCounter()
 		: FString::Printf(TEXT("AKTIVT OPPDRAG: %s"), *ActiveMissionId.ToString());
 	DrawText(MissionText, FLinearColor(0.7f, 1.0f, 0.8f, 1.0f),
 		BoxX + 10.0f, BoxY + 56.0f, nullptr, 1.0f);
+
+	PushOverlayData(SaveGame->TotalIslandsDiscovered, Credits, ActiveMissionId);
 }
 
 bool ASailingHUD::PauseMenuButtonHit(float X, float Y, float Bx, float By, float Bw, float Bh) const

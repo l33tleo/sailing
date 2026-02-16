@@ -5,6 +5,7 @@
 #include "SailingHUD.generated.h"
 
 class AIslandActor;
+class USailingHUDOverlayWidget;
 
 UCLASS()
 class SAILING_API ASailingHUD : public AHUD
@@ -45,6 +46,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HUD|Map")
 	FLinearColor MapPlayerColor = FLinearColor(1.0f, 0.9f, 0.2f, 1.0f);
 
+	/** Optional UMG overlay class used in parallel while Canvas HUD is active. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HUD|UMG")
+	TSubclassOf<USailingHUDOverlayWidget> OverlayWidgetClass;
+
 private:
 	// Discovery popup state
 	FString CurrentDiscoveryName;
@@ -70,6 +75,9 @@ private:
 	// Draw discovery counter
 	void DrawDiscoveryCounter();
 
+	void EnsureOverlayWidget();
+	void PushOverlayData(int32 DiscoveredIslands, int32 Credits, FName ActiveMissionId);
+
 	// Oversiktskart (spiller sentrum, oppdagede øyer som prikker)
 	void DrawOverviewMap();
 
@@ -83,4 +91,7 @@ private:
 	float PauseResumeY = 0.0f;
 	float PauseSaveY = 0.0f;
 	float PauseQuitY = 0.0f;
+
+	UPROPERTY()
+	TObjectPtr<USailingHUDOverlayWidget> OverlayWidget;
 };
