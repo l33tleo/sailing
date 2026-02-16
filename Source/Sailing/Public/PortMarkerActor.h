@@ -56,6 +56,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Port|MissionBoard")
 	TArray<FName> OfferedMissionIds;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Port|MissionBoard", meta = (ClampMin = "0", ClampMax = "10"))
+	int32 MaxOfferedMissionsAtBoard = 3;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Port|MissionBoard", meta = (ClampMin = "0"))
 	float MissionBoardCooldownSeconds = 0.0f;
 

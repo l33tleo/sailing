@@ -56,6 +56,11 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 	float MissionBoardCooldownRemaining = 0.0f;
 	FName NewMissionId = NAME_None;
 	FName CurrentMissionId = NAME_None;
+	TArray<FName> EffectiveOfferedMissionIds = OfferedMissionIds;
+	if (MaxOfferedMissionsAtBoard > 0 && EffectiveOfferedMissionIds.Num() > MaxOfferedMissionsAtBoard)
+	{
+		EffectiveOfferedMissionIds.SetNum(MaxOfferedMissionsAtBoard);
+	}
 	if (UGameInstance* GI = GetGameInstance())
 	{
 		if (UWorldStreamingSubsystem* WorldSubsystem = GI->GetSubsystem<UWorldStreamingSubsystem>())
@@ -107,9 +112,9 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 				}
 				else
 				{
-					if (bRestrictToOfferedMissions && OfferedMissionIds.Num() > 0)
+					if (bRestrictToOfferedMissions && EffectiveOfferedMissionIds.Num() > 0)
 					{
-						bMissionUpdated = MissionSubsystem->ActivateMissionFromCandidates(OfferedMissionIds, bCycleMissionOnDock);
+						bMissionUpdated = MissionSubsystem->ActivateMissionFromCandidates(EffectiveOfferedMissionIds, bCycleMissionOnDock);
 					}
 					else if (bCycleMissionOnDock)
 					{
@@ -160,7 +165,7 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 
 			if (bOfferMissionBoard)
 			{
-				HUD->ShowPortMissionBoard(PortId, PortDisplayName, OfferedMissionIds, CurrentMissionId,
+				HUD->ShowPortMissionBoard(PortId, PortDisplayName, EffectiveOfferedMissionIds, CurrentMissionId,
 					bMissionBoardOnCooldown, MissionBoardCooldownRemaining);
 			}
 		}

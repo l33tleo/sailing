@@ -242,6 +242,7 @@ void ASailingGameMode::BeginPlay()
 				PortMarker->bCycleMissionOnDock = PortData->bCycleMissionOnDock;
 				PortMarker->bRestrictToOfferedMissions = PortData->bRestrictToOfferedMissions;
 				PortMarker->OfferedMissionIds = PortData->OfferedMissionIds;
+				PortMarker->MaxOfferedMissionsAtBoard = PortData->MaxOfferedMissionsAtBoard;
 				PortMarker->MissionBoardCooldownSeconds = PortData->MissionBoardCooldownSeconds;
 
 				SpawnedPortMarkers.Add(PortMarker);
