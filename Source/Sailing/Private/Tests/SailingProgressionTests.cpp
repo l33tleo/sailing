@@ -400,6 +400,27 @@ bool FSailingPortWeightedOffersTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Weighted upgrade fallback should respect source order"),
 		FallbackWeightedUpgrades[0], FName(TEXT("Fallback_Upgrade_A")));
 
+	const FPortUpgradeOfferSelectionResult WeightedSelectionResult = UPortDataAsset::BuildPrioritizedUpgradeSelection(
+		WeightedUpgradeOffers,
+		{ TEXT("Fallback_Upgrade_A"), TEXT("Fallback_Upgrade_B") },
+		1,
+		3,
+		false);
+	TestTrue(TEXT("Selection result should indicate weighted-rules source when eligible offers exist"), WeightedSelectionResult.bUsedWeightedRules);
+	TestFalse(TEXT("Selection result should not indicate fallback source when weighted-rules used"), WeightedSelectionResult.bUsedFallbackOffers);
+	TestEqual(TEXT("Selection result should include eligible weighted rule count"), WeightedSelectionResult.EligibleWeightedRuleCount, 1);
+	TestEqual(TEXT("Selection result should include visit-gated weighted rule count"), WeightedSelectionResult.VisitGatedRuleCount, 1);
+
+	const FPortUpgradeOfferSelectionResult FallbackSelectionResult = UPortDataAsset::BuildPrioritizedUpgradeSelection(
+		{},
+		{ TEXT("Fallback_Upgrade_A"), TEXT("Fallback_Upgrade_B") },
+		1,
+		2,
+		true);
+	TestFalse(TEXT("Fallback selection should not mark weighted rule usage"), FallbackSelectionResult.bUsedWeightedRules);
+	TestTrue(TEXT("Fallback selection should mark fallback source"), FallbackSelectionResult.bUsedFallbackOffers);
+	TestEqual(TEXT("Fallback selection should respect max count"), FallbackSelectionResult.UpgradeIds.Num(), 2);
+
 	TSet<FName> UnlockedUpgradeIds;
 	UnlockedUpgradeIds.Add(TEXT("Upgrade_A"));
 	const TArray<FName> FilteredLockedOnly = UPortDataAsset::FilterUpgradeIdsByUnlockedState(
