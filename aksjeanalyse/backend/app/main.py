@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import stocks, analysis, recommendations, portfolio
+from app.api import stocks, analysis, recommendations, portfolio, compare, news, export, market, alerts
 from app.db.database import init_db
 
 logging.basicConfig(level=logging.INFO)
@@ -44,6 +44,11 @@ app.include_router(stocks.router, prefix="/api")
 app.include_router(analysis.router, prefix="/api")
 app.include_router(recommendations.router, prefix="/api")
 app.include_router(portfolio.router, prefix="/api")
+app.include_router(compare.router, prefix="/api")
+app.include_router(news.router, prefix="/api")
+app.include_router(export.router, prefix="/api")
+app.include_router(market.router, prefix="/api")
+app.include_router(alerts.router, prefix="/api")
 
 
 @app.get("/api/health")
