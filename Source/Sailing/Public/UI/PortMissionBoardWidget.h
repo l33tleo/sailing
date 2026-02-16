@@ -223,6 +223,21 @@ struct SAILING_API FPortMissionBoardData
 	int32 PortVisitCount = 0;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	int32 SelectableMissionOfferCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	int32 BlockedMissionOfferCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	int32 PurchasableUpgradeOfferCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	int32 BlockedUpgradeOfferCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	FText OfferActionSummaryStatus;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
 	bool bAwaitingMissionSwitchConfirmation = false;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
@@ -415,6 +430,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "MissionBoard")
 	static FPortMissionBoardData BuildActionStateAnnotatedBoardData(const FPortMissionBoardData& BoardData);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard")
+	static FText BuildOfferActionSummaryStatusText(const FPortMissionBoardData& BoardData);
 
 	UFUNCTION(BlueprintCallable, Category = "MissionBoard")
 	void RequestCloseBoard();

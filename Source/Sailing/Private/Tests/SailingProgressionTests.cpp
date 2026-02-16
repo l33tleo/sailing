@@ -804,9 +804,16 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 	TestEqual(TEXT("Annotated board should preserve mission offer count"), AnnotatedResult.OfferedMissions.Num(), 1);
 	TestFalse(TEXT("Annotated board should mark active mission as non-selectable"), AnnotatedResult.OfferedMissions[0].bSelectable);
 	TestEqual(TEXT("Annotated board should include mission blocked reason"), AnnotatedResult.OfferedMissions[0].SelectionBlockedReason.ToString(), FString(TEXT("Oppdraget er allerede aktivt.")));
+	TestEqual(TEXT("Annotated board should track selectable mission count"), AnnotatedResult.SelectableMissionOfferCount, 0);
+	TestEqual(TEXT("Annotated board should track blocked mission count"), AnnotatedResult.BlockedMissionOfferCount, 1);
 	TestEqual(TEXT("Annotated board should preserve upgrade offer count"), AnnotatedResult.OfferedUpgrades.Num(), 1);
 	TestFalse(TEXT("Annotated board should mark unaffordable upgrade as non-purchasable"), AnnotatedResult.OfferedUpgrades[0].bPurchasable);
 	TestEqual(TEXT("Annotated board should include upgrade blocked reason"), AnnotatedResult.OfferedUpgrades[0].PurchaseBlockedReason.ToString(), FString(TEXT("Ikke nok kreditter (300 kreves).")));
+	TestEqual(TEXT("Annotated board should track purchasable upgrade count"), AnnotatedResult.PurchasableUpgradeOfferCount, 0);
+	TestEqual(TEXT("Annotated board should track blocked upgrade count"), AnnotatedResult.BlockedUpgradeOfferCount, 1);
+	TestEqual(TEXT("Annotated board should include action summary text"),
+		AnnotatedResult.OfferActionSummaryStatus.ToString(),
+		FString(TEXT("Valgbare oppdrag: 0 (1 blokkert) | Kjøpbare oppgraderinger: 0 (1 blokkert)")));
 
 	UPortMissionBoardWidget* Widget = NewObject<UPortMissionBoardWidget>();
 	TestNotNull(TEXT("Widget object should be created for annotation push test"), Widget);
@@ -817,10 +824,21 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 		TestEqual(TEXT("PushMissionBoardData should preserve mission offer count"), LastData.OfferedMissions.Num(), 1);
 		TestFalse(TEXT("PushMissionBoardData should auto-annotate mission selection state"), LastData.OfferedMissions[0].bSelectable);
 		TestEqual(TEXT("PushMissionBoardData should include mission blocked reason"), LastData.OfferedMissions[0].SelectionBlockedReason.ToString(), FString(TEXT("Oppdraget er allerede aktivt.")));
+		TestEqual(TEXT("PushMissionBoardData should track blocked mission count"), LastData.BlockedMissionOfferCount, 1);
 		TestEqual(TEXT("PushMissionBoardData should preserve upgrade offer count"), LastData.OfferedUpgrades.Num(), 1);
 		TestFalse(TEXT("PushMissionBoardData should auto-annotate upgrade purchase state"), LastData.OfferedUpgrades[0].bPurchasable);
 		TestEqual(TEXT("PushMissionBoardData should include upgrade blocked reason"), LastData.OfferedUpgrades[0].PurchaseBlockedReason.ToString(), FString(TEXT("Ikke nok kreditter (300 kreves).")));
+		TestEqual(TEXT("PushMissionBoardData should track blocked upgrade count"), LastData.BlockedUpgradeOfferCount, 1);
 	}
+
+	FPortMissionBoardData SummaryBoardData;
+	SummaryBoardData.SelectableMissionOfferCount = 2;
+	SummaryBoardData.BlockedMissionOfferCount = 1;
+	SummaryBoardData.PurchasableUpgradeOfferCount = 3;
+	SummaryBoardData.BlockedUpgradeOfferCount = 2;
+	TestEqual(TEXT("Action summary helper should render compact counts"),
+		UPortMissionBoardWidget::BuildOfferActionSummaryStatusText(SummaryBoardData).ToString(),
+		FString(TEXT("Valgbare oppdrag: 2 (1 blokkert) | Kjøpbare oppgraderinger: 3 (2 blokkert)")));
 	return true;
 }
 

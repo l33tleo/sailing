@@ -546,12 +546,24 @@ bool UPortMissionBoardWidget::CanRequestManualRefresh(
 FPortMissionBoardData UPortMissionBoardWidget::BuildActionStateAnnotatedBoardData(const FPortMissionBoardData& BoardData)
 {
 	FPortMissionBoardData Result = BoardData;
+	Result.SelectableMissionOfferCount = 0;
+	Result.BlockedMissionOfferCount = 0;
+	Result.PurchasableUpgradeOfferCount = 0;
+	Result.BlockedUpgradeOfferCount = 0;
 
 	for (FPortMissionOfferEntry& OfferEntry : Result.OfferedMissions)
 	{
 		FText BlockedReason;
 		OfferEntry.bSelectable = CanRequestMissionAccept(Result, OfferEntry.MissionId, BlockedReason);
 		OfferEntry.SelectionBlockedReason = BlockedReason;
+		if (OfferEntry.bSelectable)
+		{
+			Result.SelectableMissionOfferCount++;
+		}
+		else
+		{
+			Result.BlockedMissionOfferCount++;
+		}
 	}
 
 	for (FPortUpgradeOfferEntry& OfferEntry : Result.OfferedUpgrades)
@@ -559,9 +571,33 @@ FPortMissionBoardData UPortMissionBoardWidget::BuildActionStateAnnotatedBoardDat
 		FText BlockedReason;
 		OfferEntry.bPurchasable = CanRequestUpgradePurchase(Result, OfferEntry.UpgradeId, BlockedReason);
 		OfferEntry.PurchaseBlockedReason = BlockedReason;
+		if (OfferEntry.bPurchasable)
+		{
+			Result.PurchasableUpgradeOfferCount++;
+		}
+		else
+		{
+			Result.BlockedUpgradeOfferCount++;
+		}
 	}
 
+	Result.OfferActionSummaryStatus = BuildOfferActionSummaryStatusText(Result);
 	return Result;
+}
+
+FText UPortMissionBoardWidget::BuildOfferActionSummaryStatusText(const FPortMissionBoardData& BoardData)
+{
+	const int32 SelectableMissionCount = FMath::Max(0, BoardData.SelectableMissionOfferCount);
+	const int32 BlockedMissionCount = FMath::Max(0, BoardData.BlockedMissionOfferCount);
+	const int32 PurchasableUpgradeCount = FMath::Max(0, BoardData.PurchasableUpgradeOfferCount);
+	const int32 BlockedUpgradeCount = FMath::Max(0, BoardData.BlockedUpgradeOfferCount);
+
+	return FText::FromString(FString::Printf(
+		TEXT("Valgbare oppdrag: %d (%d blokkert) | Kjøpbare oppgraderinger: %d (%d blokkert)"),
+		SelectableMissionCount,
+		BlockedMissionCount,
+		PurchasableUpgradeCount,
+		BlockedUpgradeCount));
 }
 
 void UPortMissionBoardWidget::RequestCloseBoard()
