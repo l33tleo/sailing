@@ -32,6 +32,9 @@ public:
 	void SaveGame_();
 
 private:
+	UPROPERTY(EditAnywhere, Category = "World|Ports")
+	FName PortAssetScanPath = TEXT("/Game");
+
 	UPROPERTY()
 	TObjectPtr<AActor> SpawnedWind;
 

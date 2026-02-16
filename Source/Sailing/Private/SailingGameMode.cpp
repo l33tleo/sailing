@@ -162,7 +162,7 @@ void ASailingGameMode::BeginPlay()
 			{
 				FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry"));
 				FARFilter Filter;
-				Filter.PackagePaths.Add(FName(TEXT("/Game")));
+				Filter.PackagePaths.Add(PortAssetScanPath.IsNone() ? FName(TEXT("/Game")) : PortAssetScanPath);
 				Filter.ClassPaths.Add(UPortDataAsset::StaticClass()->GetClassPathName());
 				Filter.bRecursivePaths = true;
 
