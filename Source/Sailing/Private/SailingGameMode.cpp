@@ -59,8 +59,10 @@ void ASailingGameMode::BeginPlay()
 		if (UEconomySubsystem* EconomySubsystem = GI->GetSubsystem<UEconomySubsystem>())
 		{
 			EconomySubsystem->SetUpgradeAssetPath(UpgradeAssetScanPath);
+			int32 RuntimeFallbackUpgradeCount = 0;
 
 			auto EnsureUpgrade = [this, EconomySubsystem](
+				int32& OutRuntimeFallbackUpgradeCount,
 				FName UpgradeId,
 				int32 CreditCost,
 				float MaxSpeedMultiplier,
@@ -90,12 +92,14 @@ void ASailingGameMode::BeginPlay()
 				RuntimeFallbackUpgrade->DragMultiplier = FMath::Max(0.1f, DragMultiplier);
 				RuntimeFallbackUpgrade->TurnRateMultiplier = FMath::Max(0.1f, TurnRateMultiplier);
 				EconomySubsystem->RegisterUpgradeAsset(RuntimeFallbackUpgrade);
+				OutRuntimeFallbackUpgradeCount++;
 				UE_LOG(LogTemp, Warning, TEXT("SailingGameMode: Bruker runtime fallback for oppgradering '%s'."), *UpgradeId.ToString());
 				return RuntimeFallbackUpgrade;
 			};
 
 			int32 MissingBootstrapUpgrades = 0;
 			MissingBootstrapUpgrades += EnsureUpgrade(
+				RuntimeFallbackUpgradeCount,
 				TEXT("SkrogTrimV1"),
 				450,
 				1.06f,
@@ -104,6 +108,7 @@ void ASailingGameMode::BeginPlay()
 				TEXT("Skrogtrim V1"),
 				TEXT("Lett skrogtrim som reduserer motstand i moderate hastigheter.")) ? 0 : 1;
 			MissingBootstrapUpgrades += EnsureUpgrade(
+				RuntimeFallbackUpgradeCount,
 				TEXT("RorResponsV1"),
 				600,
 				1.0f,
@@ -112,6 +117,7 @@ void ASailingGameMode::BeginPlay()
 				TEXT("Rorrespons V1"),
 				TEXT("Forbedret rorutslag for raskere vending i trange farvann.")) ? 0 : 1;
 			MissingBootstrapUpgrades += EnsureUpgrade(
+				RuntimeFallbackUpgradeCount,
 				TEXT("RiggeffektivitetV1"),
 				850,
 				1.1f,
@@ -128,6 +134,13 @@ void ASailingGameMode::BeginPlay()
 					TelemetrySubsystem->RecordCounterEvent(TEXT("MissingBootstrapUpgradeContent"), MissingBootstrapUpgrades);
 				}
 			}
+			if (RuntimeFallbackUpgradeCount > 0)
+			{
+				if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
+				{
+					TelemetrySubsystem->RecordCounterEvent(TEXT("RuntimeFallbackUpgrades"), RuntimeFallbackUpgradeCount);
+				}
+			}
 
 			EconomySubsystem->SetCredits(SaveGame ? SaveGame->PlayerCredits : 0);
 			EconomySubsystem->SetBoatConditionPercent(SaveGame ? SaveGame->BoatConditionPercent : 100);
@@ -137,11 +150,12 @@ void ASailingGameMode::BeginPlay()
 		if (UMissionSubsystem* MissionSubsystem = GI->GetSubsystem<UMissionSubsystem>())
 		{
 			MissionSubsystem->SetMissionAssetPath(MissionAssetScanPath);
+			int32 RuntimeFallbackMissionCount = 0;
 
 			const FName DiscoveryMissionId(TEXT("OppdagForsteOy"));
 			const FName DeliveryMissionId(TEXT("LeveringTilBoye"));
 
-			auto EnsureMission = [this, MissionSubsystem](FName MissionId, TFunction<void(USailingMissionDataAsset*)> ConfigureFallback)
+			auto EnsureMission = [this, MissionSubsystem](int32& OutRuntimeFallbackMissionCount, FName MissionId, TFunction<void(USailingMissionDataAsset*)> ConfigureFallback)
 				-> USailingMissionDataAsset*
 			{
 				if (const USailingMissionDataAsset* ExistingMission = MissionSubsystem->GetMissionAssetById(MissionId))
@@ -159,11 +173,12 @@ void ASailingGameMode::BeginPlay()
 				RuntimeFallbackMission->MissionId = MissionId;
 				ConfigureFallback(RuntimeFallbackMission);
 				MissionSubsystem->RegisterMissionAsset(RuntimeFallbackMission);
+				OutRuntimeFallbackMissionCount++;
 				UE_LOG(LogTemp, Warning, TEXT("SailingGameMode: Bruker runtime fallback for oppdrag '%s'."), *MissionId.ToString());
 				return RuntimeFallbackMission;
 			};
 
-			const USailingMissionDataAsset* BootstrapDiscoveryMission = EnsureMission(DiscoveryMissionId, [DeliveryMissionId](USailingMissionDataAsset* Mission)
+			const USailingMissionDataAsset* BootstrapDiscoveryMission = EnsureMission(RuntimeFallbackMissionCount, DiscoveryMissionId, [DeliveryMissionId](USailingMissionDataAsset* Mission)
 			{
 				Mission->DisplayName = FText::FromString(TEXT("Oppdag første øy"));
 				Mission->Description = FText::FromString(TEXT("Seil ut og oppdag din første øy."));
@@ -173,7 +188,7 @@ void ASailingGameMode::BeginPlay()
 				Mission->NextMissionId = DeliveryMissionId;
 			});
 
-			const USailingMissionDataAsset* BootstrapDeliveryMission = EnsureMission(DeliveryMissionId, [DeliveryObjectiveLocation](USailingMissionDataAsset* Mission)
+			const USailingMissionDataAsset* BootstrapDeliveryMission = EnsureMission(RuntimeFallbackMissionCount, DeliveryMissionId, [DeliveryObjectiveLocation](USailingMissionDataAsset* Mission)
 			{
 				Mission->DisplayName = FText::FromString(TEXT("Levering til bøye"));
 				Mission->Description = FText::FromString(TEXT("Seil til leveringsbøyen og fullfør leveransen."));
@@ -195,6 +210,13 @@ void ASailingGameMode::BeginPlay()
 				if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
 				{
 					TelemetrySubsystem->RecordCounterEvent(TEXT("MissingBootstrapMissionContent"), MissingBootstrapMissions);
+				}
+			}
+			if (RuntimeFallbackMissionCount > 0)
+			{
+				if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
+				{
+					TelemetrySubsystem->RecordCounterEvent(TEXT("RuntimeFallbackMissions"), RuntimeFallbackMissionCount);
 				}
 			}
 
@@ -299,6 +321,7 @@ void ASailingGameMode::BeginPlay()
 			SpawnedPortMarkers.Empty();
 
 			TArray<UPortDataAsset*> PortDefinitions;
+			int32 RuntimeFallbackPortCount = 0;
 			{
 				FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry"));
 				FARFilter Filter;
@@ -427,10 +450,19 @@ void ASailingGameMode::BeginPlay()
 				PortSor->bHideUnlockedUpgradesOnBoard = true;
 				PortSor->UpgradeCostMultiplier = 1.12f;
 				PortDefinitions.Add(PortSor);
+				RuntimeFallbackPortCount = PortDefinitions.Num();
 			}
 			else if (PortDefinitions.Num() == 0)
 			{
 				UE_LOG(LogTemp, Warning, TEXT("SailingGameMode: Ingen port-data funnet og runtime fallback er deaktivert."));
+			}
+
+			if (RuntimeFallbackPortCount > 0)
+			{
+				if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
+				{
+					TelemetrySubsystem->RecordCounterEvent(TEXT("RuntimeFallbackPorts"), RuntimeFallbackPortCount);
+				}
 			}
 
 			for (const UPortDataAsset* PortData : PortDefinitions)
