@@ -4,6 +4,7 @@ from app.models.portfolio import Portfolio, PortfolioHolding
 from app.models.watchlist import Watchlist
 from app.models.alert import Alert
 from app.models.paper_trade import PaperTrade
+from app.models.user import User
 
 __all__ = [
     "Stock",
@@ -14,4 +15,5 @@ __all__ = [
     "Watchlist",
     "Alert",
     "PaperTrade",
+    "User",
 ]

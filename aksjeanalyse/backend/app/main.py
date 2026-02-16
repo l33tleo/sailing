@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import stocks, analysis, recommendations, portfolio, compare, news, export, market, alerts, screener, paper_trade, sectors, chat
+from app.api import stocks, analysis, recommendations, portfolio, compare, news, export, market, alerts, screener, paper_trade, sectors, chat, auth
 from app.db.database import init_db
 from app.scheduler import start_scheduler, stop_scheduler
 
@@ -56,6 +56,7 @@ app.include_router(screener.router, prefix="/api")
 app.include_router(paper_trade.router, prefix="/api")
 app.include_router(sectors.router, prefix="/api")
 app.include_router(chat.router, prefix="/api")
+app.include_router(auth.router, prefix="/api")
 
 
 @app.get("/api/health")
