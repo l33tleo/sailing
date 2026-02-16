@@ -348,6 +348,14 @@ void ASailingGameMode::BeginPlay()
 		if (SpawnedMissionObjective)
 		{
 			SpawnedMissionObjective->SetTriggerType(DeliveryObjectiveTriggerType);
+			if (GI)
+			{
+				if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
+				{
+					TelemetrySubsystem->RecordCounterEvent(TEXT("DeliveryObjectiveSpawned"), 1);
+					TelemetrySubsystem->SetCounterValue(TEXT("DeliveryObjectiveTriggerType"), static_cast<int32>(DeliveryObjectiveTriggerType));
+				}
+			}
 		}
 		else
 		{
@@ -365,6 +373,13 @@ void ASailingGameMode::BeginPlay()
 	else
 	{
 		UE_LOG(LogTemp, Log, TEXT("SailingGameMode: Hopper over objective actor; ingen lokasjonsbasert leveringsoppdrag registrert."));
+		if (GI)
+		{
+			if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
+			{
+				TelemetrySubsystem->RecordCounterEvent(TEXT("DeliveryObjectiveSkipped"), 1);
+			}
+		}
 	}
 
 	// Spawn simple harbor markers and register with world subsystem
