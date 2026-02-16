@@ -23,6 +23,11 @@ void RecordMissionOfferBlockedReasonSummaryTelemetry(UTelemetrySubsystem* Teleme
 		return;
 	}
 
+	int32 DisabledCount = 0;
+	int32 CooldownCount = 0;
+	int32 NotOfferedCount = 0;
+	int32 AlreadyActiveCount = 0;
+	int32 InvalidMissionCount = 0;
 	for (const FPortMissionOfferBlockReasonSummaryEntry& SummaryEntry : BoardData.MissionBlockedReasonSummary)
 	{
 		const int32 SafeCount = FMath::Max(0, SummaryEntry.Count);
@@ -34,18 +39,23 @@ void RecordMissionOfferBlockedReasonSummaryTelemetry(UTelemetrySubsystem* Teleme
 		switch (SummaryEntry.BlockReason)
 		{
 		case EPortMissionOfferActionBlockReason::MissionBoardDisabled:
+			DisabledCount += SafeCount;
 			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardBlockedMissionReason_BoardDisabled"), SafeCount);
 			break;
 		case EPortMissionOfferActionBlockReason::MissionBoardCooldown:
+			CooldownCount += SafeCount;
 			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardBlockedMissionReason_Cooldown"), SafeCount);
 			break;
 		case EPortMissionOfferActionBlockReason::NotOfferedAtPort:
+			NotOfferedCount += SafeCount;
 			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardBlockedMissionReason_NotOffered"), SafeCount);
 			break;
 		case EPortMissionOfferActionBlockReason::AlreadyActiveMission:
+			AlreadyActiveCount += SafeCount;
 			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardBlockedMissionReason_AlreadyActive"), SafeCount);
 			break;
 		case EPortMissionOfferActionBlockReason::InvalidMission:
+			InvalidMissionCount += SafeCount;
 			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardBlockedMissionReason_InvalidMission"), SafeCount);
 			break;
 		case EPortMissionOfferActionBlockReason::None:
@@ -53,6 +63,12 @@ void RecordMissionOfferBlockedReasonSummaryTelemetry(UTelemetrySubsystem* Teleme
 			break;
 		}
 	}
+
+	TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastBlockedMissionReason_BoardDisabled"), DisabledCount);
+	TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastBlockedMissionReason_Cooldown"), CooldownCount);
+	TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastBlockedMissionReason_NotOffered"), NotOfferedCount);
+	TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastBlockedMissionReason_AlreadyActive"), AlreadyActiveCount);
+	TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastBlockedMissionReason_InvalidMission"), InvalidMissionCount);
 }
 
 void RecordUpgradeOfferBlockedReasonSummaryTelemetry(UTelemetrySubsystem* TelemetrySubsystem, const FPortMissionBoardData& BoardData)
@@ -62,6 +78,13 @@ void RecordUpgradeOfferBlockedReasonSummaryTelemetry(UTelemetrySubsystem* Teleme
 		return;
 	}
 
+	int32 ServiceDisabledCount = 0;
+	int32 NotOfferedCount = 0;
+	int32 AlreadyUnlockedCount = 0;
+	int32 VisitGateCount = 0;
+	int32 NoCreditsCount = 0;
+	int32 AvailabilityBlockedCount = 0;
+	int32 InvalidUpgradeCount = 0;
 	for (const FPortUpgradeOfferBlockReasonSummaryEntry& SummaryEntry : BoardData.UpgradeBlockedReasonSummary)
 	{
 		const int32 SafeCount = FMath::Max(0, SummaryEntry.Count);
@@ -73,24 +96,31 @@ void RecordUpgradeOfferBlockedReasonSummaryTelemetry(UTelemetrySubsystem* Teleme
 		switch (SummaryEntry.BlockReason)
 		{
 		case EPortUpgradeOfferActionBlockReason::UpgradeServiceDisabled:
+			ServiceDisabledCount += SafeCount;
 			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardBlockedUpgradeReason_ServiceDisabled"), SafeCount);
 			break;
 		case EPortUpgradeOfferActionBlockReason::NotOfferedAtPort:
+			NotOfferedCount += SafeCount;
 			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardBlockedUpgradeReason_NotOffered"), SafeCount);
 			break;
 		case EPortUpgradeOfferActionBlockReason::AlreadyUnlocked:
+			AlreadyUnlockedCount += SafeCount;
 			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardBlockedUpgradeReason_AlreadyUnlocked"), SafeCount);
 			break;
 		case EPortUpgradeOfferActionBlockReason::VisitRequirementNotMet:
+			VisitGateCount += SafeCount;
 			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardBlockedUpgradeReason_VisitGate"), SafeCount);
 			break;
 		case EPortUpgradeOfferActionBlockReason::InsufficientCredits:
+			NoCreditsCount += SafeCount;
 			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardBlockedUpgradeReason_NoCredits"), SafeCount);
 			break;
 		case EPortUpgradeOfferActionBlockReason::UpgradeAvailabilityBlocked:
+			AvailabilityBlockedCount += SafeCount;
 			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardBlockedUpgradeReason_Availability"), SafeCount);
 			break;
 		case EPortUpgradeOfferActionBlockReason::InvalidUpgrade:
+			InvalidUpgradeCount += SafeCount;
 			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardBlockedUpgradeReason_InvalidUpgrade"), SafeCount);
 			break;
 		case EPortUpgradeOfferActionBlockReason::None:
@@ -98,6 +128,14 @@ void RecordUpgradeOfferBlockedReasonSummaryTelemetry(UTelemetrySubsystem* Teleme
 			break;
 		}
 	}
+
+	TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastBlockedUpgradeReason_ServiceDisabled"), ServiceDisabledCount);
+	TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastBlockedUpgradeReason_NotOffered"), NotOfferedCount);
+	TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastBlockedUpgradeReason_AlreadyUnlocked"), AlreadyUnlockedCount);
+	TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastBlockedUpgradeReason_VisitGate"), VisitGateCount);
+	TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastBlockedUpgradeReason_NoCredits"), NoCreditsCount);
+	TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastBlockedUpgradeReason_Availability"), AvailabilityBlockedCount);
+	TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastBlockedUpgradeReason_InvalidUpgrade"), InvalidUpgradeCount);
 }
 }
 
