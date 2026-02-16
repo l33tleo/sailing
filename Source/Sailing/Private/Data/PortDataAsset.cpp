@@ -1,5 +1,103 @@
 #include "Data/PortDataAsset.h"
 
+TArray<FName> UPortDataAsset::FilterIdsByAllowedSet(
+	const TArray<FName>& InIds,
+	const TSet<FName>& InAllowedIds,
+	int32& OutRejectedCount)
+{
+	OutRejectedCount = 0;
+
+	TArray<FName> Result;
+	for (const FName& Id : InIds)
+	{
+		if (Id.IsNone())
+		{
+			OutRejectedCount++;
+			continue;
+		}
+
+		if (InAllowedIds.Num() > 0 && !InAllowedIds.Contains(Id))
+		{
+			OutRejectedCount++;
+			continue;
+		}
+
+		Result.AddUnique(Id);
+	}
+
+	return Result;
+}
+
+TArray<FPortMissionWeightedOffer> UPortDataAsset::FilterMissionWeightedOffersByAllowedSet(
+	const TArray<FPortMissionWeightedOffer>& InOffers,
+	const TSet<FName>& InAllowedMissionIds,
+	int32& OutRejectedCount)
+{
+	OutRejectedCount = 0;
+
+	TArray<FPortMissionWeightedOffer> Result;
+	TSet<FName> AddedMissionIds;
+	for (const FPortMissionWeightedOffer& Offer : InOffers)
+	{
+		if (Offer.MissionId.IsNone())
+		{
+			OutRejectedCount++;
+			continue;
+		}
+
+		if (InAllowedMissionIds.Num() > 0 && !InAllowedMissionIds.Contains(Offer.MissionId))
+		{
+			OutRejectedCount++;
+			continue;
+		}
+
+		if (AddedMissionIds.Contains(Offer.MissionId))
+		{
+			continue;
+		}
+
+		Result.Add(Offer);
+		AddedMissionIds.Add(Offer.MissionId);
+	}
+
+	return Result;
+}
+
+TArray<FPortUpgradeWeightedOffer> UPortDataAsset::FilterUpgradeWeightedOffersByAllowedSet(
+	const TArray<FPortUpgradeWeightedOffer>& InOffers,
+	const TSet<FName>& InAllowedUpgradeIds,
+	int32& OutRejectedCount)
+{
+	OutRejectedCount = 0;
+
+	TArray<FPortUpgradeWeightedOffer> Result;
+	TSet<FName> AddedUpgradeIds;
+	for (const FPortUpgradeWeightedOffer& Offer : InOffers)
+	{
+		if (Offer.UpgradeId.IsNone())
+		{
+			OutRejectedCount++;
+			continue;
+		}
+
+		if (InAllowedUpgradeIds.Num() > 0 && !InAllowedUpgradeIds.Contains(Offer.UpgradeId))
+		{
+			OutRejectedCount++;
+			continue;
+		}
+
+		if (AddedUpgradeIds.Contains(Offer.UpgradeId))
+		{
+			continue;
+		}
+
+		Result.Add(Offer);
+		AddedUpgradeIds.Add(Offer.UpgradeId);
+	}
+
+	return Result;
+}
+
 TArray<FName> UPortDataAsset::BuildPrioritizedMissionIds(
 	const TArray<FPortMissionWeightedOffer>& InWeightedOffers,
 	const TArray<FName>& InFallbackOffers,

@@ -157,6 +157,21 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Port|Services", meta = (ClampMin = "0.1", ClampMax = "5.0"))
 	float UpgradeCostMultiplier = 1.0f;
 
+	static TArray<FName> FilterIdsByAllowedSet(
+		const TArray<FName>& InIds,
+		const TSet<FName>& InAllowedIds,
+		int32& OutRejectedCount);
+
+	static TArray<FPortMissionWeightedOffer> FilterMissionWeightedOffersByAllowedSet(
+		const TArray<FPortMissionWeightedOffer>& InOffers,
+		const TSet<FName>& InAllowedMissionIds,
+		int32& OutRejectedCount);
+
+	static TArray<FPortUpgradeWeightedOffer> FilterUpgradeWeightedOffersByAllowedSet(
+		const TArray<FPortUpgradeWeightedOffer>& InOffers,
+		const TSet<FName>& InAllowedUpgradeIds,
+		int32& OutRejectedCount);
+
 	static TArray<FName> BuildPrioritizedMissionIds(
 		const TArray<FPortMissionWeightedOffer>& InWeightedOffers,
 		const TArray<FName>& InFallbackOffers,

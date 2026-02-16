@@ -474,8 +474,74 @@ void ASailingGameMode::BeginPlay()
 				}
 			}
 
+			TSet<FName> AllowedMissionIds;
+			if (UMissionSubsystem* MissionSubsystem = GI->GetSubsystem<UMissionSubsystem>())
+			{
+				for (const FName& MissionId : MissionSubsystem->GetRegisteredMissionIds())
+				{
+					if (!MissionId.IsNone())
+					{
+						AllowedMissionIds.Add(MissionId);
+					}
+				}
+			}
+
+			TSet<FName> AllowedUpgradeIds;
+			if (UEconomySubsystem* EconomySubsystem = GI->GetSubsystem<UEconomySubsystem>())
+			{
+				for (const FName& UpgradeId : EconomySubsystem->GetRegisteredUpgradeIds())
+				{
+					if (!UpgradeId.IsNone())
+					{
+						AllowedUpgradeIds.Add(UpgradeId);
+					}
+				}
+			}
+
+			TSet<FName> SpawnedPortIds;
+			int32 InvalidPortDefinitionCount = 0;
+			int32 DuplicatePortDefinitionCount = 0;
+			int32 RejectedMissionReferenceCount = 0;
+			int32 RejectedUpgradeReferenceCount = 0;
 			for (const UPortDataAsset* PortData : PortDefinitions)
 			{
+				if (!PortData || PortData->PortId.IsNone())
+				{
+					InvalidPortDefinitionCount++;
+					continue;
+				}
+
+				if (SpawnedPortIds.Contains(PortData->PortId))
+				{
+					DuplicatePortDefinitionCount++;
+					continue;
+				}
+
+				SpawnedPortIds.Add(PortData->PortId);
+				int32 RejectedMissionOffers = 0;
+				const TArray<FName> ValidOfferedMissionIds = UPortDataAsset::FilterIdsByAllowedSet(
+					PortData->OfferedMissionIds,
+					AllowedMissionIds,
+					RejectedMissionOffers);
+				int32 RejectedWeightedMissionOffers = 0;
+				const TArray<FPortMissionWeightedOffer> ValidWeightedMissionOffers = UPortDataAsset::FilterMissionWeightedOffersByAllowedSet(
+					PortData->WeightedOfferedMissions,
+					AllowedMissionIds,
+					RejectedWeightedMissionOffers);
+				RejectedMissionReferenceCount += RejectedMissionOffers + RejectedWeightedMissionOffers;
+
+				int32 RejectedUpgradeOffers = 0;
+				const TArray<FName> ValidOfferedUpgradeIds = UPortDataAsset::FilterIdsByAllowedSet(
+					PortData->OfferedUpgradeIds,
+					AllowedUpgradeIds,
+					RejectedUpgradeOffers);
+				int32 RejectedWeightedUpgradeOffers = 0;
+				const TArray<FPortUpgradeWeightedOffer> ValidWeightedUpgradeOffers = UPortDataAsset::FilterUpgradeWeightedOffersByAllowedSet(
+					PortData->WeightedOfferedUpgrades,
+					AllowedUpgradeIds,
+					RejectedWeightedUpgradeOffers);
+				RejectedUpgradeReferenceCount += RejectedUpgradeOffers + RejectedWeightedUpgradeOffers;
+
 				APortMarkerActor* PortMarker = GetWorld()->SpawnActor<APortMarkerActor>(
 					APortMarkerActor::StaticClass(), PortData->WorldLocation, FRotator::ZeroRotator, Params);
 				if (!PortMarker)
@@ -492,16 +558,16 @@ void ASailingGameMode::BeginPlay()
 				PortMarker->bOfferMissionBoard = PortData->bOfferMissionBoard;
 				PortMarker->bCycleMissionOnDock = PortData->bCycleMissionOnDock;
 				PortMarker->bRestrictToOfferedMissions = PortData->bRestrictToOfferedMissions;
-				PortMarker->OfferedMissionIds = PortData->OfferedMissionIds;
-				PortMarker->WeightedOfferedMissions = PortData->WeightedOfferedMissions;
+				PortMarker->OfferedMissionIds = ValidOfferedMissionIds;
+				PortMarker->WeightedOfferedMissions = ValidWeightedMissionOffers;
 				PortMarker->MaxOfferedMissionsAtBoard = PortData->MaxOfferedMissionsAtBoard;
 				PortMarker->MissionBoardCooldownSeconds = PortData->MissionBoardCooldownSeconds;
 				PortMarker->bAllowManualBoardRefresh = PortData->bAllowManualBoardRefresh;
 				PortMarker->ManualBoardRefreshCooldownSeconds = PortData->ManualBoardRefreshCooldownSeconds;
 				PortMarker->ManualBoardRefreshCreditCost = PortData->ManualBoardRefreshCreditCost;
 				PortMarker->bOfferUpgradeService = PortData->bOfferUpgradeService;
-				PortMarker->OfferedUpgradeIds = PortData->OfferedUpgradeIds;
-				PortMarker->WeightedOfferedUpgrades = PortData->WeightedOfferedUpgrades;
+				PortMarker->OfferedUpgradeIds = ValidOfferedUpgradeIds;
+				PortMarker->WeightedOfferedUpgrades = ValidWeightedUpgradeOffers;
 				PortMarker->MaxOfferedUpgrades = PortData->MaxOfferedUpgrades;
 				PortMarker->bRotateUpgradeStockByVisits = PortData->bRotateUpgradeStockByVisits;
 				PortMarker->bHideUnlockedUpgradesOnBoard = PortData->bHideUnlockedUpgradesOnBoard;
@@ -509,6 +575,46 @@ void ASailingGameMode::BeginPlay()
 
 				SpawnedPortMarkers.Add(PortMarker);
 				WorldStreamingSubsystem->RegisterPortPoint(PortData->PortId, PortData->WorldLocation);
+			}
+
+			if (InvalidPortDefinitionCount > 0)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("SailingGameMode: Ignorerte %d ugyldige port-definisjoner (manglende PortId)."), InvalidPortDefinitionCount);
+			}
+			if (DuplicatePortDefinitionCount > 0)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("SailingGameMode: Ignorerte %d dupliserte port-definisjoner."), DuplicatePortDefinitionCount);
+			}
+			if (RejectedMissionReferenceCount > 0)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("SailingGameMode: Filtrerte bort %d ugyldige oppdragsreferanser fra portinnhold."), RejectedMissionReferenceCount);
+			}
+			if (RejectedUpgradeReferenceCount > 0)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("SailingGameMode: Filtrerte bort %d ugyldige oppgraderingsreferanser fra portinnhold."), RejectedUpgradeReferenceCount);
+			}
+			if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
+			{
+				if (InvalidPortDefinitionCount > 0)
+				{
+					TelemetrySubsystem->RecordCounterEvent(TEXT("InvalidPortDefinitions"), InvalidPortDefinitionCount);
+				}
+				if (DuplicatePortDefinitionCount > 0)
+				{
+					TelemetrySubsystem->RecordCounterEvent(TEXT("DuplicatePortDefinitions"), DuplicatePortDefinitionCount);
+				}
+				if (RejectedMissionReferenceCount > 0)
+				{
+					TelemetrySubsystem->RecordCounterEvent(TEXT("InvalidPortMissionOfferRefs"), RejectedMissionReferenceCount);
+				}
+				if (RejectedUpgradeReferenceCount > 0)
+				{
+					TelemetrySubsystem->RecordCounterEvent(TEXT("InvalidPortUpgradeOfferRefs"), RejectedUpgradeReferenceCount);
+				}
+				if (SpawnedPortMarkers.Num() == 0 && !bEnableRuntimeFallbackContent)
+				{
+					TelemetrySubsystem->RecordCounterEvent(TEXT("MissingBootstrapPortContent"), 1);
+				}
 			}
 
 			UE_LOG(LogTemp, Log, TEXT("SailingGameMode: Spawned %d harbor markers."), SpawnedPortMarkers.Num());

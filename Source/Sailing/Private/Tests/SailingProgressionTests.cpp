@@ -445,6 +445,62 @@ bool FSailingPortWeightedOffersTest::RunTest(const FString& Parameters)
 		{ TEXT("Upgrade_A"), TEXT("Upgrade_B") }, UnlockedUpgradeIds, false);
 	TestEqual(TEXT("Upgrade filter should keep all upgrades when hide-unlocked disabled"), FilteredAll.Num(), 2);
 
+	int32 RejectedMissionIdCount = 0;
+	TSet<FName> AllowedMissionIds;
+	AllowedMissionIds.Add(TEXT("Mission_A"));
+	AllowedMissionIds.Add(TEXT("Mission_C"));
+	const TArray<FName> FilteredMissionIds = UPortDataAsset::FilterIdsByAllowedSet(
+		{ NAME_None, TEXT("Mission_A"), TEXT("Mission_B"), TEXT("Mission_A"), TEXT("Mission_C") },
+		AllowedMissionIds,
+		RejectedMissionIdCount);
+	TestEqual(TEXT("Allowed-set mission filter should reject unknown and None ids"), RejectedMissionIdCount, 2);
+	TestEqual(TEXT("Allowed-set mission filter should keep unique allowed ids"), FilteredMissionIds.Num(), 2);
+	TestEqual(TEXT("Allowed-set mission filter should keep source order for allowed ids"), FilteredMissionIds[0], FName(TEXT("Mission_A")));
+	TestEqual(TEXT("Allowed-set mission filter should include second allowed id"), FilteredMissionIds[1], FName(TEXT("Mission_C")));
+
+	int32 RejectedWeightedMissionCount = 0;
+	TArray<FPortMissionWeightedOffer> MissionRulesToFilter;
+	FPortMissionWeightedOffer MissionRuleA;
+	MissionRuleA.MissionId = TEXT("Mission_A");
+	MissionRulesToFilter.Add(MissionRuleA);
+	FPortMissionWeightedOffer MissionRuleB;
+	MissionRuleB.MissionId = TEXT("Mission_B");
+	MissionRulesToFilter.Add(MissionRuleB);
+	FPortMissionWeightedOffer MissionRuleNone;
+	MissionRuleNone.MissionId = NAME_None;
+	MissionRulesToFilter.Add(MissionRuleNone);
+	FPortMissionWeightedOffer MissionRuleDuplicate;
+	MissionRuleDuplicate.MissionId = TEXT("Mission_A");
+	MissionRulesToFilter.Add(MissionRuleDuplicate);
+	const TArray<FPortMissionWeightedOffer> FilteredMissionRules = UPortDataAsset::FilterMissionWeightedOffersByAllowedSet(
+		MissionRulesToFilter,
+		AllowedMissionIds,
+		RejectedWeightedMissionCount);
+	TestEqual(TEXT("Weighted mission filter should reject unknown and None rules"), RejectedWeightedMissionCount, 2);
+	TestEqual(TEXT("Weighted mission filter should keep first unique valid rule"), FilteredMissionRules.Num(), 1);
+	TestEqual(TEXT("Weighted mission filter should keep expected mission id"), FilteredMissionRules[0].MissionId, FName(TEXT("Mission_A")));
+
+	int32 RejectedWeightedUpgradeCount = 0;
+	TSet<FName> AllowedUpgradeIds;
+	AllowedUpgradeIds.Add(TEXT("Upgrade_A"));
+	TArray<FPortUpgradeWeightedOffer> UpgradeRulesToFilter;
+	FPortUpgradeWeightedOffer UpgradeRuleA;
+	UpgradeRuleA.UpgradeId = TEXT("Upgrade_A");
+	UpgradeRulesToFilter.Add(UpgradeRuleA);
+	FPortUpgradeWeightedOffer UpgradeRuleB;
+	UpgradeRuleB.UpgradeId = TEXT("Upgrade_B");
+	UpgradeRulesToFilter.Add(UpgradeRuleB);
+	FPortUpgradeWeightedOffer UpgradeRuleNone;
+	UpgradeRuleNone.UpgradeId = NAME_None;
+	UpgradeRulesToFilter.Add(UpgradeRuleNone);
+	const TArray<FPortUpgradeWeightedOffer> FilteredUpgradeRules = UPortDataAsset::FilterUpgradeWeightedOffersByAllowedSet(
+		UpgradeRulesToFilter,
+		AllowedUpgradeIds,
+		RejectedWeightedUpgradeCount);
+	TestEqual(TEXT("Weighted upgrade filter should reject unknown and None rules"), RejectedWeightedUpgradeCount, 2);
+	TestEqual(TEXT("Weighted upgrade filter should keep valid rules"), FilteredUpgradeRules.Num(), 1);
+	TestEqual(TEXT("Weighted upgrade filter should keep expected upgrade id"), FilteredUpgradeRules[0].UpgradeId, FName(TEXT("Upgrade_A")));
+
 	const TArray<FName> StaticUpgrades = UPortDataAsset::BuildRotatedUpgradeIds(
 		{ TEXT("Upgrade_A"), TEXT("Upgrade_A"), TEXT("Upgrade_B") }, 5, 0, false);
 	TestEqual(TEXT("Non-rotating upgrade list should deduplicate"), StaticUpgrades.Num(), 2);
