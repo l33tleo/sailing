@@ -6,6 +6,20 @@ TArray<FName> UPortDataAsset::BuildPrioritizedMissionIds(
 	int32 PortVisitCount,
 	int32 MaxOffers)
 {
+	return BuildPrioritizedMissionSelection(
+		InWeightedOffers,
+		InFallbackOffers,
+		PortVisitCount,
+		MaxOffers).MissionIds;
+}
+
+FPortMissionOfferSelectionResult UPortDataAsset::BuildPrioritizedMissionSelection(
+	const TArray<FPortMissionWeightedOffer>& InWeightedOffers,
+	const TArray<FName>& InFallbackOffers,
+	int32 PortVisitCount,
+	int32 MaxOffers)
+{
+	FPortMissionOfferSelectionResult SelectionResult;
 	TArray<FName> Result;
 
 	TArray<FPortMissionWeightedOffer> EligibleWeightedOffers;
@@ -18,10 +32,12 @@ TArray<FName> UPortDataAsset::BuildPrioritizedMissionIds(
 
 		if (PortVisitCount < FMath::Max(0, Offer.MinPortVisits))
 		{
+			SelectionResult.VisitGatedRuleCount++;
 			continue;
 		}
 
 		EligibleWeightedOffers.Add(Offer);
+		SelectionResult.EligibleWeightedRuleCount++;
 	}
 
 	EligibleWeightedOffers.Sort([](const FPortMissionWeightedOffer& A, const FPortMissionWeightedOffer& B)
@@ -38,14 +54,22 @@ TArray<FName> UPortDataAsset::BuildPrioritizedMissionIds(
 		Result.AddUnique(Offer.MissionId);
 	}
 
-	if (Result.Num() == 0)
+	if (Result.Num() > 0)
 	{
-		for (const FName& OfferId : InFallbackOffers)
+		if (MaxOffers > 0 && Result.Num() > MaxOffers)
 		{
-			if (!OfferId.IsNone())
-			{
-				Result.AddUnique(OfferId);
-			}
+			Result.SetNum(MaxOffers);
+		}
+		SelectionResult.MissionIds = Result;
+		SelectionResult.bUsedWeightedRules = SelectionResult.MissionIds.Num() > 0;
+		return SelectionResult;
+	}
+
+	for (const FName& OfferId : InFallbackOffers)
+	{
+		if (!OfferId.IsNone())
+		{
+			Result.AddUnique(OfferId);
 		}
 	}
 
@@ -54,7 +78,9 @@ TArray<FName> UPortDataAsset::BuildPrioritizedMissionIds(
 		Result.SetNum(MaxOffers);
 	}
 
-	return Result;
+	SelectionResult.MissionIds = Result;
+	SelectionResult.bUsedFallbackOffers = SelectionResult.MissionIds.Num() > 0;
+	return SelectionResult;
 }
 
 TArray<FName> UPortDataAsset::BuildRotatedUpgradeIds(

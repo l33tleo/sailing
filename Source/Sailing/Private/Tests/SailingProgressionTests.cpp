@@ -368,6 +368,19 @@ bool FSailingPortWeightedOffersTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Fallback should preserve first unique order"), FallbackOnly[0], FName(TEXT("Fallback_1")));
 	TestEqual(TEXT("Fallback should include subsequent unique ids"), FallbackOnly[1], FName(TEXT("Fallback_2")));
 
+	const FPortMissionOfferSelectionResult MissionSelectionResult = UPortDataAsset::BuildPrioritizedMissionSelection(
+		WeightedOffers, { TEXT("Fallback_1") }, 1, 3);
+	TestTrue(TEXT("Mission selection should indicate weighted source with eligible rules"), MissionSelectionResult.bUsedWeightedRules);
+	TestFalse(TEXT("Mission selection should not indicate fallback when weighted rules are used"), MissionSelectionResult.bUsedFallbackOffers);
+	TestEqual(TEXT("Mission selection should track eligible weighted rules"), MissionSelectionResult.EligibleWeightedRuleCount, 2);
+	TestEqual(TEXT("Mission selection should track visit-gated rules"), MissionSelectionResult.VisitGatedRuleCount, 1);
+
+	const FPortMissionOfferSelectionResult MissionFallbackSelection = UPortDataAsset::BuildPrioritizedMissionSelection(
+		{}, { TEXT("Fallback_1"), TEXT("Fallback_2") }, 0, 1);
+	TestFalse(TEXT("Mission fallback selection should not use weighted source"), MissionFallbackSelection.bUsedWeightedRules);
+	TestTrue(TEXT("Mission fallback selection should use fallback source"), MissionFallbackSelection.bUsedFallbackOffers);
+	TestEqual(TEXT("Mission fallback selection should respect max-offer cap"), MissionFallbackSelection.MissionIds.Num(), 1);
+
 	const TArray<FName> RotatedUpgrades = UPortDataAsset::BuildRotatedUpgradeIds(
 		{ TEXT("Upgrade_A"), TEXT("Upgrade_B"), TEXT("Upgrade_C") }, 2, 2, true);
 	TestEqual(TEXT("Upgrade rotation should respect max-offer cap"), RotatedUpgrades.Num(), 2);
@@ -513,6 +526,25 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 	TestEqual(TEXT("Mission availability reason should mark ready"),
 		UPortMissionBoardWidget::DetermineMissionAvailabilityReason(true, false, true),
 		EPortMissionAvailabilityReason::Ready);
+	TestEqual(TEXT("Mission offer source should be none when board disabled"),
+		UPortMissionBoardWidget::DetermineMissionOfferSource(false, true, false),
+		EPortMissionOfferSource::None);
+	TestEqual(TEXT("Mission offer source should prefer weighted rules"),
+		UPortMissionBoardWidget::DetermineMissionOfferSource(true, true, true),
+		EPortMissionOfferSource::WeightedRules);
+	TestEqual(TEXT("Mission offer source should report fallback when weighted unavailable"),
+		UPortMissionBoardWidget::DetermineMissionOfferSource(true, false, true),
+		EPortMissionOfferSource::FallbackList);
+	TestEqual(TEXT("Mission offer source status should include weighted and gated counts"),
+		UPortMissionBoardWidget::BuildMissionOfferSourceStatusText(
+			EPortMissionOfferSource::WeightedRules, 3, 2).ToString(),
+		FString(TEXT("Vektede oppdragsregler aktiv (3 kvalifiserte). 2 regel(er) låst av havnebesøk.")));
+	TestEqual(TEXT("Mission visit requirement helper should indicate no requirement"),
+		UPortMissionBoardWidget::BuildMissionVisitRequirementStatusText(0, 4).ToString(),
+		FString(TEXT("Ingen havnekrav.")));
+	TestEqual(TEXT("Mission visit requirement helper should indicate missing visits"),
+		UPortMissionBoardWidget::BuildMissionVisitRequirementStatusText(4, 1).ToString(),
+		FString(TEXT("Krever 4 havnebesøk (mangler 3).")));
 	TestEqual(TEXT("Mission availability text should expose cooldown seconds"),
 		UPortMissionBoardWidget::BuildMissionAvailabilityStatusText(
 			EPortMissionAvailabilityReason::CooldownActive, 7.2f, false).ToString(),

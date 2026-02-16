@@ -37,6 +37,14 @@ enum class EPortUpgradeOfferSource : uint8
 };
 
 UENUM(BlueprintType)
+enum class EPortMissionOfferSource : uint8
+{
+	None,
+	WeightedRules,
+	FallbackList
+};
+
+UENUM(BlueprintType)
 enum class EPortBoardRefreshContext : uint8
 {
 	DockArrival,
@@ -57,6 +65,18 @@ struct SAILING_API FPortMissionOfferEntry
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
 	FText MissionTitle;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	float PriorityWeight = 1.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	int32 MinPortVisits = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	bool bVisitGateSatisfied = true;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	FText VisitRequirementStatus;
 };
 
 USTRUCT(BlueprintType)
@@ -116,6 +136,9 @@ struct SAILING_API FPortMissionBoardData
 	TArray<FPortMissionOfferEntry> OfferedMissions;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	bool bHasWeightedMissionRules = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
 	FName CurrentMissionId = NAME_None;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
@@ -135,6 +158,18 @@ struct SAILING_API FPortMissionBoardData
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
 	EPortMissionAvailabilityReason AvailabilityReason = EPortMissionAvailabilityReason::Ready;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	EPortMissionOfferSource MissionOfferSource = EPortMissionOfferSource::None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	int32 EligibleWeightedMissionRuleCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	int32 VisitGatedWeightedMissionRuleCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	FText MissionOfferSourceStatus;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
 	EPortBoardRefreshContext RefreshContext = EPortBoardRefreshContext::DockArrival;
@@ -256,6 +291,23 @@ public:
 		EPortMissionAvailabilityReason Reason,
 		float CooldownRemainingSeconds,
 		bool bSupportsUpgradeService);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard")
+	static EPortMissionOfferSource DetermineMissionOfferSource(
+		bool bSupportsMissionBoard,
+		bool bUsedWeightedRules,
+		bool bUsedFallbackOffers);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard")
+	static FText BuildMissionOfferSourceStatusText(
+		EPortMissionOfferSource Source,
+		int32 EligibleWeightedRuleCount,
+		int32 VisitGatedRuleCount);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard")
+	static FText BuildMissionVisitRequirementStatusText(
+		int32 MinPortVisits,
+		int32 CurrentPortVisitCount);
 
 	UFUNCTION(BlueprintPure, Category = "MissionBoard|Service")
 	static EPortUpgradeAvailabilityReason DetermineUpgradeAvailabilityReason(

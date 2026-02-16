@@ -55,6 +55,27 @@ struct SAILING_API FPortUpgradeOfferSelectionResult
 	int32 VisitGatedRuleCount = 0;
 };
 
+USTRUCT(BlueprintType)
+struct SAILING_API FPortMissionOfferSelectionResult
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Port|MissionBoard")
+	TArray<FName> MissionIds;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Port|MissionBoard")
+	bool bUsedWeightedRules = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Port|MissionBoard")
+	bool bUsedFallbackOffers = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Port|MissionBoard")
+	int32 EligibleWeightedRuleCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Port|MissionBoard")
+	int32 VisitGatedRuleCount = 0;
+};
+
 /**
  * Data-driven harbor definition for world feature spawning.
  */
@@ -128,6 +149,12 @@ public:
 	float UpgradeCostMultiplier = 1.0f;
 
 	static TArray<FName> BuildPrioritizedMissionIds(
+		const TArray<FPortMissionWeightedOffer>& InWeightedOffers,
+		const TArray<FName>& InFallbackOffers,
+		int32 PortVisitCount,
+		int32 MaxOffers);
+
+	static FPortMissionOfferSelectionResult BuildPrioritizedMissionSelection(
 		const TArray<FPortMissionWeightedOffer>& InWeightedOffers,
 		const TArray<FName>& InFallbackOffers,
 		int32 PortVisitCount,

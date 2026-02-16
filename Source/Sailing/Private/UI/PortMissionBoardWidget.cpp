@@ -128,6 +128,76 @@ FText UPortMissionBoardWidget::BuildMissionAvailabilityStatusText(
 	}
 }
 
+EPortMissionOfferSource UPortMissionBoardWidget::DetermineMissionOfferSource(
+	bool bSupportsMissionBoard,
+	bool bUsedWeightedRules,
+	bool bUsedFallbackOffers)
+{
+	if (!bSupportsMissionBoard)
+	{
+		return EPortMissionOfferSource::None;
+	}
+
+	if (bUsedWeightedRules)
+	{
+		return EPortMissionOfferSource::WeightedRules;
+	}
+
+	if (bUsedFallbackOffers)
+	{
+		return EPortMissionOfferSource::FallbackList;
+	}
+
+	return EPortMissionOfferSource::None;
+}
+
+FText UPortMissionBoardWidget::BuildMissionOfferSourceStatusText(
+	EPortMissionOfferSource Source,
+	int32 EligibleWeightedRuleCount,
+	int32 VisitGatedRuleCount)
+{
+	FString BaseText;
+	switch (Source)
+	{
+	case EPortMissionOfferSource::WeightedRules:
+		BaseText = FString::Printf(TEXT("Vektede oppdragsregler aktiv (%d kvalifiserte)."), FMath::Max(0, EligibleWeightedRuleCount));
+		break;
+	case EPortMissionOfferSource::FallbackList:
+		BaseText = TEXT("Standard oppdragsliste brukes.");
+		break;
+	case EPortMissionOfferSource::None:
+	default:
+		BaseText = TEXT("Ingen oppdragskilde aktiv.");
+		break;
+	}
+
+	if (VisitGatedRuleCount > 0)
+	{
+		BaseText += FString::Printf(TEXT(" %d regel(er) låst av havnebesøk."), FMath::Max(0, VisitGatedRuleCount));
+	}
+
+	return FText::FromString(BaseText);
+}
+
+FText UPortMissionBoardWidget::BuildMissionVisitRequirementStatusText(
+	int32 MinPortVisits,
+	int32 CurrentPortVisitCount)
+{
+	const int32 SafeMinVisits = FMath::Max(0, MinPortVisits);
+	if (SafeMinVisits <= 0)
+	{
+		return FText::FromString(TEXT("Ingen havnekrav."));
+	}
+
+	const int32 SafeCurrentVisits = FMath::Max(0, CurrentPortVisitCount);
+	if (SafeCurrentVisits >= SafeMinVisits)
+	{
+		return FText::FromString(FString::Printf(TEXT("Krever %d havnebesøk (oppfylt)."), SafeMinVisits));
+	}
+
+	return FText::FromString(FString::Printf(TEXT("Krever %d havnebesøk (mangler %d)."), SafeMinVisits, SafeMinVisits - SafeCurrentVisits));
+}
+
 EPortUpgradeAvailabilityReason UPortMissionBoardWidget::DetermineUpgradeAvailabilityReason(
 	bool bSupportsUpgradeService,
 	int32 ValidUpgradeOfferCount,

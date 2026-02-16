@@ -63,6 +63,11 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 	const TArray<FName>& OfferedMissionIds, FName CurrentMissionId,
 	bool bMissionBoardOnCooldown, float CooldownRemainingSeconds,
 	EPortBoardRefreshContext RefreshContext,
+	const TArray<FPortMissionWeightedOffer>& WeightedOfferedMissionRules,
+	bool bUsedWeightedMissionRules,
+	bool bUsedFallbackMissionOffers,
+	int32 EligibleWeightedMissionRuleCount,
+	int32 VisitGatedWeightedMissionRuleCount,
 	bool bAutoRepairAtPort, int32 RepairCostPerPercentPoint,
 	bool bOfferUpgradeService, const TArray<FName>& OfferedUpgradeIds,
 	float UpgradeCostMultiplier, int32 CurrentPortVisitCount,
@@ -84,6 +89,7 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 	Data.PortDisplayName = PortDisplayName;
 	Data.bSupportsMissionBoard = bOfferMissionBoard;
 	Data.OfferedMissionIds = OfferedMissionIds;
+	Data.bHasWeightedMissionRules = WeightedOfferedMissionRules.Num() > 0;
 	Data.bHasAnyOffers = OfferedMissionIds.Num() > 0;
 	Data.CurrentMissionId = CurrentMissionId;
 	Data.bMissionBoardOnCooldown = bMissionBoardOnCooldown;
@@ -119,6 +125,16 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 	Data.UpgradePurchaseConfirmationStatus = FText::GetEmpty();
 	Data.AvailabilityReason = UPortMissionBoardWidget::DetermineMissionAvailabilityReason(
 		Data.bSupportsMissionBoard, Data.bMissionBoardOnCooldown, Data.bHasAnyOffers);
+	Data.MissionOfferSource = UPortMissionBoardWidget::DetermineMissionOfferSource(
+		Data.bSupportsMissionBoard,
+		bUsedWeightedMissionRules,
+		bUsedFallbackMissionOffers);
+	Data.EligibleWeightedMissionRuleCount = FMath::Max(0, EligibleWeightedMissionRuleCount);
+	Data.VisitGatedWeightedMissionRuleCount = FMath::Max(0, VisitGatedWeightedMissionRuleCount);
+	Data.MissionOfferSourceStatus = UPortMissionBoardWidget::BuildMissionOfferSourceStatusText(
+		Data.MissionOfferSource,
+		Data.EligibleWeightedMissionRuleCount,
+		Data.VisitGatedWeightedMissionRuleCount);
 	Data.AvailabilityStatus = UPortMissionBoardWidget::BuildMissionAvailabilityStatusText(
 		Data.AvailabilityReason, Data.CooldownRemainingSeconds, Data.bSupportsUpgradeService);
 	Data.RefreshContext = RefreshContext;
@@ -212,6 +228,19 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 				FPortMissionOfferEntry Entry;
 				Entry.MissionId = MissionId;
 				Entry.MissionTitle = MissionSubsystem->GetMissionDisplayNameById(MissionId);
+				if (const FPortMissionWeightedOffer* WeightedRule = WeightedOfferedMissionRules.FindByPredicate(
+					[MissionId](const FPortMissionWeightedOffer& Candidate)
+					{
+						return Candidate.MissionId == MissionId;
+					}))
+				{
+					Entry.PriorityWeight = FMath::Max(0.0f, WeightedRule->PriorityWeight);
+					Entry.MinPortVisits = FMath::Max(0, WeightedRule->MinPortVisits);
+				}
+				Entry.bVisitGateSatisfied = Data.PortVisitCount >= Entry.MinPortVisits;
+				Entry.VisitRequirementStatus = UPortMissionBoardWidget::BuildMissionVisitRequirementStatusText(
+					Entry.MinPortVisits,
+					Data.PortVisitCount);
 				Data.OfferedMissions.Add(Entry);
 			}
 

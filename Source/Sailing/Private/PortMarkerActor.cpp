@@ -58,6 +58,7 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 	FName CurrentMissionId = NAME_None;
 	int32 PortVisitCount = 0;
 	TArray<FName> EffectiveOfferedMissionIds;
+	FPortMissionOfferSelectionResult MissionSelectionResult;
 	TArray<FName> EffectiveOfferedUpgradeIds;
 	FPortUpgradeOfferSelectionResult UpgradeSelectionResult;
 	int32 HiddenUnlockedUpgradeOfferCount = 0;
@@ -69,8 +70,9 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 			PortVisitCount = WorldSubsystem->GetPortVisitCounts().FindRef(PortId);
 		}
 
-		EffectiveOfferedMissionIds = UPortDataAsset::BuildPrioritizedMissionIds(
+		MissionSelectionResult = UPortDataAsset::BuildPrioritizedMissionSelection(
 			WeightedOfferedMissions, OfferedMissionIds, PortVisitCount, MaxOfferedMissionsAtBoard);
+		EffectiveOfferedMissionIds = MissionSelectionResult.MissionIds;
 		UpgradeSelectionResult = UPortDataAsset::BuildPrioritizedUpgradeSelection(
 			WeightedOfferedUpgrades,
 			OfferedUpgradeIds,
@@ -169,8 +171,9 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 	}
 	else
 	{
-		EffectiveOfferedMissionIds = UPortDataAsset::BuildPrioritizedMissionIds(
+		MissionSelectionResult = UPortDataAsset::BuildPrioritizedMissionSelection(
 			WeightedOfferedMissions, OfferedMissionIds, PortVisitCount, MaxOfferedMissionsAtBoard);
+		EffectiveOfferedMissionIds = MissionSelectionResult.MissionIds;
 		UpgradeSelectionResult = UPortDataAsset::BuildPrioritizedUpgradeSelection(
 			WeightedOfferedUpgrades,
 			OfferedUpgradeIds,
@@ -222,6 +225,11 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 				HUD->ShowPortMissionBoard(PortId, PortDisplayName, bOfferMissionBoard,
 					EffectiveOfferedMissionIds, CurrentMissionId,
 					bMissionBoardOnCooldown, MissionBoardCooldownRemaining, RefreshContext,
+					WeightedOfferedMissions,
+					MissionSelectionResult.bUsedWeightedRules,
+					MissionSelectionResult.bUsedFallbackOffers,
+					MissionSelectionResult.EligibleWeightedRuleCount,
+					MissionSelectionResult.VisitGatedRuleCount,
 					bAutoRepairAtPort, RepairCostPerPercentPoint,
 					bOfferUpgradeService, EffectiveOfferedUpgradeIds,
 					UpgradeCostMultiplier, PortVisitCount, WeightedOfferedUpgrades,
