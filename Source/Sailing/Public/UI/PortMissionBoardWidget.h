@@ -368,6 +368,28 @@ public:
 		int32 ManualRefreshCreditCost,
 		bool bCanAffordManualRefresh);
 
+	UFUNCTION(BlueprintPure, Category = "MissionBoard")
+	static bool CanRequestMissionAccept(
+		const FPortMissionBoardData& BoardData,
+		FName RequestedMissionId,
+		FText& OutBlockedReason);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard|Service")
+	static bool CanRequestUpgradePurchase(
+		const FPortMissionBoardData& BoardData,
+		FName RequestedUpgradeId,
+		FText& OutBlockedReason);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard|Service")
+	static bool CanRequestRepairService(
+		const FPortMissionBoardData& BoardData,
+		FText& OutBlockedReason);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard")
+	static bool CanRequestManualRefresh(
+		const FPortMissionBoardData& BoardData,
+		FText& OutBlockedReason);
+
 	UFUNCTION(BlueprintCallable, Category = "MissionBoard")
 	void RequestCloseBoard();
 

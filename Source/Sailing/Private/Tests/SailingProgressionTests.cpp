@@ -608,6 +608,84 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 	TestEqual(TEXT("Manual refresh helper should report insufficient credits"),
 		UPortMissionBoardWidget::BuildManualRefreshStatusText(true, false, 0.0f, 40, false).ToString(),
 		FString(TEXT("Mangler kreditter til manuell oppfriskning (40).")));
+
+	FPortMissionBoardData MissionBoardData;
+	MissionBoardData.bSupportsMissionBoard = true;
+	MissionBoardData.OfferedMissionIds = { TEXT("Mission_A"), TEXT("Mission_B") };
+	MissionBoardData.CurrentMissionId = TEXT("Mission_A");
+	MissionBoardData.bMissionBoardOnCooldown = false;
+
+	FText BlockedReason;
+	TestFalse(TEXT("Mission accept helper should reject already-active mission"),
+		UPortMissionBoardWidget::CanRequestMissionAccept(MissionBoardData, TEXT("Mission_A"), BlockedReason));
+	TestEqual(TEXT("Mission accept helper should explain already-active rejection"),
+		BlockedReason.ToString(),
+		FString(TEXT("Oppdraget er allerede aktivt.")));
+	TestFalse(TEXT("Mission accept helper should reject non-offered mission"),
+		UPortMissionBoardWidget::CanRequestMissionAccept(MissionBoardData, TEXT("Mission_C"), BlockedReason));
+	TestEqual(TEXT("Mission accept helper should explain non-offered mission"),
+		BlockedReason.ToString(),
+		FString(TEXT("Oppdraget tilbys ikke i denne havnen.")));
+	TestTrue(TEXT("Mission accept helper should allow offered mission switch"),
+		UPortMissionBoardWidget::CanRequestMissionAccept(MissionBoardData, TEXT("Mission_B"), BlockedReason));
+
+	FPortUpgradeOfferEntry UpgradeOffer;
+	UpgradeOffer.UpgradeId = TEXT("Upgrade_A");
+	UpgradeOffer.CreditCost = 200;
+	UpgradeOffer.bUnlocked = false;
+	UpgradeOffer.bAffordable = true;
+	UpgradeOffer.bVisitGateSatisfied = true;
+
+	FPortMissionBoardData UpgradeBoardData;
+	UpgradeBoardData.bSupportsUpgradeService = true;
+	UpgradeBoardData.OfferedUpgradeIds = { UpgradeOffer.UpgradeId };
+	UpgradeBoardData.OfferedUpgrades = { UpgradeOffer };
+	UpgradeBoardData.UpgradeAvailabilityReason = EPortUpgradeAvailabilityReason::Ready;
+	TestTrue(TEXT("Upgrade helper should allow affordable offered upgrade"),
+		UPortMissionBoardWidget::CanRequestUpgradePurchase(UpgradeBoardData, UpgradeOffer.UpgradeId, BlockedReason));
+
+	UpgradeBoardData.OfferedUpgrades[0].bAffordable = false;
+	TestFalse(TEXT("Upgrade helper should reject unaffordable upgrade"),
+		UPortMissionBoardWidget::CanRequestUpgradePurchase(UpgradeBoardData, UpgradeOffer.UpgradeId, BlockedReason));
+	TestEqual(TEXT("Upgrade helper should explain unaffordable rejection"),
+		BlockedReason.ToString(),
+		FString(TEXT("Ikke nok kreditter (200 kreves).")));
+
+	UpgradeBoardData.OfferedUpgrades[0].bAffordable = true;
+	UpgradeBoardData.OfferedUpgrades[0].bUnlocked = true;
+	TestFalse(TEXT("Upgrade helper should reject already unlocked upgrade"),
+		UPortMissionBoardWidget::CanRequestUpgradePurchase(UpgradeBoardData, UpgradeOffer.UpgradeId, BlockedReason));
+	TestEqual(TEXT("Upgrade helper should explain unlocked rejection"),
+		BlockedReason.ToString(),
+		FString(TEXT("Oppgraderingen er allerede opplåst.")));
+
+	FPortMissionBoardData RepairBoardData;
+	RepairBoardData.bSupportsRepairService = true;
+	RepairBoardData.CurrentBoatConditionPercent = 75;
+	RepairBoardData.bCanAffordRepair = true;
+	TestTrue(TEXT("Repair helper should allow when service available and affordable"),
+		UPortMissionBoardWidget::CanRequestRepairService(RepairBoardData, BlockedReason));
+	RepairBoardData.bCanAffordRepair = false;
+	RepairBoardData.RepairStatus = FText::FromString(TEXT("Mangler kreditter til reparasjon (30)."));
+	TestFalse(TEXT("Repair helper should reject unaffordable repair"),
+		UPortMissionBoardWidget::CanRequestRepairService(RepairBoardData, BlockedReason));
+	TestEqual(TEXT("Repair helper should explain unaffordable repair"),
+		BlockedReason.ToString(),
+		FString(TEXT("Mangler kreditter til reparasjon (30).")));
+
+	FPortMissionBoardData RefreshBoardData;
+	RefreshBoardData.bSupportsManualRefresh = true;
+	RefreshBoardData.bManualRefreshOnCooldown = false;
+	RefreshBoardData.ManualRefreshCreditCost = 25;
+	RefreshBoardData.bCanAffordManualRefresh = true;
+	TestTrue(TEXT("Manual refresh helper should allow enabled affordable refresh"),
+		UPortMissionBoardWidget::CanRequestManualRefresh(RefreshBoardData, BlockedReason));
+	RefreshBoardData.bCanAffordManualRefresh = false;
+	TestFalse(TEXT("Manual refresh helper should reject unaffordable refresh"),
+		UPortMissionBoardWidget::CanRequestManualRefresh(RefreshBoardData, BlockedReason));
+	TestEqual(TEXT("Manual refresh helper should explain unaffordable refresh"),
+		BlockedReason.ToString(),
+		FString(TEXT("Mangler kreditter til manuell oppfriskning (25).")));
 	return true;
 }
 

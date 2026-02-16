@@ -366,6 +366,178 @@ FText UPortMissionBoardWidget::BuildManualRefreshStatusText(
 	return FText::FromString(FString::Printf(TEXT("Mangler kreditter til manuell oppfriskning (%d)."), SafeRefreshCost));
 }
 
+bool UPortMissionBoardWidget::CanRequestMissionAccept(
+	const FPortMissionBoardData& BoardData,
+	FName RequestedMissionId,
+	FText& OutBlockedReason)
+{
+	if (RequestedMissionId.IsNone())
+	{
+		OutBlockedReason = FText::FromString(TEXT("Ingen oppdrag valgt."));
+		return false;
+	}
+
+	if (!BoardData.bSupportsMissionBoard)
+	{
+		OutBlockedReason = BuildMissionAvailabilityStatusText(
+			EPortMissionAvailabilityReason::MissionBoardDisabled,
+			BoardData.CooldownRemainingSeconds,
+			BoardData.bSupportsUpgradeService);
+		return false;
+	}
+
+	if (BoardData.bMissionBoardOnCooldown)
+	{
+		OutBlockedReason = BuildMissionAvailabilityStatusText(
+			EPortMissionAvailabilityReason::CooldownActive,
+			BoardData.CooldownRemainingSeconds,
+			BoardData.bSupportsUpgradeService);
+		return false;
+	}
+
+	if (BoardData.OfferedMissionIds.Num() > 0 && !BoardData.OfferedMissionIds.Contains(RequestedMissionId))
+	{
+		OutBlockedReason = FText::FromString(TEXT("Oppdraget tilbys ikke i denne havnen."));
+		return false;
+	}
+
+	if (!BoardData.CurrentMissionId.IsNone() && BoardData.CurrentMissionId == RequestedMissionId)
+	{
+		OutBlockedReason = FText::FromString(TEXT("Oppdraget er allerede aktivt."));
+		return false;
+	}
+
+	OutBlockedReason = FText::GetEmpty();
+	return true;
+}
+
+bool UPortMissionBoardWidget::CanRequestUpgradePurchase(
+	const FPortMissionBoardData& BoardData,
+	FName RequestedUpgradeId,
+	FText& OutBlockedReason)
+{
+	if (!IsUpgradePurchaseRequestValid(
+		BoardData.bSupportsUpgradeService,
+		BoardData.OfferedUpgradeIds,
+		RequestedUpgradeId))
+	{
+		if (!BoardData.bSupportsUpgradeService)
+		{
+			OutBlockedReason = BuildUpgradeAvailabilityStatusText(EPortUpgradeAvailabilityReason::ServiceUnavailable, 0);
+		}
+		else if (RequestedUpgradeId.IsNone())
+		{
+			OutBlockedReason = FText::FromString(TEXT("Ingen oppgradering valgt."));
+		}
+		else
+		{
+			OutBlockedReason = FText::FromString(TEXT("Oppgraderingen tilbys ikke i denne havnen."));
+		}
+		return false;
+	}
+
+	const FPortUpgradeOfferEntry* OfferEntry = BoardData.OfferedUpgrades.FindByPredicate(
+		[RequestedUpgradeId](const FPortUpgradeOfferEntry& Entry)
+		{
+			return Entry.UpgradeId == RequestedUpgradeId;
+		});
+	if (OfferEntry)
+	{
+		if (OfferEntry->bUnlocked)
+		{
+			OutBlockedReason = FText::FromString(TEXT("Oppgraderingen er allerede opplåst."));
+			return false;
+		}
+
+		if (!OfferEntry->bVisitGateSatisfied)
+		{
+			OutBlockedReason = OfferEntry->VisitRequirementStatus;
+			return false;
+		}
+
+		if (!OfferEntry->bAffordable)
+		{
+			OutBlockedReason = FText::FromString(FString::Printf(TEXT("Ikke nok kreditter (%d kreves)."), FMath::Max(0, OfferEntry->CreditCost)));
+			return false;
+		}
+	}
+
+	if (BoardData.UpgradeAvailabilityReason != EPortUpgradeAvailabilityReason::Ready)
+	{
+		OutBlockedReason = BuildUpgradeAvailabilityStatusText(BoardData.UpgradeAvailabilityReason, 0);
+		return false;
+	}
+
+	OutBlockedReason = FText::GetEmpty();
+	return true;
+}
+
+bool UPortMissionBoardWidget::CanRequestRepairService(
+	const FPortMissionBoardData& BoardData,
+	FText& OutBlockedReason)
+{
+	if (!BoardData.bSupportsRepairService)
+	{
+		OutBlockedReason = BoardData.RepairStatus.IsEmpty()
+			? FText::FromString(TEXT("Reparasjon er ikke tilgjengelig i denne havnen."))
+			: BoardData.RepairStatus;
+		return false;
+	}
+
+	if (FMath::Clamp(BoardData.CurrentBoatConditionPercent, 0, 100) >= 100)
+	{
+		OutBlockedReason = FText::FromString(TEXT("Båten er allerede i topp stand."));
+		return false;
+	}
+
+	if (!BoardData.bCanAffordRepair)
+	{
+		OutBlockedReason = BoardData.RepairStatus.IsEmpty()
+			? FText::FromString(TEXT("Ikke nok kreditter til reparasjon."))
+			: BoardData.RepairStatus;
+		return false;
+	}
+
+	OutBlockedReason = FText::GetEmpty();
+	return true;
+}
+
+bool UPortMissionBoardWidget::CanRequestManualRefresh(
+	const FPortMissionBoardData& BoardData,
+	FText& OutBlockedReason)
+{
+	if (!BoardData.bSupportsManualRefresh)
+	{
+		OutBlockedReason = BuildManualRefreshStatusText(false, false, 0.0f, BoardData.ManualRefreshCreditCost, true);
+		return false;
+	}
+
+	if (BoardData.bManualRefreshOnCooldown)
+	{
+		OutBlockedReason = BuildManualRefreshStatusText(
+			true,
+			true,
+			BoardData.ManualRefreshCooldownRemainingSeconds,
+			BoardData.ManualRefreshCreditCost,
+			BoardData.bCanAffordManualRefresh);
+		return false;
+	}
+
+	if (!BoardData.bCanAffordManualRefresh)
+	{
+		OutBlockedReason = BuildManualRefreshStatusText(
+			true,
+			false,
+			0.0f,
+			BoardData.ManualRefreshCreditCost,
+			false);
+		return false;
+	}
+
+	OutBlockedReason = FText::GetEmpty();
+	return true;
+}
+
 void UPortMissionBoardWidget::RequestCloseBoard()
 {
 	OnCloseRequested.Broadcast();
