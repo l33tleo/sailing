@@ -682,6 +682,21 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 	TestEqual(TEXT("Mission accept helper should explain non-offered mission"),
 		BlockedReason.ToString(),
 		FString(TEXT("Oppdraget tilbys ikke i denne havnen.")));
+	MissionBoardData.bSupportsMissionBoard = false;
+	TestFalse(TEXT("Mission accept helper should reject when board service disabled"),
+		UPortMissionBoardWidget::CanRequestMissionAccept(MissionBoardData, TEXT("Mission_B"), BlockedReason));
+	TestEqual(TEXT("Mission accept helper should expose disabled-board reason"),
+		BlockedReason.ToString(),
+		FString(TEXT("Ingen tavletjenester tilgjengelig i denne havnen.")));
+	MissionBoardData.bSupportsMissionBoard = true;
+	MissionBoardData.bMissionBoardOnCooldown = true;
+	MissionBoardData.CooldownRemainingSeconds = 9.0f;
+	TestFalse(TEXT("Mission accept helper should reject during cooldown"),
+		UPortMissionBoardWidget::CanRequestMissionAccept(MissionBoardData, TEXT("Mission_B"), BlockedReason));
+	TestEqual(TEXT("Mission accept helper should expose cooldown reason"),
+		BlockedReason.ToString(),
+		FString(TEXT("Tavlen oppdateres om 9 sekunder")));
+	MissionBoardData.bMissionBoardOnCooldown = false;
 	TestTrue(TEXT("Mission accept helper should allow offered mission switch"),
 		UPortMissionBoardWidget::CanRequestMissionAccept(MissionBoardData, TEXT("Mission_B"), BlockedReason));
 
@@ -714,6 +729,14 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 	TestEqual(TEXT("Upgrade helper should explain unlocked rejection"),
 		BlockedReason.ToString(),
 		FString(TEXT("Oppgraderingen er allerede opplåst.")));
+	UpgradeBoardData.OfferedUpgrades[0].bUnlocked = false;
+	UpgradeBoardData.OfferedUpgrades[0].bVisitGateSatisfied = false;
+	UpgradeBoardData.OfferedUpgrades[0].VisitRequirementStatus = FText::FromString(TEXT("Krever 3 havnebesøk (mangler 2)."));
+	TestFalse(TEXT("Upgrade helper should reject visit-gated upgrades"),
+		UPortMissionBoardWidget::CanRequestUpgradePurchase(UpgradeBoardData, UpgradeOffer.UpgradeId, BlockedReason));
+	TestEqual(TEXT("Upgrade helper should expose visit-gate reason"),
+		BlockedReason.ToString(),
+		FString(TEXT("Krever 3 havnebesøk (mangler 2).")));
 
 	FPortMissionBoardData RepairBoardData;
 	RepairBoardData.bSupportsRepairService = true;
@@ -736,6 +759,21 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 	RefreshBoardData.bCanAffordManualRefresh = true;
 	TestTrue(TEXT("Manual refresh helper should allow enabled affordable refresh"),
 		UPortMissionBoardWidget::CanRequestManualRefresh(RefreshBoardData, BlockedReason));
+	RefreshBoardData.bSupportsManualRefresh = false;
+	TestFalse(TEXT("Manual refresh helper should reject when refresh disabled"),
+		UPortMissionBoardWidget::CanRequestManualRefresh(RefreshBoardData, BlockedReason));
+	TestEqual(TEXT("Manual refresh helper should expose disabled reason"),
+		BlockedReason.ToString(),
+		FString(TEXT("Manuell oppfriskning er deaktivert i denne havnen.")));
+	RefreshBoardData.bSupportsManualRefresh = true;
+	RefreshBoardData.bManualRefreshOnCooldown = true;
+	RefreshBoardData.ManualRefreshCooldownRemainingSeconds = 6.0f;
+	TestFalse(TEXT("Manual refresh helper should reject while cooldown active"),
+		UPortMissionBoardWidget::CanRequestManualRefresh(RefreshBoardData, BlockedReason));
+	TestEqual(TEXT("Manual refresh helper should expose cooldown reason"),
+		BlockedReason.ToString(),
+		FString(TEXT("Manuell oppfriskning klar om 6 sekunder.")));
+	RefreshBoardData.bManualRefreshOnCooldown = false;
 	RefreshBoardData.bCanAffordManualRefresh = false;
 	TestFalse(TEXT("Manual refresh helper should reject unaffordable refresh"),
 		UPortMissionBoardWidget::CanRequestManualRefresh(RefreshBoardData, BlockedReason));

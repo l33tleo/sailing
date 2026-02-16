@@ -14,6 +14,32 @@
 #include "Engine/Font.h"
 #include "Kismet/GameplayStatics.h"
 
+namespace
+{
+void UpdateBoardOfferActionStates(FPortMissionBoardData& BoardData)
+{
+	for (FPortMissionOfferEntry& OfferEntry : BoardData.OfferedMissions)
+	{
+		FText BlockedReason;
+		OfferEntry.bSelectable = UPortMissionBoardWidget::CanRequestMissionAccept(
+			BoardData,
+			OfferEntry.MissionId,
+			BlockedReason);
+		OfferEntry.SelectionBlockedReason = BlockedReason;
+	}
+
+	for (FPortUpgradeOfferEntry& OfferEntry : BoardData.OfferedUpgrades)
+	{
+		FText BlockedReason;
+		OfferEntry.bPurchasable = UPortMissionBoardWidget::CanRequestUpgradePurchase(
+			BoardData,
+			OfferEntry.UpgradeId,
+			BlockedReason);
+		OfferEntry.PurchaseBlockedReason = BlockedReason;
+	}
+}
+}
+
 void ASailingHUD::BeginPlay()
 {
 	Super::BeginPlay();
@@ -270,6 +296,7 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 		Data.ManualRefreshCooldownRemainingSeconds,
 		Data.ManualRefreshCreditCost,
 		Data.bCanAffordManualRefresh);
+	UpdateBoardOfferActionStates(Data);
 	LastMissionBoardData = Data;
 	PortMissionBoardWidget->PushMissionBoardData(LastMissionBoardData);
 	PortMissionBoardWidget->SetVisibility(ESlateVisibility::Visible);
@@ -342,6 +369,7 @@ bool ASailingHUD::AcceptMissionFromBoard(FName MissionId)
 			LastMissionBoardData.AvailabilityStatus = BlockedReason;
 			if (PortMissionBoardWidget)
 			{
+				UpdateBoardOfferActionStates(LastMissionBoardData);
 				PortMissionBoardWidget->PushMissionBoardData(LastMissionBoardData);
 			}
 			ShowDiscoveryPopup(BlockedReason.ToString());
@@ -373,6 +401,7 @@ bool ASailingHUD::AcceptMissionFromBoard(FName MissionId)
 		LastMissionBoardData.AvailabilityStatus = LastMissionBoardData.MissionSwitchConfirmationStatus;
 		if (PortMissionBoardWidget)
 		{
+			UpdateBoardOfferActionStates(LastMissionBoardData);
 			PortMissionBoardWidget->PushMissionBoardData(LastMissionBoardData);
 		}
 
@@ -402,6 +431,7 @@ bool ASailingHUD::AcceptMissionFromBoard(FName MissionId)
 	}
 	else if (PortMissionBoardWidget)
 	{
+		UpdateBoardOfferActionStates(LastMissionBoardData);
 		PortMissionBoardWidget->PushMissionBoardData(LastMissionBoardData);
 	}
 	return bActivated;
@@ -573,6 +603,7 @@ bool ASailingHUD::RequestUpgradePurchaseFromBoard(FName UpgradeId)
 		LastMissionBoardData.UpgradeStatus = LastMissionBoardData.UpgradePurchaseConfirmationStatus;
 		if (PortMissionBoardWidget)
 		{
+			UpdateBoardOfferActionStates(LastMissionBoardData);
 			PortMissionBoardWidget->PushMissionBoardData(LastMissionBoardData);
 		}
 
@@ -656,6 +687,7 @@ void ASailingHUD::RefreshCurrentMissionBoard()
 			LastMissionBoardData.RefreshContextStatus = UPortMissionBoardWidget::BuildRefreshContextStatusText(
 				LastMissionBoardData.RefreshContext);
 		}
+		UpdateBoardOfferActionStates(LastMissionBoardData);
 		PortMissionBoardWidget->PushMissionBoardData(LastMissionBoardData);
 		if (!RefreshBlockedReason.IsEmpty())
 		{
@@ -683,6 +715,7 @@ void ASailingHUD::RefreshCurrentMissionBoard()
 				0.0f,
 				RefreshCost,
 				false);
+			UpdateBoardOfferActionStates(LastMissionBoardData);
 			PortMissionBoardWidget->PushMissionBoardData(LastMissionBoardData);
 			ShowDiscoveryPopup(FString::Printf(TEXT("Ikke nok kreditter til oppfriskning (%d)."), RefreshCost));
 			return;
@@ -757,6 +790,7 @@ void ASailingHUD::RefreshCurrentMissionBoard()
 	LastMissionBoardData.RefreshContext = EPortBoardRefreshContext::ManualRefresh;
 	LastMissionBoardData.RefreshContextStatus = UPortMissionBoardWidget::BuildRefreshContextStatusText(
 		LastMissionBoardData.RefreshContext);
+	UpdateBoardOfferActionStates(LastMissionBoardData);
 	PortMissionBoardWidget->PushMissionBoardData(LastMissionBoardData);
 
 	GetWorldTimerManager().ClearTimer(MissionBoardHideTimer);

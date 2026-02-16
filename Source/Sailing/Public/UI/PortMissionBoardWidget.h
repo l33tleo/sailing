@@ -78,6 +78,12 @@ struct SAILING_API FPortMissionOfferEntry
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
 	FText VisitRequirementStatus;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	bool bSelectable = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	FText SelectionBlockedReason;
 };
 
 USTRUCT(BlueprintType)
@@ -114,6 +120,12 @@ struct SAILING_API FPortUpgradeOfferEntry
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
 	FText VisitRequirementStatus;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	bool bPurchasable = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	FText PurchaseBlockedReason;
 };
 
 USTRUCT(BlueprintType)
