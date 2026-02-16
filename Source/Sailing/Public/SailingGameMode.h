@@ -7,6 +7,7 @@
 class USaveGameSailing;
 class AChunkManager;
 class AMissionObjectiveActor;
+class APortMarkerActor;
 
 UCLASS()
 class SAILING_API ASailingGameMode : public AGameModeBase
@@ -42,6 +43,9 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<AMissionObjectiveActor> SpawnedMissionObjective;
+
+	UPROPERTY()
+	TArray<TObjectPtr<APortMarkerActor>> SpawnedPortMarkers;
 
 	UPROPERTY()
 	TObjectPtr<USaveGameSailing> SaveGame;

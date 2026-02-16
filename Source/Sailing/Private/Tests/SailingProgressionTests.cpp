@@ -147,4 +147,26 @@ bool FSailingMissionChainProgressionTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSailingWorldPortRegistryTest,
+	"Sailing.Progression.World.PortRegistry",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSailingWorldPortRegistryTest::RunTest(const FString& Parameters)
+{
+	UWorldStreamingSubsystem* WorldSubsystem = NewObject<UWorldStreamingSubsystem>();
+	WorldSubsystem->ClearPortPoints();
+	WorldSubsystem->RegisterPortPoint(TEXT("Port_A"), FVector(100.0f, 200.0f, 300.0f));
+	WorldSubsystem->RegisterPortPoint(TEXT("Port_B"), FVector(-100.0f, 50.0f, 10.0f));
+
+	const TArray<FName> PortIds = WorldSubsystem->GetRegisteredPortIds();
+	TestEqual(TEXT("Two port ids should be registered"), PortIds.Num(), 2);
+
+	FVector PortLocation = FVector::ZeroVector;
+	const bool bHasPortA = WorldSubsystem->GetPortLocation(TEXT("Port_A"), PortLocation);
+	TestTrue(TEXT("Port_A should be queryable"), bHasPortA);
+	TestEqual(TEXT("Port_A location should match registered value"), PortLocation, FVector(100.0f, 200.0f, 300.0f));
+	return true;
+}
+
 #endif

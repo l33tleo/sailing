@@ -44,8 +44,42 @@ void UWorldStreamingSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
 void UWorldStreamingSubsystem::Deinitialize()
 {
+	RegisteredPortPoints.Empty();
 	UE_LOG(LogTemp, Log, TEXT("WorldStreamingSubsystem deinitialized."));
 	Super::Deinitialize();
+}
+
+void UWorldStreamingSubsystem::RegisterPortPoint(FName PortId, const FVector& WorldLocation)
+{
+	if (PortId.IsNone())
+	{
+		return;
+	}
+
+	RegisteredPortPoints.FindOrAdd(PortId) = WorldLocation;
+}
+
+void UWorldStreamingSubsystem::ClearPortPoints()
+{
+	RegisteredPortPoints.Empty();
+}
+
+TArray<FName> UWorldStreamingSubsystem::GetRegisteredPortIds() const
+{
+	TArray<FName> PortIds;
+	RegisteredPortPoints.GenerateKeyArray(PortIds);
+	PortIds.Sort(FNameLexicalLess());
+	return PortIds;
+}
+
+bool UWorldStreamingSubsystem::GetPortLocation(FName PortId, FVector& OutWorldLocation) const
+{
+	if (const FVector* Location = RegisteredPortPoints.Find(PortId))
+	{
+		OutWorldLocation = *Location;
+		return true;
+	}
+	return false;
 }
 
 void UMissionSubsystem::Initialize(FSubsystemCollectionBase& Collection)

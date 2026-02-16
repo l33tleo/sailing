@@ -7,6 +7,7 @@
 #include "ChunkManager.h"
 #include "OceanPlaneActor.h"
 #include "MissionObjectiveActor.h"
+#include "PortMarkerActor.h"
 #include "Data/SailingMissionDataAsset.h"
 #include "SaveGameSailing.h"
 #include "Systems/SailingCoreSubsystems.h"
@@ -136,6 +137,42 @@ void ASailingGameMode::BeginPlay()
 	if (SpawnedMissionObjective)
 	{
 		SpawnedMissionObjective->SetTriggerType(ESailingMissionType::Delivery);
+	}
+
+	// Spawn simple harbor markers and register with world subsystem
+	if (GI)
+	{
+		if (UWorldStreamingSubsystem* WorldStreamingSubsystem = GI->GetSubsystem<UWorldStreamingSubsystem>())
+		{
+			WorldStreamingSubsystem->ClearPortPoints();
+			SpawnedPortMarkers.Empty();
+
+			struct FPortSeed
+			{
+				FName PortId;
+				FVector Location;
+			};
+
+			const TArray<FPortSeed> PortSeeds = {
+				{ TEXT("HavnNord"), FVector(2000.0f, -6000.0f, 100.0f) },
+				{ TEXT("HavnVest"), FVector(-7000.0f, 1500.0f, 100.0f) },
+				{ TEXT("HavnSor"), FVector(8500.0f, 4500.0f, 100.0f) }
+			};
+
+			for (const FPortSeed& PortSeed : PortSeeds)
+			{
+				APortMarkerActor* PortMarker = GetWorld()->SpawnActor<APortMarkerActor>(
+					APortMarkerActor::StaticClass(), PortSeed.Location, FRotator::ZeroRotator, Params);
+				if (!PortMarker)
+				{
+					continue;
+				}
+
+				PortMarker->PortId = PortSeed.PortId;
+				SpawnedPortMarkers.Add(PortMarker);
+				WorldStreamingSubsystem->RegisterPortPoint(PortSeed.PortId, PortSeed.Location);
+			}
+		}
 	}
 
 	// Teleporter pawn til siste posisjon ved Fortsett (etter at pawn er spawnet)

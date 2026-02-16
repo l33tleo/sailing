@@ -65,9 +65,24 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Sailing|World")
 	int32 GetTargetActiveChunkRadius() const { return TargetActiveChunkRadius; }
 
+	UFUNCTION(BlueprintCallable, Category = "Sailing|World")
+	void RegisterPortPoint(FName PortId, const FVector& WorldLocation);
+
+	UFUNCTION(BlueprintCallable, Category = "Sailing|World")
+	void ClearPortPoints();
+
+	UFUNCTION(BlueprintPure, Category = "Sailing|World")
+	TArray<FName> GetRegisteredPortIds() const;
+
+	UFUNCTION(BlueprintPure, Category = "Sailing|World")
+	bool GetPortLocation(FName PortId, FVector& OutWorldLocation) const;
+
 private:
 	UPROPERTY(EditAnywhere, Category = "Sailing|World")
 	int32 TargetActiveChunkRadius = 3;
+
+	UPROPERTY()
+	TMap<FName, FVector> RegisteredPortPoints;
 };
 
 UCLASS()
