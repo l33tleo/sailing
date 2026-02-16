@@ -827,8 +827,34 @@ void ASailingHUD::HandleUpgradePurchaseRequest(FName UpgradeId)
 	RequestUpgradePurchaseFromBoard(UpgradeId);
 }
 
-void ASailingHUD::HandleMissionBoardActionBlocked(const FText& Reason)
+void ASailingHUD::HandleMissionBoardActionBlocked(EPortBoardActionType ActionType, const FText& Reason)
 {
+	UGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
+	if (GI)
+	{
+		if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
+		{
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardWidgetActionBlocked"), 1);
+			switch (ActionType)
+			{
+			case EPortBoardActionType::MissionAccept:
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardWidgetActionBlocked_MissionAccept"), 1);
+				break;
+			case EPortBoardActionType::ManualRefresh:
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardWidgetActionBlocked_ManualRefresh"), 1);
+				break;
+			case EPortBoardActionType::RepairService:
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardWidgetActionBlocked_RepairService"), 1);
+				break;
+			case EPortBoardActionType::UpgradePurchase:
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardWidgetActionBlocked_UpgradePurchase"), 1);
+				break;
+			default:
+				break;
+			}
+		}
+	}
+
 	if (!Reason.IsEmpty())
 	{
 		ShowDiscoveryPopup(Reason.ToString());

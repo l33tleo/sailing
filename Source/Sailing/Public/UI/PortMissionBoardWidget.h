@@ -10,7 +10,17 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPortMissionBoardCloseRequested);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPortMissionBoardRefreshRequested);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPortRepairRequested);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPortUpgradePurchaseRequested, FName, UpgradeId);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPortBoardActionBlocked, FText, Reason);
+
+UENUM(BlueprintType)
+enum class EPortBoardActionType : uint8
+{
+	MissionAccept,
+	ManualRefresh,
+	RepairService,
+	UpgradePurchase
+};
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnPortBoardActionBlocked, EPortBoardActionType, ActionType, FText, Reason);
 
 UENUM(BlueprintType)
 enum class EPortMissionAvailabilityReason : uint8

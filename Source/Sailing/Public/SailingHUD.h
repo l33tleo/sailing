@@ -138,7 +138,7 @@ private:
 	UFUNCTION()
 	void HandleUpgradePurchaseRequest(FName UpgradeId);
 	UFUNCTION()
-	void HandleMissionBoardActionBlocked(const FText& Reason);
+	void HandleMissionBoardActionBlocked(EPortBoardActionType ActionType, const FText& Reason);
 	void PushOverlayData(int32 DiscoveredIslands, int32 Credits, FName ActiveMissionId,
 		const FText& ActiveMissionTitle, float ObjectiveDistanceMeters, int32 BoatConditionPercent,
 		float ObjectiveBearingDegrees, FName LastVisitedPortId);

@@ -13,7 +13,7 @@ void UPortMissionBoardWidget::RequestAcceptMission(FName MissionId)
 	{
 		if (!BlockedReason.IsEmpty())
 		{
-			OnActionBlocked.Broadcast(BlockedReason);
+			OnActionBlocked.Broadcast(EPortBoardActionType::MissionAccept, BlockedReason);
 		}
 		return;
 	}
@@ -576,7 +576,7 @@ void UPortMissionBoardWidget::RequestRefreshBoard()
 	{
 		if (!BlockedReason.IsEmpty())
 		{
-			OnActionBlocked.Broadcast(BlockedReason);
+			OnActionBlocked.Broadcast(EPortBoardActionType::ManualRefresh, BlockedReason);
 		}
 		return;
 	}
@@ -591,7 +591,7 @@ void UPortMissionBoardWidget::RequestRepairService()
 	{
 		if (!BlockedReason.IsEmpty())
 		{
-			OnActionBlocked.Broadcast(BlockedReason);
+			OnActionBlocked.Broadcast(EPortBoardActionType::RepairService, BlockedReason);
 		}
 		return;
 	}
@@ -606,7 +606,7 @@ void UPortMissionBoardWidget::RequestPurchaseUpgrade(FName UpgradeId)
 	{
 		if (!BlockedReason.IsEmpty())
 		{
-			OnActionBlocked.Broadcast(BlockedReason);
+			OnActionBlocked.Broadcast(EPortBoardActionType::UpgradePurchase, BlockedReason);
 		}
 		return;
 	}
