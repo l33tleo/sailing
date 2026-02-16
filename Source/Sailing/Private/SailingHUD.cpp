@@ -82,7 +82,8 @@ void ASailingHUD::HidePortMissionBoard()
 }
 
 void ASailingHUD::PushOverlayData(int32 DiscoveredIslands, int32 Credits, FName ActiveMissionId,
-	const FText& ActiveMissionTitle, float ObjectiveDistanceMeters, int32 BoatConditionPercent)
+	const FText& ActiveMissionTitle, float ObjectiveDistanceMeters, int32 BoatConditionPercent,
+	float ObjectiveBearingDegrees)
 {
 	EnsureOverlayWidget();
 	if (!OverlayWidget)
@@ -97,6 +98,7 @@ void ASailingHUD::PushOverlayData(int32 DiscoveredIslands, int32 Credits, FName 
 	OverlayData.ActiveMissionTitle = ActiveMissionTitle;
 	OverlayData.ObjectiveDistanceMeters = ObjectiveDistanceMeters;
 	OverlayData.BoatConditionPercent = BoatConditionPercent;
+	OverlayData.ObjectiveBearingDegrees = ObjectiveBearingDegrees;
 	OverlayWidget->PushOverlayData(OverlayData);
 }
 
@@ -573,6 +575,7 @@ void ASailingHUD::DrawOverviewMap()
 				{
 					const float Px = MapCenterX + Dx * Scale;
 					const float Py = MapCenterY - Dy * Scale;
+					DrawLine(MapCenterX, MapCenterY, Px, Py, FLinearColor(MapMissionColor.R, MapMissionColor.G, MapMissionColor.B, 0.7f), 1.2f);
 					const float DotSize = 7.0f;
 					DrawRect(MapMissionColor, Px - DotSize * 0.5f, Py - DotSize * 0.5f, DotSize, DotSize);
 				}
@@ -620,6 +623,7 @@ void ASailingHUD::DrawDiscoveryCounter()
 	FName ActiveMissionId = NAME_None;
 	FText ActiveMissionTitle = FText::GetEmpty();
 	float ObjectiveDistanceMeters = -1.0f;
+	float ObjectiveBearingDegrees = -999.0f;
 	if (UGameInstance* GI = GetWorld()->GetGameInstance())
 	{
 		if (UEconomySubsystem* EconomySubsystem = GI->GetSubsystem<UEconomySubsystem>())
@@ -636,8 +640,17 @@ void ASailingHUD::DrawDiscoveryCounter()
 			{
 				if (APawn* Pawn = GetOwningPawn())
 				{
-					const float DistCm = FVector::Dist(Pawn->GetActorLocation(), ObjectiveLocation);
+					const FVector ToObjective = ObjectiveLocation - Pawn->GetActorLocation();
+					const FVector ToObjectiveFlat(ToObjective.X, ToObjective.Y, 0.0f);
+					const float DistCm = ToObjectiveFlat.Size();
 					ObjectiveDistanceMeters = DistCm * 0.01f;
+
+					if (!ToObjectiveFlat.IsNearlyZero())
+					{
+						const FVector BoatFwd = Pawn->GetActorForwardVector();
+						const float RelativeBearingRad = FMath::Atan2(ToObjectiveFlat.Y, ToObjectiveFlat.X) - FMath::Atan2(BoatFwd.Y, BoatFwd.X);
+						ObjectiveBearingDegrees = FMath::UnwindDegrees(FMath::RadiansToDegrees(RelativeBearingRad));
+					}
 				}
 			}
 		}
@@ -667,13 +680,20 @@ void ASailingHUD::DrawDiscoveryCounter()
 			BoxX + 170.0f, BoxY + 32.0f, nullptr, 1.0f);
 	}
 
+	if (ObjectiveBearingDegrees > -999.0f && ObjectiveBearingDegrees <= 999.0f)
+	{
+		const FString BearingText = FString::Printf(TEXT("PEILING: %+0.0f°"), ObjectiveBearingDegrees);
+		DrawText(BearingText, FLinearColor(0.95f, 0.75f, 1.0f, 1.0f),
+			BoxX + 170.0f, BoxY + 80.0f, nullptr, 0.95f);
+	}
+
 	const FLinearColor ConditionColor = BoatCondition > 70
 		? FLinearColor(0.3f, 1.0f, 0.4f, 1.0f)
 		: (BoatCondition > 35 ? FLinearColor(1.0f, 0.9f, 0.3f, 1.0f) : FLinearColor(1.0f, 0.35f, 0.35f, 1.0f));
 	const FString ConditionText = FString::Printf(TEXT("SKROGTILSTAND: %d%%"), BoatCondition);
 	DrawText(ConditionText, ConditionColor, BoxX + 10.0f, BoxY + 80.0f, nullptr, 1.0f);
 
-	PushOverlayData(SaveGame->TotalIslandsDiscovered, Credits, ActiveMissionId, ActiveMissionTitle, ObjectiveDistanceMeters, BoatCondition);
+	PushOverlayData(SaveGame->TotalIslandsDiscovered, Credits, ActiveMissionId, ActiveMissionTitle, ObjectiveDistanceMeters, BoatCondition, ObjectiveBearingDegrees);
 }
 
 bool ASailingHUD::PauseMenuButtonHit(float X, float Y, float Bx, float By, float Bw, float Bh) const

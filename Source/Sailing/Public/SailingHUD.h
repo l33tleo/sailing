@@ -92,7 +92,8 @@ private:
 	void EnsurePortMissionBoardWidget();
 	void HidePortMissionBoard();
 	void PushOverlayData(int32 DiscoveredIslands, int32 Credits, FName ActiveMissionId,
-		const FText& ActiveMissionTitle, float ObjectiveDistanceMeters, int32 BoatConditionPercent);
+		const FText& ActiveMissionTitle, float ObjectiveDistanceMeters, int32 BoatConditionPercent,
+		float ObjectiveBearingDegrees);
 
 	// Oversiktskart (spiller sentrum, oppdagede øyer som prikker)
 	void DrawOverviewMap();

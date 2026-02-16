@@ -26,6 +26,9 @@ struct SAILING_API FSailingHUDOverlayData
 
 	UPROPERTY(BlueprintReadOnly, Category = "HUD")
 	int32 BoatConditionPercent = 100;
+
+	UPROPERTY(BlueprintReadOnly, Category = "HUD")
+	float ObjectiveBearingDegrees = -1.0f;
 };
 
 /**
