@@ -75,6 +75,12 @@ void ASailingGameMode::BeginPlay()
 					return const_cast<UBoatUpgradeDataAsset*>(ExistingUpgrade);
 				}
 
+				if (!bEnableRuntimeFallbackContent)
+				{
+					UE_LOG(LogTemp, Warning, TEXT("SailingGameMode: Mangler oppgradering '%s' i innholdsdata og runtime fallback er deaktivert."), *UpgradeId.ToString());
+					return static_cast<UBoatUpgradeDataAsset*>(nullptr);
+				}
+
 				UBoatUpgradeDataAsset* RuntimeFallbackUpgrade = NewObject<UBoatUpgradeDataAsset>(this);
 				RuntimeFallbackUpgrade->UpgradeId = UpgradeId;
 				RuntimeFallbackUpgrade->DisplayName = FText::FromString(DisplayNameText);
@@ -131,6 +137,12 @@ void ASailingGameMode::BeginPlay()
 				if (const USailingMissionDataAsset* ExistingMission = MissionSubsystem->GetMissionAssetById(MissionId))
 				{
 					return const_cast<USailingMissionDataAsset*>(ExistingMission);
+				}
+
+				if (!bEnableRuntimeFallbackContent)
+				{
+					UE_LOG(LogTemp, Warning, TEXT("SailingGameMode: Mangler oppdrag '%s' i innholdsdata og runtime fallback er deaktivert."), *MissionId.ToString());
+					return static_cast<USailingMissionDataAsset*>(nullptr);
 				}
 
 				USailingMissionDataAsset* RuntimeFallbackMission = NewObject<USailingMissionDataAsset>(this);
@@ -267,7 +279,7 @@ void ASailingGameMode::BeginPlay()
 			}
 
 			// Fallback defaults if no data assets exist yet
-			if (PortDefinitions.Num() == 0)
+			if (PortDefinitions.Num() == 0 && bEnableRuntimeFallbackContent)
 			{
 				UPortDataAsset* PortNord = NewObject<UPortDataAsset>(this);
 				PortNord->PortId = TEXT("HavnNord");
@@ -334,6 +346,10 @@ void ASailingGameMode::BeginPlay()
 				PortSor->bRotateUpgradeStockByVisits = false;
 				PortSor->UpgradeCostMultiplier = 1.12f;
 				PortDefinitions.Add(PortSor);
+			}
+			else if (PortDefinitions.Num() == 0)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("SailingGameMode: Ingen port-data funnet og runtime fallback er deaktivert."));
 			}
 
 			for (const UPortDataAsset* PortData : PortDefinitions)

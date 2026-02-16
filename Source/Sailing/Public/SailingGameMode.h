@@ -32,6 +32,9 @@ public:
 	void SaveGame_();
 
 private:
+	UPROPERTY(EditAnywhere, Category = "World|Content")
+	bool bEnableRuntimeFallbackContent = true;
+
 	UPROPERTY(EditAnywhere, Category = "World|Missions")
 	FName MissionAssetScanPath = TEXT("/Game");
 
