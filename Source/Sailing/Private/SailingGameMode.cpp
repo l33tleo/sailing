@@ -7,6 +7,7 @@
 #include "ChunkManager.h"
 #include "OceanPlaneActor.h"
 #include "SaveGameSailing.h"
+#include "Systems/SailingCoreSubsystems.h"
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
 
@@ -32,6 +33,30 @@ void ASailingGameMode::BeginPlay()
 	else
 	{
 		LoadOrCreateSaveGame();
+	}
+
+	if (SaveGame)
+	{
+		SaveGame->EnsureCompatibility();
+	}
+
+	if (GI)
+	{
+		if (USaveSubsystem* SaveSubsystem = GI->GetSubsystem<USaveSubsystem>())
+		{
+			SaveSubsystem->MigrateSaveGame(SaveGame);
+		}
+
+		if (UEconomySubsystem* EconomySubsystem = GI->GetSubsystem<UEconomySubsystem>())
+		{
+			EconomySubsystem->SetCredits(SaveGame ? SaveGame->PlayerCredits : 0);
+			EconomySubsystem->SetUnlockedUpgrades(SaveGame ? SaveGame->UnlockedUpgradeIds : TArray<FName>());
+		}
+
+		if (UMissionSubsystem* MissionSubsystem = GI->GetSubsystem<UMissionSubsystem>())
+		{
+			MissionSubsystem->SetActiveMissionId(SaveGame ? SaveGame->ActiveMissionId : NAME_None);
+		}
 	}
 
 	FActorSpawnParameters Params;
@@ -108,6 +133,21 @@ void ASailingGameMode::SaveGame_()
 {
 	if (SaveGame)
 	{
+		USailingGameInstance* GI = Cast<USailingGameInstance>(GetGameInstance());
+		if (GI)
+		{
+			if (UEconomySubsystem* EconomySubsystem = GI->GetSubsystem<UEconomySubsystem>())
+			{
+				SaveGame->PlayerCredits = EconomySubsystem->GetCredits();
+				SaveGame->UnlockedUpgradeIds = EconomySubsystem->GetUnlockedUpgradeIds();
+			}
+
+			if (UMissionSubsystem* MissionSubsystem = GI->GetSubsystem<UMissionSubsystem>())
+			{
+				SaveGame->ActiveMissionId = MissionSubsystem->GetActiveMissionId();
+			}
+		}
+
 		// Update player location
 		if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
 		{
@@ -116,6 +156,8 @@ void ASailingGameMode::SaveGame_()
 				SaveGame->LastPlayerLocation = Pawn->GetActorLocation();
 			}
 		}
+
+		SaveGame->EnsureCompatibility();
 
 		UGameplayStatics::SaveGameToSlot(SaveGame, USaveGameSailing::SaveSlotName, 0);
 		UE_LOG(LogTemp, Log, TEXT("Spill lagret"));

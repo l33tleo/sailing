@@ -1,6 +1,7 @@
 #include "Systems/SailingCoreSubsystems.h"
 #include "Data/BoatUpgradeDataAsset.h"
 #include "Data/SailingMissionDataAsset.h"
+#include "SaveGameSailing.h"
 
 void USailingSimulationSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -85,6 +86,11 @@ void UEconomySubsystem::AddCredits(int32 Delta)
 	Credits = FMath::Max(0, Credits + Delta);
 }
 
+void UEconomySubsystem::SetCredits(int32 InCredits)
+{
+	Credits = FMath::Max(0, InCredits);
+}
+
 bool UEconomySubsystem::SpendCredits(int32 Cost)
 {
 	if (Cost <= 0)
@@ -122,6 +128,26 @@ bool UEconomySubsystem::PurchaseUpgrade(const UBoatUpgradeDataAsset* UpgradeData
 	return true;
 }
 
+void UEconomySubsystem::SetUnlockedUpgrades(const TArray<FName>& UpgradeIds)
+{
+	UnlockedUpgradeIds.Empty();
+	for (const FName& UpgradeId : UpgradeIds)
+	{
+		if (!UpgradeId.IsNone())
+		{
+			UnlockedUpgradeIds.Add(UpgradeId);
+		}
+	}
+}
+
+TArray<FName> UEconomySubsystem::GetUnlockedUpgradeIds() const
+{
+	TArray<FName> Result;
+	UnlockedUpgradeIds.GenerateKeyArray(Result);
+	Result.Sort(FNameLexicalLess());
+	return Result;
+}
+
 void UUISubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
@@ -137,6 +163,7 @@ void UUISubsystem::Deinitialize()
 void USaveSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
+	SaveSchemaVersion = USaveGameSailing::CurrentSaveSchemaVersion;
 	UE_LOG(LogTemp, Log, TEXT("SaveSubsystem initialized. SchemaVersion=%d"), SaveSchemaVersion);
 }
 
@@ -144,6 +171,17 @@ void USaveSubsystem::Deinitialize()
 {
 	UE_LOG(LogTemp, Log, TEXT("SaveSubsystem deinitialized."));
 	Super::Deinitialize();
+}
+
+bool USaveSubsystem::MigrateSaveGame(USaveGameSailing* SaveGame) const
+{
+	if (!SaveGame)
+	{
+		return false;
+	}
+
+	SaveGame->EnsureCompatibility();
+	return true;
 }
 
 void UTelemetrySubsystem::Initialize(FSubsystemCollectionBase& Collection)

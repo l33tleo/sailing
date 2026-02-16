@@ -6,6 +6,7 @@
 
 class UBoatUpgradeDataAsset;
 class USailingMissionDataAsset;
+class USaveGameSailing;
 
 /**
  * Subsystem skeleton for sailing simulation systems.
@@ -107,6 +108,9 @@ public:
 	void AddCredits(int32 Delta);
 
 	UFUNCTION(BlueprintCallable, Category = "Sailing|Economy")
+	void SetCredits(int32 InCredits);
+
+	UFUNCTION(BlueprintCallable, Category = "Sailing|Economy")
 	bool SpendCredits(int32 Cost);
 
 	UFUNCTION(BlueprintCallable, Category = "Sailing|Economy")
@@ -114,6 +118,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Sailing|Economy")
 	bool IsUpgradeUnlocked(FName UpgradeId) const { return UnlockedUpgradeIds.Contains(UpgradeId); }
+
+	UFUNCTION(BlueprintCallable, Category = "Sailing|Economy")
+	void SetUnlockedUpgrades(const TArray<FName>& UpgradeIds);
+
+	UFUNCTION(BlueprintPure, Category = "Sailing|Economy")
+	TArray<FName> GetUnlockedUpgradeIds() const;
 
 private:
 	UPROPERTY()
@@ -155,9 +165,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Sailing|Save")
 	int32 GetSaveSchemaVersion() const { return SaveSchemaVersion; }
 
+	UFUNCTION(BlueprintCallable, Category = "Sailing|Save")
+	bool MigrateSaveGame(USaveGameSailing* SaveGame) const;
+
 private:
 	UPROPERTY()
-	int32 SaveSchemaVersion = 1;
+	int32 SaveSchemaVersion = 2;
 };
 
 UCLASS()

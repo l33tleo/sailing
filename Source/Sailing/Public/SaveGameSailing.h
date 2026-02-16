@@ -42,6 +42,11 @@ class SAILING_API USaveGameSailing : public USaveGame
 public:
 	USaveGameSailing();
 
+	static const int32 CurrentSaveSchemaVersion = 2;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Save")
+	int32 SaveSchemaVersion = CurrentSaveSchemaVersion;
+
 	UPROPERTY(BlueprintReadWrite, Category = "Save")
 	TMap<FString, FIslandData> DiscoveredIslands;
 
@@ -51,10 +56,20 @@ public:
 	UPROPERTY(BlueprintReadWrite, Category = "Save")
 	FVector LastPlayerLocation = FVector::ZeroVector;
 
+	UPROPERTY(BlueprintReadWrite, Category = "Save|Economy")
+	int32 PlayerCredits = 0;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Save|Economy")
+	TArray<FName> UnlockedUpgradeIds;
+
+	UPROPERTY(BlueprintReadWrite, Category = "Save|Mission")
+	FName ActiveMissionId = NAME_None;
+
 	// Helper functions
 	bool IsIslandDiscovered(FIntPoint ChunkCoord, int32 IslandIndex) const;
 	void MarkIslandDiscovered(const FIslandData& IslandData);
 	FIslandData* GetIslandData(FIntPoint ChunkCoord, int32 IslandIndex);
+	void EnsureCompatibility();
 
 	static const FString SaveSlotName;
 };
