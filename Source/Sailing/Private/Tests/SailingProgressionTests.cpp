@@ -258,6 +258,31 @@ bool FSailingMissionCandidateSelectionTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSailingMissionDisplayNameLookupTest,
+	"Sailing.Progression.Mission.DisplayNameLookup",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSailingMissionDisplayNameLookupTest::RunTest(const FString& Parameters)
+{
+	UMissionSubsystem* MissionSubsystem = NewObject<UMissionSubsystem>();
+
+	USailingMissionDataAsset* Mission = NewObject<USailingMissionDataAsset>();
+	Mission->MissionId = TEXT("Mission_Display");
+	Mission->DisplayName = FText::FromString(TEXT("Visningsnavn"));
+	Mission->MissionType = ESailingMissionType::Delivery;
+
+	MissionSubsystem->RegisterMissionAsset(Mission);
+
+	const FText FoundTitle = MissionSubsystem->GetMissionDisplayNameById(Mission->MissionId);
+	TestEqual(TEXT("Display name lookup should return registered title"), FoundTitle.ToString(), FString(TEXT("Visningsnavn")));
+
+	const FText FallbackTitle = MissionSubsystem->GetMissionDisplayNameById(TEXT("UnknownMission"));
+	TestEqual(TEXT("Unknown mission should fallback to mission id text"), FallbackTitle.ToString(), FString(TEXT("UnknownMission")));
+
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FSailingEconomyRepairFlowTest,
 	"Sailing.Progression.Economy.RepairFlow",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
