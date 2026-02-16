@@ -214,6 +214,60 @@ bool FSailingMissionChainProgressionTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSailingMissionActiveMissionChangedDelegateTest,
+	"Sailing.Progression.Mission.ActiveMissionChangedDelegate",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSailingMissionActiveMissionChangedDelegateTest::RunTest(const FString& Parameters)
+{
+	UMissionSubsystem* MissionSubsystem = NewObject<UMissionSubsystem>();
+	TArray<TPair<FName, FName>> ObservedTransitions;
+	MissionSubsystem->OnActiveMissionChanged().AddLambda([&ObservedTransitions](FName PreviousMissionId, FName NewMissionId)
+	{
+		ObservedTransitions.Emplace(PreviousMissionId, NewMissionId);
+	});
+
+	MissionSubsystem->SetActiveMissionId(NAME_None);
+	MissionSubsystem->SetActiveMissionId(TEXT("Mission_A"));
+	MissionSubsystem->SetActiveMissionId(TEXT("Mission_A"));
+	MissionSubsystem->SetActiveMissionId(TEXT("Mission_B"));
+	MissionSubsystem->SetActiveMissionId(NAME_None);
+
+	TestEqual(TEXT("Setter should only broadcast on actual mission changes"), ObservedTransitions.Num(), 3);
+	TestEqual(TEXT("First setter transition previous mission should be none"), ObservedTransitions[0].Key, NAME_None);
+	TestEqual(TEXT("First setter transition new mission should be A"), ObservedTransitions[0].Value, FName(TEXT("Mission_A")));
+	TestEqual(TEXT("Second setter transition previous mission should be A"), ObservedTransitions[1].Key, FName(TEXT("Mission_A")));
+	TestEqual(TEXT("Second setter transition new mission should be B"), ObservedTransitions[1].Value, FName(TEXT("Mission_B")));
+	TestEqual(TEXT("Third setter transition previous mission should be B"), ObservedTransitions[2].Key, FName(TEXT("Mission_B")));
+	TestEqual(TEXT("Third setter transition new mission should be none"), ObservedTransitions[2].Value, NAME_None);
+
+	ObservedTransitions.Reset();
+
+	USailingMissionDataAsset* MissionA = NewObject<USailingMissionDataAsset>();
+	MissionA->MissionId = TEXT("Chain_A");
+	MissionA->MissionType = ESailingMissionType::NavigationChallenge;
+	MissionA->NextMissionId = TEXT("Chain_B");
+
+	USailingMissionDataAsset* MissionB = NewObject<USailingMissionDataAsset>();
+	MissionB->MissionId = TEXT("Chain_B");
+	MissionB->MissionType = ESailingMissionType::NavigationChallenge;
+
+	TestTrue(TEXT("Mission A registration should succeed"), MissionSubsystem->RegisterMissionAsset(MissionA));
+	TestTrue(TEXT("Mission B registration should succeed"), MissionSubsystem->RegisterMissionAsset(MissionB));
+	TestTrue(TEXT("Mission A activation should succeed"), MissionSubsystem->ActivateMissionAsset(MissionA));
+	TestEqual(TEXT("Completion should yield next mission transition"),
+		MissionSubsystem->CompleteActiveMissionByTrigger(ESailingMissionType::NavigationChallenge),
+		0);
+	TestEqual(TEXT("Active mission should transition to Chain_B"), MissionSubsystem->GetActiveMissionId(), MissionB->MissionId);
+	TestEqual(TEXT("Activate + completion should emit two transitions"), ObservedTransitions.Num(), 2);
+	TestEqual(TEXT("Activation transition previous mission should be none"), ObservedTransitions[0].Key, NAME_None);
+	TestEqual(TEXT("Activation transition new mission should be Chain_A"), ObservedTransitions[0].Value, MissionA->MissionId);
+	TestEqual(TEXT("Completion transition previous mission should be Chain_A"), ObservedTransitions[1].Key, MissionA->MissionId);
+	TestEqual(TEXT("Completion transition new mission should be Chain_B"), ObservedTransitions[1].Value, MissionB->MissionId);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FSailingMissionObjectiveMarkerConfigTest,
 	"Sailing.Progression.Mission.ObjectiveMarkerConfig",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

@@ -414,6 +414,19 @@ void ASailingGameMode::BeginPlay()
 	SpawnedOcean = GetWorld()->SpawnActor<AOceanPlaneActor>(
 		AOceanPlaneActor::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Params);
 
+	if (GI)
+	{
+		if (UMissionSubsystem* MissionSubsystem = GI->GetSubsystem<UMissionSubsystem>())
+		{
+			if (!ActiveMissionChangedHandle.IsValid())
+			{
+				ActiveMissionChangedHandle = MissionSubsystem->OnActiveMissionChanged().AddUObject(
+					this,
+					&ASailingGameMode::HandleActiveMissionChanged);
+			}
+		}
+	}
+
 	// Align objective marker with whichever mission is currently active.
 	SyncActiveMissionObjectiveMarker();
 
@@ -813,8 +826,50 @@ void ASailingGameMode::BeginPlay()
 		SaveGame ? SaveGame->TotalIslandsDiscovered : 0);
 }
 
+void ASailingGameMode::HandleActiveMissionChanged(FName PreviousMissionId, FName NewMissionId)
+{
+	UE_LOG(LogTemp, Verbose,
+		TEXT("SailingGameMode: Aktivt oppdrag endret fra '%s' til '%s'. Synkroniserer objective marker."),
+		*PreviousMissionId.ToString(),
+		*NewMissionId.ToString());
+
+	SyncActiveMissionObjectiveMarker();
+
+	if (USailingGameInstance* GI = Cast<USailingGameInstance>(GetGameInstance()))
+	{
+		if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
+		{
+			TelemetrySubsystem->RecordCounterEvent(TEXT("ActiveMissionChanged"), 1);
+			if (PreviousMissionId.IsNone() && !NewMissionId.IsNone())
+			{
+				TelemetrySubsystem->RecordCounterEvent(TEXT("ActiveMissionActivated"), 1);
+			}
+			else if (!PreviousMissionId.IsNone() && NewMissionId.IsNone())
+			{
+				TelemetrySubsystem->RecordCounterEvent(TEXT("ActiveMissionCleared"), 1);
+			}
+			else if (!PreviousMissionId.IsNone() && !NewMissionId.IsNone())
+			{
+				TelemetrySubsystem->RecordCounterEvent(TEXT("ActiveMissionSwitched"), 1);
+			}
+		}
+	}
+}
+
 void ASailingGameMode::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	if (ActiveMissionChangedHandle.IsValid())
+	{
+		if (USailingGameInstance* GI = Cast<USailingGameInstance>(GetGameInstance()))
+		{
+			if (UMissionSubsystem* MissionSubsystem = GI->GetSubsystem<UMissionSubsystem>())
+			{
+				MissionSubsystem->OnActiveMissionChanged().Remove(ActiveMissionChangedHandle);
+			}
+		}
+		ActiveMissionChangedHandle.Reset();
+	}
+
 	SaveGame_();
 	Super::EndPlay(EndPlayReason);
 }

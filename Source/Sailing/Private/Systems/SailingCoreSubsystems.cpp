@@ -121,6 +121,18 @@ void UMissionSubsystem::Deinitialize()
 	Super::Deinitialize();
 }
 
+void UMissionSubsystem::SetActiveMissionId(FName MissionId)
+{
+	if (ActiveMissionId == MissionId)
+	{
+		return;
+	}
+
+	const FName PreviousMissionId = ActiveMissionId;
+	ActiveMissionId = MissionId;
+	ActiveMissionChanged.Broadcast(PreviousMissionId, ActiveMissionId);
+}
+
 bool UMissionSubsystem::ActivateMissionAsset(const USailingMissionDataAsset* MissionData)
 {
 	if (!RegisterMissionAsset(MissionData))
@@ -133,7 +145,7 @@ bool UMissionSubsystem::ActivateMissionAsset(const USailingMissionDataAsset* Mis
 		return false;
 	}
 
-	ActiveMissionId = MissionData->MissionId;
+	SetActiveMissionId(MissionData->MissionId);
 	return true;
 }
 
@@ -319,11 +331,11 @@ int32 UMissionSubsystem::CompleteActiveMissionAtLocation(ESailingMissionType Tri
 
 	if (!ActiveMission->NextMissionId.IsNone() && RegisteredMissions.Contains(ActiveMission->NextMissionId))
 	{
-		ActiveMissionId = ActiveMission->NextMissionId;
+		SetActiveMissionId(ActiveMission->NextMissionId);
 	}
 	else
 	{
-		ActiveMissionId = NAME_None;
+		SetActiveMissionId(NAME_None);
 	}
 
 	UE_LOG(LogTemp, Log, TEXT("MissionSubsystem: Completed '%s', next='%s', reward=%d"),
@@ -360,7 +372,7 @@ bool UMissionSubsystem::ActivateFallbackMission()
 			continue;
 		}
 
-		ActiveMissionId = MissionId;
+		SetActiveMissionId(MissionId);
 		return true;
 	}
 
@@ -402,7 +414,7 @@ bool UMissionSubsystem::CycleToNextMission()
 			continue;
 		}
 
-		ActiveMissionId = CandidateId;
+		SetActiveMissionId(CandidateId);
 		return true;
 	}
 
@@ -456,7 +468,7 @@ bool UMissionSubsystem::ActivateMissionFromCandidates(const TArray<FName>& Candi
 			continue;
 		}
 
-		ActiveMissionId = CandidateId;
+		SetActiveMissionId(CandidateId);
 		return true;
 	}
 

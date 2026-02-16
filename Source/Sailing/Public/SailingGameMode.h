@@ -81,5 +81,9 @@ private:
 	UPROPERTY()
 	TObjectPtr<USaveGameSailing> SaveGame;
 
+	FDelegateHandle ActiveMissionChangedHandle;
+
+	void HandleActiveMissionChanged(FName PreviousMissionId, FName NewMissionId);
+
 	void LoadOrCreateSaveGame();
 };

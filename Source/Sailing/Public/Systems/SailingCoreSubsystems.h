@@ -9,6 +9,7 @@ class UBoatUpgradeDataAsset;
 class USailingMissionDataAsset;
 class USaveGameSailing;
 enum class ESailingMissionType : uint8;
+DECLARE_MULTICAST_DELEGATE_TwoParams(FOnActiveMissionChanged, FName, FName);
 
 /**
  * Subsystem skeleton for sailing simulation systems.
@@ -117,7 +118,9 @@ public:
 	FName GetActiveMissionId() const { return ActiveMissionId; }
 
 	UFUNCTION(BlueprintCallable, Category = "Sailing|Mission")
-	void SetActiveMissionId(FName MissionId) { ActiveMissionId = MissionId; }
+	void SetActiveMissionId(FName MissionId);
+
+	FOnActiveMissionChanged& OnActiveMissionChanged() { return ActiveMissionChanged; }
 
 	UFUNCTION(BlueprintCallable, Category = "Sailing|Mission")
 	bool ActivateMissionAsset(const USailingMissionDataAsset* MissionData);
@@ -203,6 +206,8 @@ private:
 
 	UPROPERTY(EditAnywhere, Category = "Sailing|Mission")
 	FName MissionAssetPath = TEXT("/Game");
+
+	FOnActiveMissionChanged ActiveMissionChanged;
 };
 
 UCLASS()
