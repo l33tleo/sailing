@@ -543,6 +543,27 @@ bool UPortMissionBoardWidget::CanRequestManualRefresh(
 	return true;
 }
 
+FPortMissionBoardData UPortMissionBoardWidget::BuildActionStateAnnotatedBoardData(const FPortMissionBoardData& BoardData)
+{
+	FPortMissionBoardData Result = BoardData;
+
+	for (FPortMissionOfferEntry& OfferEntry : Result.OfferedMissions)
+	{
+		FText BlockedReason;
+		OfferEntry.bSelectable = CanRequestMissionAccept(Result, OfferEntry.MissionId, BlockedReason);
+		OfferEntry.SelectionBlockedReason = BlockedReason;
+	}
+
+	for (FPortUpgradeOfferEntry& OfferEntry : Result.OfferedUpgrades)
+	{
+		FText BlockedReason;
+		OfferEntry.bPurchasable = CanRequestUpgradePurchase(Result, OfferEntry.UpgradeId, BlockedReason);
+		OfferEntry.PurchaseBlockedReason = BlockedReason;
+	}
+
+	return Result;
+}
+
 void UPortMissionBoardWidget::RequestCloseBoard()
 {
 	OnCloseRequested.Broadcast();

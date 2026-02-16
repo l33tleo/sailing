@@ -403,6 +403,9 @@ public:
 		const FPortMissionBoardData& BoardData,
 		FText& OutBlockedReason);
 
+	UFUNCTION(BlueprintPure, Category = "MissionBoard")
+	static FPortMissionBoardData BuildActionStateAnnotatedBoardData(const FPortMissionBoardData& BoardData);
+
 	UFUNCTION(BlueprintCallable, Category = "MissionBoard")
 	void RequestCloseBoard();
 

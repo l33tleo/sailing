@@ -780,6 +780,33 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 	TestEqual(TEXT("Manual refresh helper should explain unaffordable refresh"),
 		BlockedReason.ToString(),
 		FString(TEXT("Mangler kreditter til manuell oppfriskning (25).")));
+
+	FPortMissionBoardData AnnotatedBoardData;
+	AnnotatedBoardData.bSupportsMissionBoard = true;
+	AnnotatedBoardData.OfferedMissionIds = { TEXT("Mission_A") };
+	AnnotatedBoardData.CurrentMissionId = TEXT("Mission_A");
+	FPortMissionOfferEntry AnnotatedMissionEntry;
+	AnnotatedMissionEntry.MissionId = TEXT("Mission_A");
+	AnnotatedBoardData.OfferedMissions.Add(AnnotatedMissionEntry);
+
+	AnnotatedBoardData.bSupportsUpgradeService = true;
+	AnnotatedBoardData.OfferedUpgradeIds = { TEXT("Upgrade_A") };
+	AnnotatedBoardData.UpgradeAvailabilityReason = EPortUpgradeAvailabilityReason::Ready;
+	FPortUpgradeOfferEntry AnnotatedUpgradeEntry;
+	AnnotatedUpgradeEntry.UpgradeId = TEXT("Upgrade_A");
+	AnnotatedUpgradeEntry.CreditCost = 300;
+	AnnotatedUpgradeEntry.bAffordable = false;
+	AnnotatedUpgradeEntry.bUnlocked = false;
+	AnnotatedUpgradeEntry.bVisitGateSatisfied = true;
+	AnnotatedBoardData.OfferedUpgrades.Add(AnnotatedUpgradeEntry);
+
+	const FPortMissionBoardData AnnotatedResult = UPortMissionBoardWidget::BuildActionStateAnnotatedBoardData(AnnotatedBoardData);
+	TestEqual(TEXT("Annotated board should preserve mission offer count"), AnnotatedResult.OfferedMissions.Num(), 1);
+	TestFalse(TEXT("Annotated board should mark active mission as non-selectable"), AnnotatedResult.OfferedMissions[0].bSelectable);
+	TestEqual(TEXT("Annotated board should include mission blocked reason"), AnnotatedResult.OfferedMissions[0].SelectionBlockedReason.ToString(), FString(TEXT("Oppdraget er allerede aktivt.")));
+	TestEqual(TEXT("Annotated board should preserve upgrade offer count"), AnnotatedResult.OfferedUpgrades.Num(), 1);
+	TestFalse(TEXT("Annotated board should mark unaffordable upgrade as non-purchasable"), AnnotatedResult.OfferedUpgrades[0].bPurchasable);
+	TestEqual(TEXT("Annotated board should include upgrade blocked reason"), AnnotatedResult.OfferedUpgrades[0].PurchaseBlockedReason.ToString(), FString(TEXT("Ikke nok kreditter (300 kreves).")));
 	return true;
 }
 

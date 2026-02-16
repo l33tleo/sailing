@@ -18,25 +18,7 @@ namespace
 {
 void UpdateBoardOfferActionStates(FPortMissionBoardData& BoardData)
 {
-	for (FPortMissionOfferEntry& OfferEntry : BoardData.OfferedMissions)
-	{
-		FText BlockedReason;
-		OfferEntry.bSelectable = UPortMissionBoardWidget::CanRequestMissionAccept(
-			BoardData,
-			OfferEntry.MissionId,
-			BlockedReason);
-		OfferEntry.SelectionBlockedReason = BlockedReason;
-	}
-
-	for (FPortUpgradeOfferEntry& OfferEntry : BoardData.OfferedUpgrades)
-	{
-		FText BlockedReason;
-		OfferEntry.bPurchasable = UPortMissionBoardWidget::CanRequestUpgradePurchase(
-			BoardData,
-			OfferEntry.UpgradeId,
-			BlockedReason);
-		OfferEntry.PurchaseBlockedReason = BlockedReason;
-	}
+	BoardData = UPortMissionBoardWidget::BuildActionStateAnnotatedBoardData(BoardData);
 }
 }
 
