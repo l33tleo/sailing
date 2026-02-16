@@ -1042,6 +1042,26 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 	TestEqual(TEXT("Annotated board should include action summary text"),
 		AnnotatedResult.OfferActionSummaryStatus.ToString(),
 		FString(TEXT("Valgbare oppdrag: 0 (1 blokkert) | Kjøpbare oppgraderinger: 0 (1 blokkert)")));
+	TestEqual(TEXT("Annotated board should summarize mission blocked reasons"), AnnotatedResult.MissionBlockedReasonSummary.Num(), 1);
+	TestEqual(TEXT("Annotated board mission blocked summary should classify active mission reason"),
+		AnnotatedResult.MissionBlockedReasonSummary[0].BlockReason,
+		EPortMissionOfferActionBlockReason::AlreadyActiveMission);
+	TestEqual(TEXT("Annotated board mission blocked summary should count one blocked offer"),
+		AnnotatedResult.MissionBlockedReasonSummary[0].Count,
+		1);
+	TestEqual(TEXT("Annotated board mission blocked summary status should format reason"),
+		AnnotatedResult.MissionBlockedReasonSummaryStatus.ToString(),
+		FString(TEXT("Allerede aktivt: 1")));
+	TestEqual(TEXT("Annotated board should summarize upgrade blocked reasons"), AnnotatedResult.UpgradeBlockedReasonSummary.Num(), 1);
+	TestEqual(TEXT("Annotated board upgrade blocked summary should classify insufficient credits"),
+		AnnotatedResult.UpgradeBlockedReasonSummary[0].BlockReason,
+		EPortUpgradeOfferActionBlockReason::InsufficientCredits);
+	TestEqual(TEXT("Annotated board upgrade blocked summary should count one blocked offer"),
+		AnnotatedResult.UpgradeBlockedReasonSummary[0].Count,
+		1);
+	TestEqual(TEXT("Annotated board upgrade blocked summary status should format reason"),
+		AnnotatedResult.UpgradeBlockedReasonSummaryStatus.ToString(),
+		FString(TEXT("For få kreditter: 1")));
 
 	UPortMissionBoardWidget* Widget = NewObject<UPortMissionBoardWidget>();
 	TestNotNull(TEXT("Widget object should be created for annotation push test"), Widget);
@@ -1056,6 +1076,7 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 			EPortMissionOfferActionBlockReason::AlreadyActiveMission);
 		TestEqual(TEXT("PushMissionBoardData should include mission blocked reason"), LastData.OfferedMissions[0].SelectionBlockedReason.ToString(), FString(TEXT("Oppdraget er allerede aktivt.")));
 		TestEqual(TEXT("PushMissionBoardData should track blocked mission count"), LastData.BlockedMissionOfferCount, 1);
+		TestEqual(TEXT("PushMissionBoardData should include mission blocked summary count"), LastData.MissionBlockedReasonSummary.Num(), 1);
 		TestEqual(TEXT("PushMissionBoardData should preserve upgrade offer count"), LastData.OfferedUpgrades.Num(), 1);
 		TestFalse(TEXT("PushMissionBoardData should auto-annotate upgrade purchase state"), LastData.OfferedUpgrades[0].bPurchasable);
 		TestEqual(TEXT("PushMissionBoardData should include upgrade blocked reason enum"),
@@ -1063,6 +1084,7 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 			EPortUpgradeOfferActionBlockReason::InsufficientCredits);
 		TestEqual(TEXT("PushMissionBoardData should include upgrade blocked reason"), LastData.OfferedUpgrades[0].PurchaseBlockedReason.ToString(), FString(TEXT("Ikke nok kreditter (300 kreves).")));
 		TestEqual(TEXT("PushMissionBoardData should track blocked upgrade count"), LastData.BlockedUpgradeOfferCount, 1);
+		TestEqual(TEXT("PushMissionBoardData should include upgrade blocked summary count"), LastData.UpgradeBlockedReasonSummary.Num(), 1);
 		TestEqual(TEXT("PushMissionBoardData should annotate repair block reason enum"),
 			LastData.RepairActionBlockReasonType,
 			EPortRepairActionBlockReason::InsufficientCredits);
@@ -1081,6 +1103,26 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 	TestEqual(TEXT("Action summary helper should render compact counts"),
 		UPortMissionBoardWidget::BuildOfferActionSummaryStatusText(SummaryBoardData).ToString(),
 		FString(TEXT("Valgbare oppdrag: 2 (1 blokkert) | Kjøpbare oppgraderinger: 3 (2 blokkert)")));
+	TArray<FPortMissionOfferBlockReasonSummaryEntry> MissionBlockedSummaryEntries;
+	FPortMissionOfferBlockReasonSummaryEntry MissionBlockedCooldownEntry;
+	MissionBlockedCooldownEntry.BlockReason = EPortMissionOfferActionBlockReason::MissionBoardCooldown;
+	MissionBlockedCooldownEntry.Count = 2;
+	MissionBlockedCooldownEntry.Label = UPortMissionBoardWidget::BuildMissionOfferActionBlockReasonSummaryLabel(
+		MissionBlockedCooldownEntry.BlockReason);
+	MissionBlockedSummaryEntries.Add(MissionBlockedCooldownEntry);
+	TestEqual(TEXT("Mission blocked-summary helper should render compact reason counts"),
+		UPortMissionBoardWidget::BuildMissionOfferBlockedReasonSummaryStatusText(MissionBlockedSummaryEntries).ToString(),
+		FString(TEXT("Nedkjøling: 2")));
+	TArray<FPortUpgradeOfferBlockReasonSummaryEntry> UpgradeBlockedSummaryEntries;
+	FPortUpgradeOfferBlockReasonSummaryEntry UpgradeBlockedCreditsEntry;
+	UpgradeBlockedCreditsEntry.BlockReason = EPortUpgradeOfferActionBlockReason::InsufficientCredits;
+	UpgradeBlockedCreditsEntry.Count = 3;
+	UpgradeBlockedCreditsEntry.Label = UPortMissionBoardWidget::BuildUpgradeOfferActionBlockReasonSummaryLabel(
+		UpgradeBlockedCreditsEntry.BlockReason);
+	UpgradeBlockedSummaryEntries.Add(UpgradeBlockedCreditsEntry);
+	TestEqual(TEXT("Upgrade blocked-summary helper should render compact reason counts"),
+		UPortMissionBoardWidget::BuildUpgradeOfferBlockedReasonSummaryStatusText(UpgradeBlockedSummaryEntries).ToString(),
+		FString(TEXT("For få kreditter: 3")));
 
 	FPortMissionBoardData MissionOnlySummaryData;
 	MissionOnlySummaryData.bSupportsMissionBoard = true;

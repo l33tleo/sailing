@@ -14,6 +14,93 @@
 #include "Engine/Font.h"
 #include "Kismet/GameplayStatics.h"
 
+namespace
+{
+void RecordMissionOfferBlockedReasonSummaryTelemetry(UTelemetrySubsystem* TelemetrySubsystem, const FPortMissionBoardData& BoardData)
+{
+	if (!TelemetrySubsystem)
+	{
+		return;
+	}
+
+	for (const FPortMissionOfferBlockReasonSummaryEntry& SummaryEntry : BoardData.MissionBlockedReasonSummary)
+	{
+		const int32 SafeCount = FMath::Max(0, SummaryEntry.Count);
+		if (SafeCount <= 0)
+		{
+			continue;
+		}
+
+		switch (SummaryEntry.BlockReason)
+		{
+		case EPortMissionOfferActionBlockReason::MissionBoardDisabled:
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardBlockedMissionReason_BoardDisabled"), SafeCount);
+			break;
+		case EPortMissionOfferActionBlockReason::MissionBoardCooldown:
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardBlockedMissionReason_Cooldown"), SafeCount);
+			break;
+		case EPortMissionOfferActionBlockReason::NotOfferedAtPort:
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardBlockedMissionReason_NotOffered"), SafeCount);
+			break;
+		case EPortMissionOfferActionBlockReason::AlreadyActiveMission:
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardBlockedMissionReason_AlreadyActive"), SafeCount);
+			break;
+		case EPortMissionOfferActionBlockReason::InvalidMission:
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardBlockedMissionReason_InvalidMission"), SafeCount);
+			break;
+		case EPortMissionOfferActionBlockReason::None:
+		default:
+			break;
+		}
+	}
+}
+
+void RecordUpgradeOfferBlockedReasonSummaryTelemetry(UTelemetrySubsystem* TelemetrySubsystem, const FPortMissionBoardData& BoardData)
+{
+	if (!TelemetrySubsystem)
+	{
+		return;
+	}
+
+	for (const FPortUpgradeOfferBlockReasonSummaryEntry& SummaryEntry : BoardData.UpgradeBlockedReasonSummary)
+	{
+		const int32 SafeCount = FMath::Max(0, SummaryEntry.Count);
+		if (SafeCount <= 0)
+		{
+			continue;
+		}
+
+		switch (SummaryEntry.BlockReason)
+		{
+		case EPortUpgradeOfferActionBlockReason::UpgradeServiceDisabled:
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardBlockedUpgradeReason_ServiceDisabled"), SafeCount);
+			break;
+		case EPortUpgradeOfferActionBlockReason::NotOfferedAtPort:
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardBlockedUpgradeReason_NotOffered"), SafeCount);
+			break;
+		case EPortUpgradeOfferActionBlockReason::AlreadyUnlocked:
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardBlockedUpgradeReason_AlreadyUnlocked"), SafeCount);
+			break;
+		case EPortUpgradeOfferActionBlockReason::VisitRequirementNotMet:
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardBlockedUpgradeReason_VisitGate"), SafeCount);
+			break;
+		case EPortUpgradeOfferActionBlockReason::InsufficientCredits:
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardBlockedUpgradeReason_NoCredits"), SafeCount);
+			break;
+		case EPortUpgradeOfferActionBlockReason::UpgradeAvailabilityBlocked:
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardBlockedUpgradeReason_Availability"), SafeCount);
+			break;
+		case EPortUpgradeOfferActionBlockReason::InvalidUpgrade:
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardBlockedUpgradeReason_InvalidUpgrade"), SafeCount);
+			break;
+		case EPortUpgradeOfferActionBlockReason::None:
+		default:
+			break;
+		}
+	}
+}
+}
+
 void ASailingHUD::BeginPlay()
 {
 	Super::BeginPlay();
@@ -345,6 +432,8 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 			default:
 				break;
 			}
+			RecordMissionOfferBlockedReasonSummaryTelemetry(TelemetrySubsystem, LastMissionBoardData);
+			RecordUpgradeOfferBlockedReasonSummaryTelemetry(TelemetrySubsystem, LastMissionBoardData);
 		}
 	}
 
@@ -854,6 +943,8 @@ void ASailingHUD::RefreshCurrentMissionBoard()
 			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastPrimaryActionHint"), static_cast<int32>(LastMissionBoardData.PrimaryActionHint));
 			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastRepairActionBlockReason"), static_cast<int32>(LastMissionBoardData.RepairActionBlockReasonType));
 			TelemetrySubsystem->SetCounterValue(TEXT("MissionBoardLastManualRefreshActionBlockReason"), static_cast<int32>(LastMissionBoardData.ManualRefreshActionBlockReasonType));
+			RecordMissionOfferBlockedReasonSummaryTelemetry(TelemetrySubsystem, LastMissionBoardData);
+			RecordUpgradeOfferBlockedReasonSummaryTelemetry(TelemetrySubsystem, LastMissionBoardData);
 		}
 	}
 

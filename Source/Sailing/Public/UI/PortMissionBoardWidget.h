@@ -176,6 +176,21 @@ struct SAILING_API FPortMissionOfferEntry
 };
 
 USTRUCT(BlueprintType)
+struct SAILING_API FPortMissionOfferBlockReasonSummaryEntry
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	EPortMissionOfferActionBlockReason BlockReason = EPortMissionOfferActionBlockReason::None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	int32 Count = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	FText Label;
+};
+
+USTRUCT(BlueprintType)
 struct SAILING_API FPortUpgradeOfferEntry
 {
 	GENERATED_BODY()
@@ -218,6 +233,21 @@ struct SAILING_API FPortUpgradeOfferEntry
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
 	FText PurchaseBlockedReason;
+};
+
+USTRUCT(BlueprintType)
+struct SAILING_API FPortUpgradeOfferBlockReasonSummaryEntry
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	EPortUpgradeOfferActionBlockReason BlockReason = EPortUpgradeOfferActionBlockReason::None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	int32 Count = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	FText Label;
 };
 
 USTRUCT(BlueprintType)
@@ -313,6 +343,12 @@ struct SAILING_API FPortMissionBoardData
 	int32 BlockedMissionOfferCount = 0;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	TArray<FPortMissionOfferBlockReasonSummaryEntry> MissionBlockedReasonSummary;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	FText MissionBlockedReasonSummaryStatus;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
 	bool bHasSelectableMissionOffers = false;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
@@ -320,6 +356,12 @@ struct SAILING_API FPortMissionBoardData
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
 	int32 BlockedUpgradeOfferCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	TArray<FPortUpgradeOfferBlockReasonSummaryEntry> UpgradeBlockedReasonSummary;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	FText UpgradeBlockedReasonSummaryStatus;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
 	bool bHasPurchasableUpgradeOffers = false;
@@ -525,6 +567,10 @@ public:
 		const FPortMissionBoardData& BoardData,
 		FName RequestedMissionId);
 
+	UFUNCTION(BlueprintPure, Category = "MissionBoard")
+	static FText BuildMissionOfferActionBlockReasonSummaryLabel(
+		EPortMissionOfferActionBlockReason BlockReason);
+
 	UFUNCTION(BlueprintPure, Category = "MissionBoard|Service")
 	static bool CanRequestUpgradePurchase(
 		const FPortMissionBoardData& BoardData,
@@ -541,6 +587,10 @@ public:
 		EPortUpgradeOfferActionBlockReason BlockReason,
 		const FPortMissionBoardData& BoardData,
 		FName RequestedUpgradeId);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard|Service")
+	static FText BuildUpgradeOfferActionBlockReasonSummaryLabel(
+		EPortUpgradeOfferActionBlockReason BlockReason);
 
 	UFUNCTION(BlueprintPure, Category = "MissionBoard|Service")
 	static bool CanRequestRepairService(
@@ -572,6 +622,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "MissionBoard")
 	static FPortMissionBoardData BuildActionStateAnnotatedBoardData(const FPortMissionBoardData& BoardData);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard")
+	static FText BuildMissionOfferBlockedReasonSummaryStatusText(const TArray<FPortMissionOfferBlockReasonSummaryEntry>& SummaryEntries);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard|Service")
+	static FText BuildUpgradeOfferBlockedReasonSummaryStatusText(const TArray<FPortUpgradeOfferBlockReasonSummaryEntry>& SummaryEntries);
 
 	UFUNCTION(BlueprintPure, Category = "MissionBoard")
 	static FText BuildOfferActionSummaryStatusText(const FPortMissionBoardData& BoardData);
