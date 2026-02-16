@@ -14,11 +14,13 @@ import {
   Bell,
   CandlestickChart,
   Layers,
+  SlidersHorizontal,
 } from "lucide-react";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/aksjer", label: "Aksjer", icon: Search },
+  { href: "/screener", label: "Screener", icon: SlidersHorizontal },
   { href: "/anbefalinger", label: "Anbefalinger", icon: TrendingUp },
   { href: "/sammenligning", label: "Sammenligning", icon: GitCompareArrows },
   { href: "/sektorer", label: "Sektorer", icon: Layers },

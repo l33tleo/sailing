@@ -520,3 +520,41 @@ export interface SectorData {
 export async function getSectors(): Promise<{ sectors: SectorData[] }> {
   return fetchAPI("/sectors");
 }
+
+// --- Screener endpoints ---
+
+export interface ScreenerStock {
+  ticker: string;
+  name: string;
+  price: number;
+  change_percent: number;
+  currency: string | null;
+  market_cap: number | null;
+  pe_ratio: number | null;
+  forward_pe: number | null;
+  dividend_yield: number | null;
+  debt_to_equity: number | null;
+  revenue_growth: number | null;
+  roe: number | null;
+  beta: number | null;
+  market: string;
+}
+
+export async function screenStocks(params: {
+  market?: string;
+  min_pe?: number;
+  max_pe?: number;
+  min_dividend?: number;
+  max_debt?: number;
+  min_market_cap?: number;
+}): Promise<ScreenerStock[]> {
+  const searchParams = new URLSearchParams();
+  if (params.market) searchParams.set("market", params.market);
+  if (params.min_pe != null) searchParams.set("min_pe", String(params.min_pe));
+  if (params.max_pe != null) searchParams.set("max_pe", String(params.max_pe));
+  if (params.min_dividend != null) searchParams.set("min_dividend", String(params.min_dividend));
+  if (params.max_debt != null) searchParams.set("max_debt", String(params.max_debt));
+  if (params.min_market_cap != null) searchParams.set("min_market_cap", String(params.min_market_cap));
+  const qs = searchParams.toString();
+  return fetchAPI(`/screener${qs ? `?${qs}` : ""}`);
+}
