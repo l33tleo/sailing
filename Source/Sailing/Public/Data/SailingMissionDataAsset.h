@@ -47,5 +47,11 @@ public:
 	FVector EndWorldLocation = FVector::ZeroVector;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mission")
+	bool bRequireLocationMatch = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mission", meta = (ClampMin = "50"))
+	float CompletionRadius = 800.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Mission")
 	bool bRepeatable = true;
 };

@@ -92,7 +92,19 @@ public:
 	bool RegisterMissionAsset(const USailingMissionDataAsset* MissionData);
 
 	UFUNCTION(BlueprintCallable, Category = "Sailing|Mission")
+	int32 ReloadMissionAssets();
+
+	UFUNCTION(BlueprintPure, Category = "Sailing|Mission")
+	TArray<FName> GetRegisteredMissionIds() const;
+
+	UFUNCTION(BlueprintPure, Category = "Sailing|Mission")
+	const USailingMissionDataAsset* GetActiveMissionAsset() const;
+
+	UFUNCTION(BlueprintCallable, Category = "Sailing|Mission")
 	int32 CompleteActiveMissionByTrigger(ESailingMissionType TriggerType);
+
+	UFUNCTION(BlueprintCallable, Category = "Sailing|Mission")
+	int32 CompleteActiveMissionAtLocation(ESailingMissionType TriggerType, const FVector& CompletionLocation);
 
 private:
 	UPROPERTY()
@@ -103,6 +115,9 @@ private:
 
 	UPROPERTY()
 	TSet<FName> CompletedMissionIds;
+
+	UPROPERTY(EditAnywhere, Category = "Sailing|Mission")
+	FName MissionAssetPath = TEXT("/Game");
 };
 
 UCLASS()

@@ -2,6 +2,8 @@
 #include "Data/BoatUpgradeDataAsset.h"
 #include "Data/SailingMissionDataAsset.h"
 #include "SaveGameSailing.h"
+#include "AssetRegistry/AssetRegistryModule.h"
+#include "Modules/ModuleManager.h"
 
 void USailingSimulationSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -49,6 +51,7 @@ void UWorldStreamingSubsystem::Deinitialize()
 void UMissionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
+	ReloadMissionAssets();
 	UE_LOG(LogTemp, Log, TEXT("MissionSubsystem initialized."));
 }
 
@@ -80,7 +83,62 @@ bool UMissionSubsystem::RegisterMissionAsset(const USailingMissionDataAsset* Mis
 	return true;
 }
 
+int32 UMissionSubsystem::ReloadMissionAssets()
+{
+	RegisteredMissions.Empty();
+
+	const FName ScanPath = MissionAssetPath.IsNone() ? FName(TEXT("/Game")) : MissionAssetPath;
+
+	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry"));
+	FARFilter Filter;
+	Filter.PackagePaths.Add(ScanPath);
+	Filter.ClassPaths.Add(USailingMissionDataAsset::StaticClass()->GetClassPathName());
+	Filter.bRecursivePaths = true;
+
+	TArray<FAssetData> MissionAssets;
+	AssetRegistryModule.Get().GetAssets(Filter, MissionAssets);
+
+	int32 RegisteredCount = 0;
+	for (const FAssetData& AssetData : MissionAssets)
+	{
+		if (const USailingMissionDataAsset* MissionData = Cast<USailingMissionDataAsset>(AssetData.GetAsset()))
+		{
+			RegisteredCount += RegisterMissionAsset(MissionData) ? 1 : 0;
+		}
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("MissionSubsystem: Registered %d mission assets from %s"), RegisteredCount, *ScanPath.ToString());
+	return RegisteredCount;
+}
+
+TArray<FName> UMissionSubsystem::GetRegisteredMissionIds() const
+{
+	TArray<FName> MissionIds;
+	RegisteredMissions.GenerateKeyArray(MissionIds);
+	MissionIds.Sort(FNameLexicalLess());
+	return MissionIds;
+}
+
+const USailingMissionDataAsset* UMissionSubsystem::GetActiveMissionAsset() const
+{
+	if (ActiveMissionId.IsNone())
+	{
+		return nullptr;
+	}
+
+	if (const TObjectPtr<USailingMissionDataAsset>* MissionPtr = RegisteredMissions.Find(ActiveMissionId))
+	{
+		return MissionPtr ? MissionPtr->Get() : nullptr;
+	}
+	return nullptr;
+}
+
 int32 UMissionSubsystem::CompleteActiveMissionByTrigger(ESailingMissionType TriggerType)
+{
+	return CompleteActiveMissionAtLocation(TriggerType, FVector::ZeroVector);
+}
+
+int32 UMissionSubsystem::CompleteActiveMissionAtLocation(ESailingMissionType TriggerType, const FVector& CompletionLocation)
 {
 	if (ActiveMissionId.IsNone())
 	{
@@ -97,6 +155,16 @@ int32 UMissionSubsystem::CompleteActiveMissionByTrigger(ESailingMissionType Trig
 	if (!ActiveMission || ActiveMission->MissionType != TriggerType)
 	{
 		return 0;
+	}
+
+	if (ActiveMission->bRequireLocationMatch)
+	{
+		const float AllowedRadius = FMath::Max(50.0f, ActiveMission->CompletionRadius);
+		const float DistSq = FVector::DistSquared(ActiveMission->EndWorldLocation, CompletionLocation);
+		if (DistSq > FMath::Square(AllowedRadius))
+		{
+			return 0;
+		}
 	}
 
 	const int32 RewardCredits = FMath::Max(0, ActiveMission->RewardCredits);

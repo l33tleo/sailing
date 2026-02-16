@@ -11,6 +11,7 @@ public class Sailing : ModuleRules
 			"InputCore",
 			"EnhancedInput",
 			"ProceduralMeshComponent",
+			"AssetRegistry",
 			"UMG",
 			"Slate",
 			"SlateCore"
