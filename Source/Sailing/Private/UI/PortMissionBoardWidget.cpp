@@ -82,6 +82,93 @@ FText UPortMissionBoardWidget::BuildUpgradePricingStatusText(
 	return FText::FromString(FString::Printf(TEXT("Havnepåslag: x%.2f"), SafeMultiplier));
 }
 
+EPortMissionAvailabilityReason UPortMissionBoardWidget::DetermineMissionAvailabilityReason(
+	bool bSupportsMissionBoard,
+	bool bMissionBoardOnCooldown,
+	bool bHasAnyOffers)
+{
+	if (!bSupportsMissionBoard)
+	{
+		return EPortMissionAvailabilityReason::MissionBoardDisabled;
+	}
+
+	if (bMissionBoardOnCooldown)
+	{
+		return EPortMissionAvailabilityReason::CooldownActive;
+	}
+
+	if (!bHasAnyOffers)
+	{
+		return EPortMissionAvailabilityReason::NoOffers;
+	}
+
+	return EPortMissionAvailabilityReason::Ready;
+}
+
+FText UPortMissionBoardWidget::BuildMissionAvailabilityStatusText(
+	EPortMissionAvailabilityReason Reason,
+	float CooldownRemainingSeconds,
+	bool bSupportsUpgradeService)
+{
+	switch (Reason)
+	{
+	case EPortMissionAvailabilityReason::MissionBoardDisabled:
+		return bSupportsUpgradeService
+			? FText::FromString(TEXT("Oppdragstavlen er stengt, men havneservice er tilgjengelig."))
+			: FText::FromString(TEXT("Ingen tavletjenester tilgjengelig i denne havnen."));
+	case EPortMissionAvailabilityReason::CooldownActive:
+		return FText::FromString(FString::Printf(TEXT("Tavlen oppdateres om %.0f sekunder"), FMath::Max(0.0f, CooldownRemainingSeconds)));
+	case EPortMissionAvailabilityReason::NoOffers:
+		return bSupportsUpgradeService
+			? FText::FromString(TEXT("Ingen tilgjengelige oppdrag – bruk havneservice nedenfor."))
+			: FText::FromString(TEXT("Ingen tilgjengelige oppdrag i denne havnen."));
+	case EPortMissionAvailabilityReason::Ready:
+	default:
+		return FText::FromString(TEXT("Velg et oppdrag fra havnetavlen."));
+	}
+}
+
+EPortUpgradeAvailabilityReason UPortMissionBoardWidget::DetermineUpgradeAvailabilityReason(
+	bool bSupportsUpgradeService,
+	int32 ValidUpgradeOfferCount,
+	int32 AffordableUpgradeOfferCount)
+{
+	if (!bSupportsUpgradeService)
+	{
+		return EPortUpgradeAvailabilityReason::ServiceUnavailable;
+	}
+
+	if (ValidUpgradeOfferCount <= 0)
+	{
+		return EPortUpgradeAvailabilityReason::NoValidOffers;
+	}
+
+	if (AffordableUpgradeOfferCount <= 0)
+	{
+		return EPortUpgradeAvailabilityReason::NoAffordableOffers;
+	}
+
+	return EPortUpgradeAvailabilityReason::Ready;
+}
+
+FText UPortMissionBoardWidget::BuildUpgradeAvailabilityStatusText(
+	EPortUpgradeAvailabilityReason Reason,
+	int32 AffordableUpgradeOfferCount)
+{
+	switch (Reason)
+	{
+	case EPortUpgradeAvailabilityReason::ServiceUnavailable:
+		return FText::FromString(TEXT("Ingen oppgraderingsservice i denne havnen."));
+	case EPortUpgradeAvailabilityReason::NoValidOffers:
+		return FText::FromString(TEXT("Ingen gyldige oppgraderinger konfigurert for havnen."));
+	case EPortUpgradeAvailabilityReason::NoAffordableOffers:
+		return FText::FromString(TEXT("Ingen oppgraderinger kan kjøpes akkurat nå."));
+	case EPortUpgradeAvailabilityReason::Ready:
+	default:
+		return FText::FromString(FString::Printf(TEXT("%d oppgradering(er) kan kjøpes nå."), FMath::Max(0, AffordableUpgradeOfferCount)));
+	}
+}
+
 void UPortMissionBoardWidget::RequestCloseBoard()
 {
 	OnCloseRequested.Broadcast();

@@ -10,6 +10,24 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPortMissionBoardCloseRequested);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPortRepairRequested);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPortUpgradePurchaseRequested, FName, UpgradeId);
 
+UENUM(BlueprintType)
+enum class EPortMissionAvailabilityReason : uint8
+{
+	Ready,
+	MissionBoardDisabled,
+	CooldownActive,
+	NoOffers
+};
+
+UENUM(BlueprintType)
+enum class EPortUpgradeAvailabilityReason : uint8
+{
+	Ready,
+	ServiceUnavailable,
+	NoValidOffers,
+	NoAffordableOffers
+};
+
 USTRUCT(BlueprintType)
 struct SAILING_API FPortMissionOfferEntry
 {
@@ -94,6 +112,9 @@ struct SAILING_API FPortMissionBoardData
 	FText AvailabilityStatus;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	EPortMissionAvailabilityReason AvailabilityReason = EPortMissionAvailabilityReason::Ready;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
 	int32 PortVisitCount = 0;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
@@ -119,6 +140,9 @@ struct SAILING_API FPortMissionBoardData
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
 	FText UpgradeStatus;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	EPortUpgradeAvailabilityReason UpgradeAvailabilityReason = EPortUpgradeAvailabilityReason::ServiceUnavailable;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
 	float UpgradeCostMultiplier = 1.0f;
@@ -177,6 +201,29 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "MissionBoard|Service")
 	static FText BuildUpgradePricingStatusText(bool bSupportsUpgradeService, float UpgradeCostMultiplier);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard")
+	static EPortMissionAvailabilityReason DetermineMissionAvailabilityReason(
+		bool bSupportsMissionBoard,
+		bool bMissionBoardOnCooldown,
+		bool bHasAnyOffers);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard")
+	static FText BuildMissionAvailabilityStatusText(
+		EPortMissionAvailabilityReason Reason,
+		float CooldownRemainingSeconds,
+		bool bSupportsUpgradeService);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard|Service")
+	static EPortUpgradeAvailabilityReason DetermineUpgradeAvailabilityReason(
+		bool bSupportsUpgradeService,
+		int32 ValidUpgradeOfferCount,
+		int32 AffordableUpgradeOfferCount);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard|Service")
+	static FText BuildUpgradeAvailabilityStatusText(
+		EPortUpgradeAvailabilityReason Reason,
+		int32 AffordableUpgradeOfferCount);
 
 	UFUNCTION(BlueprintCallable, Category = "MissionBoard")
 	void RequestCloseBoard();

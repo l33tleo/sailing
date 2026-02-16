@@ -99,26 +99,10 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 	Data.bAwaitingUpgradePurchaseConfirmation = false;
 	Data.PendingUpgradePurchaseId = NAME_None;
 	Data.UpgradePurchaseConfirmationStatus = FText::GetEmpty();
-	if (!Data.bSupportsMissionBoard)
-	{
-		Data.AvailabilityStatus = Data.bSupportsUpgradeService
-			? FText::FromString(TEXT("Oppdragstavlen er stengt, men havneservice er tilgjengelig."))
-			: FText::FromString(TEXT("Ingen tavletjenester tilgjengelig i denne havnen."));
-	}
-	else if (Data.bMissionBoardOnCooldown)
-	{
-		Data.AvailabilityStatus = FText::FromString(FString::Printf(TEXT("Tavlen oppdateres om %.0f sekunder"), Data.CooldownRemainingSeconds));
-	}
-	else if (!Data.bHasAnyOffers)
-	{
-		Data.AvailabilityStatus = Data.bSupportsUpgradeService
-			? FText::FromString(TEXT("Ingen tilgjengelige oppdrag – bruk havneservice nedenfor."))
-			: FText::FromString(TEXT("Ingen tilgjengelige oppdrag i denne havnen."));
-	}
-	else
-	{
-		Data.AvailabilityStatus = FText::FromString(TEXT("Velg et oppdrag fra havnetavlen."));
-	}
+	Data.AvailabilityReason = UPortMissionBoardWidget::DetermineMissionAvailabilityReason(
+		Data.bSupportsMissionBoard, Data.bMissionBoardOnCooldown, Data.bHasAnyOffers);
+	Data.AvailabilityStatus = UPortMissionBoardWidget::BuildMissionAvailabilityStatusText(
+		Data.AvailabilityReason, Data.CooldownRemainingSeconds, Data.bSupportsUpgradeService);
 	if (UGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance() : nullptr)
 	{
 		if (UEconomySubsystem* EconomySubsystem = GI->GetSubsystem<UEconomySubsystem>())
@@ -149,6 +133,7 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 			if (Data.bSupportsUpgradeService)
 			{
 				int32 AffordableUpgradeCount = 0;
+				int32 ValidUpgradeOfferCount = 0;
 				const float SafeUpgradeCostMultiplier = FMath::Max(0.1f, UpgradeCostMultiplier);
 				for (const FName& UpgradeId : OfferedUpgradeIds)
 				{
@@ -175,6 +160,7 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 						}
 						OfferEntry.bVisitGateSatisfied = Data.PortVisitCount >= OfferEntry.MinPortVisits;
 						Data.OfferedUpgrades.Add(OfferEntry);
+						ValidUpgradeOfferCount++;
 
 						if (!OfferEntry.bUnlocked && OfferEntry.bAffordable)
 						{
@@ -182,19 +168,17 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 						}
 					}
 				}
-
-				if (Data.OfferedUpgrades.Num() == 0)
-				{
-					Data.UpgradeStatus = FText::FromString(TEXT("Ingen gyldige oppgraderinger konfigurert for havnen."));
-				}
-				else if (AffordableUpgradeCount > 0)
-				{
-					Data.UpgradeStatus = FText::FromString(FString::Printf(TEXT("%d oppgradering(er) kan kjøpes nå."), AffordableUpgradeCount));
-				}
-				else
-				{
-					Data.UpgradeStatus = FText::FromString(TEXT("Ingen oppgraderinger kan kjøpes akkurat nå."));
-				}
+				Data.UpgradeAvailabilityReason = UPortMissionBoardWidget::DetermineUpgradeAvailabilityReason(
+					Data.bSupportsUpgradeService, ValidUpgradeOfferCount, AffordableUpgradeCount);
+				Data.UpgradeStatus = UPortMissionBoardWidget::BuildUpgradeAvailabilityStatusText(
+					Data.UpgradeAvailabilityReason, AffordableUpgradeCount);
+			}
+			else
+			{
+				Data.UpgradeAvailabilityReason = UPortMissionBoardWidget::DetermineUpgradeAvailabilityReason(
+					Data.bSupportsUpgradeService, 0, 0);
+				Data.UpgradeStatus = UPortMissionBoardWidget::BuildUpgradeAvailabilityStatusText(
+					Data.UpgradeAvailabilityReason, 0);
 			}
 		}
 

@@ -480,6 +480,38 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 	TestEqual(TEXT("Pricing helper should return surcharge label when multiplier above 1"),
 		UPortMissionBoardWidget::BuildUpgradePricingStatusText(true, 1.1f).ToString(),
 		FString(TEXT("Havnepåslag: x1.10")));
+	TestEqual(TEXT("Mission availability reason should mark disabled board"),
+		UPortMissionBoardWidget::DetermineMissionAvailabilityReason(false, false, true),
+		EPortMissionAvailabilityReason::MissionBoardDisabled);
+	TestEqual(TEXT("Mission availability reason should mark cooldown"),
+		UPortMissionBoardWidget::DetermineMissionAvailabilityReason(true, true, true),
+		EPortMissionAvailabilityReason::CooldownActive);
+	TestEqual(TEXT("Mission availability reason should mark no offers"),
+		UPortMissionBoardWidget::DetermineMissionAvailabilityReason(true, false, false),
+		EPortMissionAvailabilityReason::NoOffers);
+	TestEqual(TEXT("Mission availability reason should mark ready"),
+		UPortMissionBoardWidget::DetermineMissionAvailabilityReason(true, false, true),
+		EPortMissionAvailabilityReason::Ready);
+	TestEqual(TEXT("Mission availability text should expose cooldown seconds"),
+		UPortMissionBoardWidget::BuildMissionAvailabilityStatusText(
+			EPortMissionAvailabilityReason::CooldownActive, 7.2f, false).ToString(),
+		FString(TEXT("Tavlen oppdateres om 7 sekunder")));
+	TestEqual(TEXT("Upgrade availability reason should mark service unavailable"),
+		UPortMissionBoardWidget::DetermineUpgradeAvailabilityReason(false, 2, 2),
+		EPortUpgradeAvailabilityReason::ServiceUnavailable);
+	TestEqual(TEXT("Upgrade availability reason should mark no valid offers"),
+		UPortMissionBoardWidget::DetermineUpgradeAvailabilityReason(true, 0, 0),
+		EPortUpgradeAvailabilityReason::NoValidOffers);
+	TestEqual(TEXT("Upgrade availability reason should mark no affordable offers"),
+		UPortMissionBoardWidget::DetermineUpgradeAvailabilityReason(true, 2, 0),
+		EPortUpgradeAvailabilityReason::NoAffordableOffers);
+	TestEqual(TEXT("Upgrade availability reason should mark ready"),
+		UPortMissionBoardWidget::DetermineUpgradeAvailabilityReason(true, 2, 1),
+		EPortUpgradeAvailabilityReason::Ready);
+	TestEqual(TEXT("Upgrade availability text should include affordable count"),
+		UPortMissionBoardWidget::BuildUpgradeAvailabilityStatusText(
+			EPortUpgradeAvailabilityReason::Ready, 3).ToString(),
+		FString(TEXT("3 oppgradering(er) kan kjøpes nå.")));
 	return true;
 }
 
