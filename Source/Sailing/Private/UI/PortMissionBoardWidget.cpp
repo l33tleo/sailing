@@ -16,6 +16,19 @@ void UPortMissionBoardWidget::RequestAcceptMission(FName MissionId)
 	OnAcceptMissionRequested.Broadcast(MissionId);
 }
 
+bool UPortMissionBoardWidget::RequiresMissionSwitchConfirmation(
+	FName CurrentMissionId,
+	FName RequestedMissionId,
+	FName PendingConfirmationMissionId)
+{
+	if (RequestedMissionId.IsNone() || CurrentMissionId.IsNone() || CurrentMissionId == RequestedMissionId)
+	{
+		return false;
+	}
+
+	return PendingConfirmationMissionId != RequestedMissionId;
+}
+
 void UPortMissionBoardWidget::RequestCloseBoard()
 {
 	OnCloseRequested.Broadcast();

@@ -74,6 +74,9 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 	Data.CurrentMissionId = CurrentMissionId;
 	Data.bMissionBoardOnCooldown = bMissionBoardOnCooldown;
 	Data.CooldownRemainingSeconds = FMath::Max(0.0f, CooldownRemainingSeconds);
+	Data.bAwaitingMissionSwitchConfirmation = false;
+	Data.PendingMissionSwitchId = NAME_None;
+	Data.MissionSwitchConfirmationStatus = FText::GetEmpty();
 	if (Data.bMissionBoardOnCooldown)
 	{
 		Data.AvailabilityStatus = FText::FromString(FString::Printf(TEXT("Tavlen oppdateres om %.0f sekunder"), Data.CooldownRemainingSeconds));
@@ -127,7 +130,8 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 			Data.RecentSelections = MissionSubsystem->GetRecentMissionBoardSelectionsForPort(PortId, 5);
 		}
 	}
-	PortMissionBoardWidget->PushMissionBoardData(Data);
+	LastMissionBoardData = Data;
+	PortMissionBoardWidget->PushMissionBoardData(LastMissionBoardData);
 	PortMissionBoardWidget->SetVisibility(ESlateVisibility::Visible);
 
 	LastMissionBoardPortId = PortId;
@@ -171,6 +175,46 @@ bool ASailingHUD::AcceptMissionFromBoard(FName MissionId)
 		return false;
 	}
 
+	const FName CurrentMissionId = MissionSubsystem->GetActiveMissionId();
+	if (!CurrentMissionId.IsNone() && CurrentMissionId == MissionId)
+	{
+		ShowDiscoveryPopup(FString::Printf(TEXT("Oppdraget '%s' er allerede aktivt."), *MissionId.ToString()));
+		CloseMissionBoard();
+		return true;
+	}
+
+	const bool bRequiresSwitchConfirmation = UPortMissionBoardWidget::RequiresMissionSwitchConfirmation(
+		CurrentMissionId, MissionId, LastMissionBoardData.PendingMissionSwitchId);
+	if (bRequiresSwitchConfirmation)
+	{
+		FText RequestedMissionTitle = FText::FromName(MissionId);
+		for (const FPortMissionOfferEntry& OfferEntry : LastMissionBoardData.OfferedMissions)
+		{
+			if (OfferEntry.MissionId == MissionId && !OfferEntry.MissionTitle.IsEmpty())
+			{
+				RequestedMissionTitle = OfferEntry.MissionTitle;
+				break;
+			}
+		}
+
+		LastMissionBoardData.bAwaitingMissionSwitchConfirmation = true;
+		LastMissionBoardData.PendingMissionSwitchId = MissionId;
+		LastMissionBoardData.MissionSwitchConfirmationStatus = FText::FromString(
+			FString::Printf(TEXT("Bekreft bytte til '%s' ved å trykke oppdraget igjen."), *RequestedMissionTitle.ToString()));
+		LastMissionBoardData.AvailabilityStatus = LastMissionBoardData.MissionSwitchConfirmationStatus;
+		if (PortMissionBoardWidget)
+		{
+			PortMissionBoardWidget->PushMissionBoardData(LastMissionBoardData);
+		}
+
+		ShowDiscoveryPopup(FString::Printf(TEXT("Bekreft bytte til oppdrag: %s"), *RequestedMissionTitle.ToString()));
+		return false;
+	}
+
+	LastMissionBoardData.bAwaitingMissionSwitchConfirmation = false;
+	LastMissionBoardData.PendingMissionSwitchId = NAME_None;
+	LastMissionBoardData.MissionSwitchConfirmationStatus = FText::GetEmpty();
+
 	const bool bActivated = MissionSubsystem->ActivateMissionFromCandidates({ MissionId }, false);
 	if (bActivated)
 	{
@@ -186,6 +230,10 @@ bool ASailingHUD::AcceptMissionFromBoard(FName MissionId)
 			GM->SaveGame_();
 		}
 		CloseMissionBoard();
+	}
+	else if (PortMissionBoardWidget)
+	{
+		PortMissionBoardWidget->PushMissionBoardData(LastMissionBoardData);
 	}
 	return bActivated;
 }
@@ -251,6 +299,7 @@ void ASailingHUD::CloseMissionBoard()
 	LastMissionBoardCooldownRemainingSeconds = 0.0f;
 	bLastMissionBoardAutoRepairAtPort = true;
 	LastMissionBoardRepairCostPerPercentPoint = 1;
+	LastMissionBoardData = FPortMissionBoardData();
 }
 
 void ASailingHUD::HidePortMissionBoard()

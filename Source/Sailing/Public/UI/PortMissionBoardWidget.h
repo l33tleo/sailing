@@ -56,6 +56,15 @@ struct SAILING_API FPortMissionBoardData
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
 	FText AvailabilityStatus;
 
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	bool bAwaitingMissionSwitchConfirmation = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	FName PendingMissionSwitchId = NAME_None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	FText MissionSwitchConfirmationStatus;
+
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
 	bool bSupportsRepairService = false;
 
@@ -86,6 +95,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "MissionBoard")
 	void RequestAcceptMission(FName MissionId);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard")
+	static bool RequiresMissionSwitchConfirmation(FName CurrentMissionId, FName RequestedMissionId, FName PendingConfirmationMissionId);
 
 	UFUNCTION(BlueprintCallable, Category = "MissionBoard")
 	void RequestCloseBoard();

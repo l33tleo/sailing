@@ -6,6 +6,7 @@
 #include "Data/BoatUpgradeDataAsset.h"
 #include "Data/PortDataAsset.h"
 #include "Data/SailingMissionDataAsset.h"
+#include "UI/PortMissionBoardWidget.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FSailingSaveMigrationRecountsDiscoveredIslandsTest,
@@ -334,6 +335,26 @@ bool FSailingPortWeightedOffersTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("Fallback should preserve first unique order"), FallbackOnly[0], FName(TEXT("Fallback_1")));
 	TestEqual(TEXT("Fallback should include subsequent unique ids"), FallbackOnly[1], FName(TEXT("Fallback_2")));
 
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSailingMissionSwitchConfirmationPolicyTest,
+	"Sailing.Progression.Port.MissionSwitchConfirmationPolicy",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSailingMissionSwitchConfirmationPolicyTest::RunTest(const FString& Parameters)
+{
+	TestFalse(TEXT("No current mission should not require confirmation"),
+		UPortMissionBoardWidget::RequiresMissionSwitchConfirmation(NAME_None, TEXT("Mission_A"), NAME_None));
+	TestFalse(TEXT("Switch to same mission should not require confirmation"),
+		UPortMissionBoardWidget::RequiresMissionSwitchConfirmation(TEXT("Mission_A"), TEXT("Mission_A"), NAME_None));
+	TestTrue(TEXT("Switch to different mission should require first confirmation"),
+		UPortMissionBoardWidget::RequiresMissionSwitchConfirmation(TEXT("Mission_A"), TEXT("Mission_B"), NAME_None));
+	TestFalse(TEXT("Second click on pending mission should pass confirmation"),
+		UPortMissionBoardWidget::RequiresMissionSwitchConfirmation(TEXT("Mission_A"), TEXT("Mission_B"), TEXT("Mission_B")));
+	TestTrue(TEXT("Different mission than pending should request new confirmation"),
+		UPortMissionBoardWidget::RequiresMissionSwitchConfirmation(TEXT("Mission_A"), TEXT("Mission_C"), TEXT("Mission_B")));
 	return true;
 }
 

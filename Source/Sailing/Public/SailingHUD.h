@@ -2,11 +2,11 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/HUD.h"
+#include "UI/PortMissionBoardWidget.h"
 #include "SailingHUD.generated.h"
 
 class AIslandActor;
 class USailingHUDOverlayWidget;
-class UPortMissionBoardWidget;
 
 UCLASS()
 class SAILING_API ASailingHUD : public AHUD
@@ -131,6 +131,8 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UPortMissionBoardWidget> PortMissionBoardWidget;
+
+	FPortMissionBoardData LastMissionBoardData;
 
 	FTimerHandle MissionBoardHideTimer;
 	TArray<FName> LastMissionBoardOfferedIds;
