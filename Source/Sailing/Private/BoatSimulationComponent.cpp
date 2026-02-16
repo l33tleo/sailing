@@ -1,5 +1,6 @@
 #include "BoatSimulationComponent.h"
 #include "SailboatPawn.h"
+#include "Simulation/SailingSimulationMath.h"
 #include "WindActor.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -42,28 +43,14 @@ void UBoatSimulationComponent::Simulate(ASailboatPawn* OwnerPawn, float DeltaTim
 		const float CosAngle = FVector::DotProduct(Forward, WindDir);
 		const float AngleToWind = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(CosAngle, -1.0f, 1.0f)));
 
-		float ForceMultiplier = 0.0f;
-		if (AngleToWind < OwnerPawn->NoGoZoneAngle)
-		{
-			ForceMultiplier = 0.0f;
-		}
-		else if (AngleToWind < 90.0f)
-		{
-			const float T = (AngleToWind - OwnerPawn->NoGoZoneAngle) / (90.0f - OwnerPawn->NoGoZoneAngle);
-			ForceMultiplier = FMath::Lerp(OwnerPawn->CloseHauledForce, OwnerPawn->BeamReachForce, T);
-		}
-		else if (AngleToWind < 135.0f)
-		{
-			const float T = (AngleToWind - 90.0f) / 45.0f;
-			ForceMultiplier = FMath::Lerp(OwnerPawn->BeamReachForce, OwnerPawn->BroadReachForce, T);
-		}
-		else
-		{
-			const float T = (AngleToWind - 135.0f) / 45.0f;
-			ForceMultiplier = FMath::Lerp(OwnerPawn->BroadReachForce, OwnerPawn->RunningForce, T);
-		}
-
-		CurrentSailForce = WindStr * FMath::Pow(ForceMultiplier, OwnerPawn->PolarSharpness);
+		FSailingPolarSettings PolarSettings;
+		PolarSettings.NoGoZoneAngle = OwnerPawn->NoGoZoneAngle;
+		PolarSettings.CloseHauledForce = OwnerPawn->CloseHauledForce;
+		PolarSettings.BeamReachForce = OwnerPawn->BeamReachForce;
+		PolarSettings.BroadReachForce = OwnerPawn->BroadReachForce;
+		PolarSettings.RunningForce = OwnerPawn->RunningForce;
+		PolarSettings.PolarSharpness = OwnerPawn->PolarSharpness;
+		CurrentSailForce = USailingSimulationMath::CalculateSailForce(WindStr, AngleToWind, PolarSettings);
 	}
 	else
 	{
