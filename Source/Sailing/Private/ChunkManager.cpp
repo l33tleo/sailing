@@ -11,6 +11,21 @@ AChunkManager::AChunkManager()
 	IslandClass = AIslandActor::StaticClass();
 }
 
+void AChunkManager::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UWorldStreamingSubsystem* WorldStreamingSubsystem = GI->GetSubsystem<UWorldStreamingSubsystem>())
+		{
+			LoadRadius = FMath::Max(1, WorldStreamingSubsystem->GetTargetActiveChunkRadius());
+			UnloadRadius = FMath::Max(LoadRadius + 1, UnloadRadius);
+			UE_LOG(LogTemp, Log, TEXT("ChunkManager: Synced radii from subsystem. Load=%d Unload=%d"), LoadRadius, UnloadRadius);
+		}
+	}
+}
+
 void AChunkManager::SetSaveGame(USaveGameSailing* InSaveGame)
 {
 	SaveGame = InSaveGame;

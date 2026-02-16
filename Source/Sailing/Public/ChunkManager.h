@@ -14,6 +14,7 @@ class SAILING_API AChunkManager : public AActor
 
 public:
 	AChunkManager();
+	virtual void BeginPlay() override;
 
 	virtual void Tick(float DeltaTime) override;
 
