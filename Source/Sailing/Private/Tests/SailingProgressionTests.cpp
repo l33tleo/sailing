@@ -527,6 +527,13 @@ bool FSailingPortWeightedOffersTest::RunTest(const FString& Parameters)
 		AllowedMissionIds);
 	TestEqual(TEXT("Missing-required helper should return unique missing mission ids"), MissingRequiredMissionIds.Num(), 1);
 	TestEqual(TEXT("Missing-required helper should include expected missing mission id"), MissingRequiredMissionIds[0], FName(TEXT("Mission_B")));
+	const TArray<FName> MissingSortedIds = UPortDataAsset::FindMissingRequiredIds(
+		{ TEXT("Mission_Z"), TEXT("Mission_B"), TEXT("Mission_C"), TEXT("Mission_B") },
+		TSet<FName>());
+	TestEqual(TEXT("Missing-required helper should sort ids lexically"), MissingSortedIds.Num(), 3);
+	TestEqual(TEXT("Sorted missing ids should place Mission_B first"), MissingSortedIds[0], FName(TEXT("Mission_B")));
+	TestEqual(TEXT("Sorted missing ids should place Mission_C second"), MissingSortedIds[1], FName(TEXT("Mission_C")));
+	TestEqual(TEXT("Sorted missing ids should place Mission_Z last"), MissingSortedIds[2], FName(TEXT("Mission_Z")));
 
 	const TArray<FName> FilteredMissionIds = UPortDataAsset::FilterIdsByAllowedSet(
 		{ NAME_None, TEXT("Mission_A"), TEXT("Mission_B"), TEXT("Mission_A"), TEXT("Mission_C") },
