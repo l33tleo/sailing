@@ -47,6 +47,18 @@ bool UPortMissionBoardWidget::IsUpgradePurchaseRequestValid(
 	return InOfferedUpgradeIds.Contains(RequestedUpgradeId);
 }
 
+bool UPortMissionBoardWidget::RequiresUpgradePurchaseConfirmation(
+	FName RequestedUpgradeId,
+	FName PendingUpgradePurchaseId)
+{
+	if (RequestedUpgradeId.IsNone())
+	{
+		return false;
+	}
+
+	return PendingUpgradePurchaseId != RequestedUpgradeId;
+}
+
 void UPortMissionBoardWidget::RequestCloseBoard()
 {
 	OnCloseRequested.Broadcast();

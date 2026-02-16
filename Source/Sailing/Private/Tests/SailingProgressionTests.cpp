@@ -414,6 +414,12 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 		UPortMissionBoardWidget::IsUpgradePurchaseRequestValid(true, { TEXT("Upgrade_A"), TEXT("Upgrade_B") }, TEXT("Upgrade_B")));
 	TestFalse(TEXT("Unconfigured upgrade should be rejected when list is present"),
 		UPortMissionBoardWidget::IsUpgradePurchaseRequestValid(true, { TEXT("Upgrade_A"), TEXT("Upgrade_B") }, TEXT("Upgrade_C")));
+	TestTrue(TEXT("First click should require upgrade purchase confirmation"),
+		UPortMissionBoardWidget::RequiresUpgradePurchaseConfirmation(TEXT("Upgrade_A"), NAME_None));
+	TestFalse(TEXT("Second click on same upgrade should pass confirmation"),
+		UPortMissionBoardWidget::RequiresUpgradePurchaseConfirmation(TEXT("Upgrade_A"), TEXT("Upgrade_A")));
+	TestTrue(TEXT("Switching pending upgrade should require new confirmation"),
+		UPortMissionBoardWidget::RequiresUpgradePurchaseConfirmation(TEXT("Upgrade_B"), TEXT("Upgrade_A")));
 	return true;
 }
 

@@ -89,6 +89,9 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 	Data.UpgradeStatus = bOfferUpgradeService
 		? FText::FromString(TEXT("Tilgjengelige oppgraderinger i denne havnen."))
 		: FText::FromString(TEXT("Ingen oppgraderingsservice i denne havnen."));
+	Data.bAwaitingUpgradePurchaseConfirmation = false;
+	Data.PendingUpgradePurchaseId = NAME_None;
+	Data.UpgradePurchaseConfirmationStatus = FText::GetEmpty();
 	if (!Data.bSupportsMissionBoard)
 	{
 		Data.AvailabilityStatus = Data.bSupportsUpgradeService
@@ -391,6 +394,32 @@ bool ASailingHUD::RequestUpgradePurchaseFromBoard(FName UpgradeId)
 		ShowDiscoveryPopup(FString::Printf(TEXT("Oppgradering allerede låst opp: %s"), *UpgradeId.ToString()));
 		return true;
 	}
+
+	const bool bRequiresUpgradeConfirmation = UPortMissionBoardWidget::RequiresUpgradePurchaseConfirmation(
+		UpgradeId,
+		LastMissionBoardData.PendingUpgradePurchaseId);
+	if (bRequiresUpgradeConfirmation)
+	{
+		FText UpgradeTitle = UpgradeData->DisplayName.IsEmpty()
+			? FText::FromName(UpgradeId)
+			: UpgradeData->DisplayName;
+		LastMissionBoardData.bAwaitingUpgradePurchaseConfirmation = true;
+		LastMissionBoardData.PendingUpgradePurchaseId = UpgradeId;
+		LastMissionBoardData.UpgradePurchaseConfirmationStatus = FText::FromString(
+			FString::Printf(TEXT("Bekreft kjøp av '%s' ved å trykke oppgraderingen igjen."), *UpgradeTitle.ToString()));
+		LastMissionBoardData.UpgradeStatus = LastMissionBoardData.UpgradePurchaseConfirmationStatus;
+		if (PortMissionBoardWidget)
+		{
+			PortMissionBoardWidget->PushMissionBoardData(LastMissionBoardData);
+		}
+
+		ShowDiscoveryPopup(FString::Printf(TEXT("Bekreft kjøp av oppgradering: %s"), *UpgradeTitle.ToString()));
+		return false;
+	}
+
+	LastMissionBoardData.bAwaitingUpgradePurchaseConfirmation = false;
+	LastMissionBoardData.PendingUpgradePurchaseId = NAME_None;
+	LastMissionBoardData.UpgradePurchaseConfirmationStatus = FText::GetEmpty();
 
 	const int32 AdjustedCost = UPortDataAsset::CalculateAdjustedUpgradeCost(
 		UpgradeData->CreditCost,

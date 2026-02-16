@@ -103,6 +103,15 @@ struct SAILING_API FPortMissionBoardData
 	FText UpgradeStatus;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	bool bAwaitingUpgradePurchaseConfirmation = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	FName PendingUpgradePurchaseId = NAME_None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	FText UpgradePurchaseConfirmationStatus;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
 	bool bSupportsRepairService = false;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
@@ -138,6 +147,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "MissionBoard|Service")
 	static bool IsUpgradePurchaseRequestValid(bool bSupportsUpgradeService, const TArray<FName>& InOfferedUpgradeIds, FName RequestedUpgradeId);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard|Service")
+	static bool RequiresUpgradePurchaseConfirmation(FName RequestedUpgradeId, FName PendingUpgradePurchaseId);
 
 	UFUNCTION(BlueprintCallable, Category = "MissionBoard")
 	void RequestCloseBoard();
