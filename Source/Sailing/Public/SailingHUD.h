@@ -23,10 +23,14 @@ public:
 	/** Shows mission board data from current harbor interaction. */
 	void ShowPortMissionBoard(FName PortId, const FText& PortDisplayName,
 		const TArray<FName>& OfferedMissionIds, FName CurrentMissionId,
-		bool bMissionBoardOnCooldown, float CooldownRemainingSeconds);
+		bool bMissionBoardOnCooldown, float CooldownRemainingSeconds,
+		bool bAutoRepairAtPort, int32 RepairCostPerPercentPoint);
 
 	UFUNCTION(BlueprintCallable, Category = "HUD|MissionBoard")
 	bool AcceptMissionFromBoard(FName MissionId);
+
+	UFUNCTION(BlueprintCallable, Category = "HUD|MissionBoard")
+	bool RequestRepairFromBoard();
 
 	UFUNCTION(BlueprintCallable, Category = "HUD|MissionBoard")
 	void CloseMissionBoard();
@@ -102,6 +106,8 @@ private:
 	void HandleMissionAcceptedRequest(FName MissionId);
 	UFUNCTION()
 	void HandleMissionBoardCloseRequest();
+	UFUNCTION()
+	void HandleRepairRequest();
 	void PushOverlayData(int32 DiscoveredIslands, int32 Credits, FName ActiveMissionId,
 		const FText& ActiveMissionTitle, float ObjectiveDistanceMeters, int32 BoatConditionPercent,
 		float ObjectiveBearingDegrees, FName LastVisitedPortId);
@@ -132,4 +138,6 @@ private:
 	FText LastMissionBoardPortDisplayName;
 	bool bLastMissionBoardOnCooldown = false;
 	float LastMissionBoardCooldownRemainingSeconds = 0.0f;
+	bool bLastMissionBoardAutoRepairAtPort = true;
+	int32 LastMissionBoardRepairCostPerPercentPoint = 1;
 };

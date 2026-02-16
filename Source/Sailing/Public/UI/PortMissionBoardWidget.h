@@ -7,6 +7,7 @@
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPortMissionAcceptRequested, FName, MissionId);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPortMissionBoardCloseRequested);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPortRepairRequested);
 
 USTRUCT(BlueprintType)
 struct SAILING_API FPortMissionOfferEntry
@@ -54,6 +55,21 @@ struct SAILING_API FPortMissionBoardData
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
 	FText AvailabilityStatus;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	bool bSupportsRepairService = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	int32 CurrentBoatConditionPercent = 100;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	int32 EstimatedRepairCostCredits = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	bool bCanAffordRepair = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	FText RepairStatus;
 };
 
 /**
@@ -74,6 +90,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MissionBoard")
 	void RequestCloseBoard();
 
+	UFUNCTION(BlueprintCallable, Category = "MissionBoard|Service")
+	void RequestRepairService();
+
 	UFUNCTION(BlueprintPure, Category = "MissionBoard")
 	const FPortMissionBoardData& GetLastData() const { return LastData; }
 
@@ -82,6 +101,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "MissionBoard")
 	FOnPortMissionBoardCloseRequested OnCloseRequested;
+
+	UPROPERTY(BlueprintAssignable, Category = "MissionBoard|Service")
+	FOnPortRepairRequested OnRepairRequested;
 
 protected:
 	UFUNCTION(BlueprintImplementableEvent, Category = "MissionBoard")

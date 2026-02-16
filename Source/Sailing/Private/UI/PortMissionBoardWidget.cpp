@@ -20,3 +20,8 @@ void UPortMissionBoardWidget::RequestCloseBoard()
 {
 	OnCloseRequested.Broadcast();
 }
+
+void UPortMissionBoardWidget::RequestRepairService()
+{
+	OnRepairRequested.Broadcast();
+}

@@ -49,6 +49,7 @@ void ASailingHUD::EnsurePortMissionBoardWidget()
 	{
 		PortMissionBoardWidget->OnAcceptMissionRequested.AddDynamic(this, &ASailingHUD::HandleMissionAcceptedRequest);
 		PortMissionBoardWidget->OnCloseRequested.AddDynamic(this, &ASailingHUD::HandleMissionBoardCloseRequest);
+		PortMissionBoardWidget->OnRepairRequested.AddDynamic(this, &ASailingHUD::HandleRepairRequest);
 		PortMissionBoardWidget->AddToViewport(2);
 		PortMissionBoardWidget->SetVisibility(ESlateVisibility::Hidden);
 	}
@@ -56,7 +57,8 @@ void ASailingHUD::EnsurePortMissionBoardWidget()
 
 void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayName,
 	const TArray<FName>& OfferedMissionIds, FName CurrentMissionId,
-	bool bMissionBoardOnCooldown, float CooldownRemainingSeconds)
+	bool bMissionBoardOnCooldown, float CooldownRemainingSeconds,
+	bool bAutoRepairAtPort, int32 RepairCostPerPercentPoint)
 {
 	EnsurePortMissionBoardWidget();
 	if (!PortMissionBoardWidget)
@@ -86,6 +88,32 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 	}
 	if (UGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance() : nullptr)
 	{
+		if (UEconomySubsystem* EconomySubsystem = GI->GetSubsystem<UEconomySubsystem>())
+		{
+			Data.CurrentBoatConditionPercent = EconomySubsystem->GetBoatConditionPercent();
+			const int32 MissingCondition = 100 - FMath::Clamp(Data.CurrentBoatConditionPercent, 0, 100);
+			const int32 CostPerPoint = FMath::Max(0, RepairCostPerPercentPoint);
+			Data.EstimatedRepairCostCredits = MissingCondition * CostPerPoint;
+			Data.bSupportsRepairService = !bAutoRepairAtPort;
+			Data.bCanAffordRepair = EconomySubsystem->GetCredits() >= Data.EstimatedRepairCostCredits;
+			if (!Data.bSupportsRepairService)
+			{
+				Data.RepairStatus = FText::FromString(TEXT("Reparasjon utføres automatisk ved anløp."));
+			}
+			else if (MissingCondition <= 0)
+			{
+				Data.RepairStatus = FText::FromString(TEXT("Båten er allerede i topp stand."));
+			}
+			else if (Data.bCanAffordRepair)
+			{
+				Data.RepairStatus = FText::FromString(FString::Printf(TEXT("Reparasjon tilgjengelig (%d kreditter)."), Data.EstimatedRepairCostCredits));
+			}
+			else
+			{
+				Data.RepairStatus = FText::FromString(FString::Printf(TEXT("Mangler kreditter til reparasjon (%d)."), Data.EstimatedRepairCostCredits));
+			}
+		}
+
 		if (UMissionSubsystem* MissionSubsystem = GI->GetSubsystem<UMissionSubsystem>())
 		{
 			for (const FName& MissionId : OfferedMissionIds)
@@ -107,6 +135,8 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 	LastMissionBoardOfferedIds = OfferedMissionIds;
 	bLastMissionBoardOnCooldown = bMissionBoardOnCooldown;
 	LastMissionBoardCooldownRemainingSeconds = FMath::Max(0.0f, CooldownRemainingSeconds);
+	bLastMissionBoardAutoRepairAtPort = bAutoRepairAtPort;
+	LastMissionBoardRepairCostPerPercentPoint = FMath::Max(0, RepairCostPerPercentPoint);
 
 	GetWorldTimerManager().ClearTimer(MissionBoardHideTimer);
 	GetWorldTimerManager().SetTimer(MissionBoardHideTimer, this, &ASailingHUD::HidePortMissionBoard, 5.0f, false);
@@ -160,6 +190,57 @@ bool ASailingHUD::AcceptMissionFromBoard(FName MissionId)
 	return bActivated;
 }
 
+bool ASailingHUD::RequestRepairFromBoard()
+{
+	if (bLastMissionBoardAutoRepairAtPort)
+	{
+		return false;
+	}
+
+	UGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
+	if (!GI)
+	{
+		return false;
+	}
+
+	UEconomySubsystem* EconomySubsystem = GI->GetSubsystem<UEconomySubsystem>();
+	if (!EconomySubsystem)
+	{
+		return false;
+	}
+
+	const int32 PreviousCondition = EconomySubsystem->GetBoatConditionPercent();
+	const int32 MissingCondition = 100 - FMath::Clamp(PreviousCondition, 0, 100);
+	if (MissingCondition <= 0)
+	{
+		ShowDiscoveryPopup(TEXT("Båten er allerede fullstendig reparert."));
+		return true;
+	}
+
+	const int32 CostPerPoint = FMath::Max(0, LastMissionBoardRepairCostPerPercentPoint);
+	const int32 EstimatedCost = MissingCondition * CostPerPoint;
+	const bool bRepaired = EconomySubsystem->RepairBoatToFull(CostPerPoint);
+	if (!bRepaired)
+	{
+		ShowDiscoveryPopup(FString::Printf(TEXT("Ikke nok kreditter til reparasjon (%d)."), EstimatedCost));
+		return false;
+	}
+
+	ShowDiscoveryPopup(FString::Printf(TEXT("Båten reparert for %d kreditter."), EstimatedCost));
+	if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
+	{
+		TelemetrySubsystem->RecordCounterEvent(TEXT("PortRepairs"), 1);
+	}
+
+	if (ASailingGameMode* GM = Cast<ASailingGameMode>(UGameplayStatics::GetGameMode(GetWorld())))
+	{
+		GM->SaveGame_();
+	}
+
+	CloseMissionBoard();
+	return true;
+}
+
 void ASailingHUD::CloseMissionBoard()
 {
 	HidePortMissionBoard();
@@ -168,6 +249,8 @@ void ASailingHUD::CloseMissionBoard()
 	LastMissionBoardPortDisplayName = FText::GetEmpty();
 	bLastMissionBoardOnCooldown = false;
 	LastMissionBoardCooldownRemainingSeconds = 0.0f;
+	bLastMissionBoardAutoRepairAtPort = true;
+	LastMissionBoardRepairCostPerPercentPoint = 1;
 }
 
 void ASailingHUD::HidePortMissionBoard()
@@ -186,6 +269,11 @@ void ASailingHUD::HandleMissionAcceptedRequest(FName MissionId)
 void ASailingHUD::HandleMissionBoardCloseRequest()
 {
 	CloseMissionBoard();
+}
+
+void ASailingHUD::HandleRepairRequest()
+{
+	RequestRepairFromBoard();
 }
 
 void ASailingHUD::PushOverlayData(int32 DiscoveredIslands, int32 Credits, FName ActiveMissionId,
