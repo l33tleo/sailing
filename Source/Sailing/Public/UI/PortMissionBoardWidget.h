@@ -571,6 +571,9 @@ public:
 	static FText BuildMissionOfferActionBlockReasonSummaryLabel(
 		EPortMissionOfferActionBlockReason BlockReason);
 
+	UFUNCTION(BlueprintPure, Category = "MissionBoard")
+	static EPortBoardActionBlockedReason ToBoardBlockedReason(EPortMissionOfferActionBlockReason BlockReason);
+
 	UFUNCTION(BlueprintPure, Category = "MissionBoard|Service")
 	static bool CanRequestUpgradePurchase(
 		const FPortMissionBoardData& BoardData,
@@ -593,6 +596,9 @@ public:
 		EPortUpgradeOfferActionBlockReason BlockReason);
 
 	UFUNCTION(BlueprintPure, Category = "MissionBoard|Service")
+	static EPortBoardActionBlockedReason ToBoardBlockedReason(EPortUpgradeOfferActionBlockReason BlockReason);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard|Service")
 	static bool CanRequestRepairService(
 		const FPortMissionBoardData& BoardData,
 		FText& OutBlockedReason);
@@ -605,6 +611,9 @@ public:
 	static FText BuildRepairActionBlockReasonText(
 		EPortRepairActionBlockReason BlockReason,
 		const FPortMissionBoardData& BoardData);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard|Service")
+	static EPortBoardActionBlockedReason ToBoardBlockedReason(EPortRepairActionBlockReason BlockReason);
 
 	UFUNCTION(BlueprintPure, Category = "MissionBoard")
 	static bool CanRequestManualRefresh(
@@ -619,6 +628,9 @@ public:
 	static FText BuildManualRefreshActionBlockReasonText(
 		EPortManualRefreshActionBlockReason BlockReason,
 		const FPortMissionBoardData& BoardData);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard")
+	static EPortBoardActionBlockedReason ToBoardBlockedReason(EPortManualRefreshActionBlockReason BlockReason);
 
 	UFUNCTION(BlueprintPure, Category = "MissionBoard")
 	static FPortMissionBoardData BuildActionStateAnnotatedBoardData(const FPortMissionBoardData& BoardData);

@@ -1,84 +1,5 @@
 #include "UI/PortMissionBoardWidget.h"
 
-namespace
-{
-EPortBoardActionBlockedReason MapMissionBlockReasonToBoardReason(EPortMissionOfferActionBlockReason BlockReason)
-{
-	switch (BlockReason)
-	{
-	case EPortMissionOfferActionBlockReason::InvalidMission:
-		return EPortBoardActionBlockedReason::MissionInvalid;
-	case EPortMissionOfferActionBlockReason::MissionBoardDisabled:
-		return EPortBoardActionBlockedReason::MissionBoardDisabled;
-	case EPortMissionOfferActionBlockReason::MissionBoardCooldown:
-		return EPortBoardActionBlockedReason::MissionBoardCooldown;
-	case EPortMissionOfferActionBlockReason::NotOfferedAtPort:
-		return EPortBoardActionBlockedReason::MissionNotOffered;
-	case EPortMissionOfferActionBlockReason::AlreadyActiveMission:
-		return EPortBoardActionBlockedReason::MissionAlreadyActive;
-	case EPortMissionOfferActionBlockReason::None:
-	default:
-		return EPortBoardActionBlockedReason::None;
-	}
-}
-
-EPortBoardActionBlockedReason MapUpgradeBlockReasonToBoardReason(EPortUpgradeOfferActionBlockReason BlockReason)
-{
-	switch (BlockReason)
-	{
-	case EPortUpgradeOfferActionBlockReason::InvalidUpgrade:
-		return EPortBoardActionBlockedReason::UpgradeInvalid;
-	case EPortUpgradeOfferActionBlockReason::UpgradeServiceDisabled:
-		return EPortBoardActionBlockedReason::UpgradeServiceDisabled;
-	case EPortUpgradeOfferActionBlockReason::NotOfferedAtPort:
-		return EPortBoardActionBlockedReason::UpgradeNotOffered;
-	case EPortUpgradeOfferActionBlockReason::AlreadyUnlocked:
-		return EPortBoardActionBlockedReason::UpgradeAlreadyUnlocked;
-	case EPortUpgradeOfferActionBlockReason::VisitRequirementNotMet:
-		return EPortBoardActionBlockedReason::UpgradeVisitRequirementNotMet;
-	case EPortUpgradeOfferActionBlockReason::InsufficientCredits:
-		return EPortBoardActionBlockedReason::UpgradeNoCredits;
-	case EPortUpgradeOfferActionBlockReason::UpgradeAvailabilityBlocked:
-		return EPortBoardActionBlockedReason::UpgradeAvailabilityBlocked;
-	case EPortUpgradeOfferActionBlockReason::None:
-	default:
-		return EPortBoardActionBlockedReason::None;
-	}
-}
-
-EPortBoardActionBlockedReason MapRepairBlockReasonToBoardReason(EPortRepairActionBlockReason BlockReason)
-{
-	switch (BlockReason)
-	{
-	case EPortRepairActionBlockReason::RepairServiceDisabled:
-		return EPortBoardActionBlockedReason::RepairServiceDisabled;
-	case EPortRepairActionBlockReason::AlreadyAtFullCondition:
-		return EPortBoardActionBlockedReason::RepairAlreadyFullCondition;
-	case EPortRepairActionBlockReason::InsufficientCredits:
-		return EPortBoardActionBlockedReason::RepairNoCredits;
-	case EPortRepairActionBlockReason::None:
-	default:
-		return EPortBoardActionBlockedReason::None;
-	}
-}
-
-EPortBoardActionBlockedReason MapManualRefreshBlockReasonToBoardReason(EPortManualRefreshActionBlockReason BlockReason)
-{
-	switch (BlockReason)
-	{
-	case EPortManualRefreshActionBlockReason::ManualRefreshDisabled:
-		return EPortBoardActionBlockedReason::ManualRefreshDisabled;
-	case EPortManualRefreshActionBlockReason::ManualRefreshCooldown:
-		return EPortBoardActionBlockedReason::ManualRefreshCooldown;
-	case EPortManualRefreshActionBlockReason::InsufficientCredits:
-		return EPortBoardActionBlockedReason::ManualRefreshNoCredits;
-	case EPortManualRefreshActionBlockReason::None:
-	default:
-		return EPortBoardActionBlockedReason::None;
-	}
-}
-}
-
 void UPortMissionBoardWidget::PushMissionBoardData(const FPortMissionBoardData& InData)
 {
 	LastData = BuildActionStateAnnotatedBoardData(InData);
@@ -95,7 +16,7 @@ void UPortMissionBoardWidget::RequestAcceptMission(FName MissionId)
 		{
 			OnActionBlocked.Broadcast(
 				EPortBoardActionType::MissionAccept,
-				MapMissionBlockReasonToBoardReason(BlockReason),
+				ToBoardBlockedReason(BlockReason),
 				BlockedReasonText);
 		}
 		return;
@@ -547,6 +468,26 @@ FText UPortMissionBoardWidget::BuildMissionOfferActionBlockReasonSummaryLabel(
 	}
 }
 
+EPortBoardActionBlockedReason UPortMissionBoardWidget::ToBoardBlockedReason(EPortMissionOfferActionBlockReason BlockReason)
+{
+	switch (BlockReason)
+	{
+	case EPortMissionOfferActionBlockReason::InvalidMission:
+		return EPortBoardActionBlockedReason::MissionInvalid;
+	case EPortMissionOfferActionBlockReason::MissionBoardDisabled:
+		return EPortBoardActionBlockedReason::MissionBoardDisabled;
+	case EPortMissionOfferActionBlockReason::MissionBoardCooldown:
+		return EPortBoardActionBlockedReason::MissionBoardCooldown;
+	case EPortMissionOfferActionBlockReason::NotOfferedAtPort:
+		return EPortBoardActionBlockedReason::MissionNotOffered;
+	case EPortMissionOfferActionBlockReason::AlreadyActiveMission:
+		return EPortBoardActionBlockedReason::MissionAlreadyActive;
+	case EPortMissionOfferActionBlockReason::None:
+	default:
+		return EPortBoardActionBlockedReason::None;
+	}
+}
+
 bool UPortMissionBoardWidget::CanRequestUpgradePurchase(
 	const FPortMissionBoardData& BoardData,
 	FName RequestedUpgradeId,
@@ -672,6 +613,30 @@ FText UPortMissionBoardWidget::BuildUpgradeOfferActionBlockReasonSummaryLabel(
 	}
 }
 
+EPortBoardActionBlockedReason UPortMissionBoardWidget::ToBoardBlockedReason(EPortUpgradeOfferActionBlockReason BlockReason)
+{
+	switch (BlockReason)
+	{
+	case EPortUpgradeOfferActionBlockReason::InvalidUpgrade:
+		return EPortBoardActionBlockedReason::UpgradeInvalid;
+	case EPortUpgradeOfferActionBlockReason::UpgradeServiceDisabled:
+		return EPortBoardActionBlockedReason::UpgradeServiceDisabled;
+	case EPortUpgradeOfferActionBlockReason::NotOfferedAtPort:
+		return EPortBoardActionBlockedReason::UpgradeNotOffered;
+	case EPortUpgradeOfferActionBlockReason::AlreadyUnlocked:
+		return EPortBoardActionBlockedReason::UpgradeAlreadyUnlocked;
+	case EPortUpgradeOfferActionBlockReason::VisitRequirementNotMet:
+		return EPortBoardActionBlockedReason::UpgradeVisitRequirementNotMet;
+	case EPortUpgradeOfferActionBlockReason::InsufficientCredits:
+		return EPortBoardActionBlockedReason::UpgradeNoCredits;
+	case EPortUpgradeOfferActionBlockReason::UpgradeAvailabilityBlocked:
+		return EPortBoardActionBlockedReason::UpgradeAvailabilityBlocked;
+	case EPortUpgradeOfferActionBlockReason::None:
+	default:
+		return EPortBoardActionBlockedReason::None;
+	}
+}
+
 bool UPortMissionBoardWidget::CanRequestRepairService(
 	const FPortMissionBoardData& BoardData,
 	FText& OutBlockedReason)
@@ -722,6 +687,22 @@ FText UPortMissionBoardWidget::BuildRepairActionBlockReasonText(
 			: BoardData.RepairStatus;
 	default:
 		return FText::FromString(TEXT("Reparasjon er utilgjengelig akkurat nå."));
+	}
+}
+
+EPortBoardActionBlockedReason UPortMissionBoardWidget::ToBoardBlockedReason(EPortRepairActionBlockReason BlockReason)
+{
+	switch (BlockReason)
+	{
+	case EPortRepairActionBlockReason::RepairServiceDisabled:
+		return EPortBoardActionBlockedReason::RepairServiceDisabled;
+	case EPortRepairActionBlockReason::AlreadyAtFullCondition:
+		return EPortBoardActionBlockedReason::RepairAlreadyFullCondition;
+	case EPortRepairActionBlockReason::InsufficientCredits:
+		return EPortBoardActionBlockedReason::RepairNoCredits;
+	case EPortRepairActionBlockReason::None:
+	default:
+		return EPortBoardActionBlockedReason::None;
 	}
 }
 
@@ -781,6 +762,22 @@ FText UPortMissionBoardWidget::BuildManualRefreshActionBlockReasonText(
 			false);
 	default:
 		return FText::FromString(TEXT("Manuell oppfriskning er utilgjengelig akkurat nå."));
+	}
+}
+
+EPortBoardActionBlockedReason UPortMissionBoardWidget::ToBoardBlockedReason(EPortManualRefreshActionBlockReason BlockReason)
+{
+	switch (BlockReason)
+	{
+	case EPortManualRefreshActionBlockReason::ManualRefreshDisabled:
+		return EPortBoardActionBlockedReason::ManualRefreshDisabled;
+	case EPortManualRefreshActionBlockReason::ManualRefreshCooldown:
+		return EPortBoardActionBlockedReason::ManualRefreshCooldown;
+	case EPortManualRefreshActionBlockReason::InsufficientCredits:
+		return EPortBoardActionBlockedReason::ManualRefreshNoCredits;
+	case EPortManualRefreshActionBlockReason::None:
+	default:
+		return EPortBoardActionBlockedReason::None;
 	}
 }
 
@@ -1015,7 +1012,7 @@ void UPortMissionBoardWidget::RequestRefreshBoard()
 		{
 			OnActionBlocked.Broadcast(
 				EPortBoardActionType::ManualRefresh,
-				MapManualRefreshBlockReasonToBoardReason(BlockReason),
+				ToBoardBlockedReason(BlockReason),
 				BlockedReasonText);
 		}
 		return;
@@ -1034,7 +1031,7 @@ void UPortMissionBoardWidget::RequestRepairService()
 		{
 			OnActionBlocked.Broadcast(
 				EPortBoardActionType::RepairService,
-				MapRepairBlockReasonToBoardReason(BlockReason),
+				ToBoardBlockedReason(BlockReason),
 				BlockedReasonText);
 		}
 		return;
@@ -1053,7 +1050,7 @@ void UPortMissionBoardWidget::RequestPurchaseUpgrade(FName UpgradeId)
 		{
 			OnActionBlocked.Broadcast(
 				EPortBoardActionType::UpgradePurchase,
-				MapUpgradeBlockReasonToBoardReason(BlockReason),
+				ToBoardBlockedReason(BlockReason),
 				BlockedReasonText);
 		}
 		return;
