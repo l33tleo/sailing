@@ -58,6 +58,7 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 	FName CurrentMissionId = NAME_None;
 	int32 PortVisitCount = 0;
 	TArray<FName> EffectiveOfferedMissionIds;
+	TArray<FName> EffectiveOfferedUpgradeIds;
 	if (UGameInstance* GI = GetGameInstance())
 	{
 		if (UWorldStreamingSubsystem* WorldSubsystem = GI->GetSubsystem<UWorldStreamingSubsystem>())
@@ -68,6 +69,17 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 
 		EffectiveOfferedMissionIds = UPortDataAsset::BuildPrioritizedMissionIds(
 			WeightedOfferedMissions, OfferedMissionIds, PortVisitCount, MaxOfferedMissionsAtBoard);
+		for (const FName& UpgradeId : OfferedUpgradeIds)
+		{
+			if (!UpgradeId.IsNone())
+			{
+				EffectiveOfferedUpgradeIds.AddUnique(UpgradeId);
+			}
+		}
+		if (MaxOfferedUpgrades > 0 && EffectiveOfferedUpgradeIds.Num() > MaxOfferedUpgrades)
+		{
+			EffectiveOfferedUpgradeIds.SetNum(MaxOfferedUpgrades);
+		}
 
 		if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
 		{
@@ -144,6 +156,17 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 	{
 		EffectiveOfferedMissionIds = UPortDataAsset::BuildPrioritizedMissionIds(
 			WeightedOfferedMissions, OfferedMissionIds, PortVisitCount, MaxOfferedMissionsAtBoard);
+		for (const FName& UpgradeId : OfferedUpgradeIds)
+		{
+			if (!UpgradeId.IsNone())
+			{
+				EffectiveOfferedUpgradeIds.AddUnique(UpgradeId);
+			}
+		}
+		if (MaxOfferedUpgrades > 0 && EffectiveOfferedUpgradeIds.Num() > MaxOfferedUpgrades)
+		{
+			EffectiveOfferedUpgradeIds.SetNum(MaxOfferedUpgrades);
+		}
 	}
 
 	bVisitedInSession = true;
@@ -173,7 +196,8 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 			{
 				HUD->ShowPortMissionBoard(PortId, PortDisplayName, EffectiveOfferedMissionIds, CurrentMissionId,
 					bMissionBoardOnCooldown, MissionBoardCooldownRemaining,
-					bAutoRepairAtPort, RepairCostPerPercentPoint);
+					bAutoRepairAtPort, RepairCostPerPercentPoint,
+					bOfferUpgradeService, EffectiveOfferedUpgradeIds);
 			}
 		}
 	}

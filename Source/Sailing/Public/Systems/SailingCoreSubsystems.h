@@ -232,6 +232,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Sailing|Economy")
 	bool PurchaseUpgrade(const UBoatUpgradeDataAsset* UpgradeData);
 
+	UFUNCTION(BlueprintCallable, Category = "Sailing|Economy")
+	bool RegisterUpgradeAsset(const UBoatUpgradeDataAsset* UpgradeData);
+
+	UFUNCTION(BlueprintCallable, Category = "Sailing|Economy")
+	int32 ReloadUpgradeAssets();
+
+	UFUNCTION(BlueprintPure, Category = "Sailing|Economy")
+	TArray<FName> GetRegisteredUpgradeIds() const;
+
+	UFUNCTION(BlueprintPure, Category = "Sailing|Economy")
+	const UBoatUpgradeDataAsset* GetUpgradeAssetById(FName UpgradeId) const;
+
 	UFUNCTION(BlueprintPure, Category = "Sailing|Economy")
 	bool IsUpgradeUnlocked(FName UpgradeId) const { return UnlockedUpgradeIds.Contains(UpgradeId); }
 
@@ -250,6 +262,12 @@ private:
 
 	UPROPERTY()
 	TSet<FName> UnlockedUpgradeIds;
+
+	UPROPERTY()
+	TMap<FName, TObjectPtr<UBoatUpgradeDataAsset>> RegisteredUpgrades;
+
+	UPROPERTY(EditAnywhere, Category = "Sailing|Economy")
+	FName UpgradeAssetPath = TEXT("/Game");
 };
 
 UCLASS()

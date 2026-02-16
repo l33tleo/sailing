@@ -70,6 +70,15 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Port|MissionBoard", meta = (ClampMin = "0"))
 	float MissionBoardCooldownSeconds = 0.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Port|Services")
+	bool bOfferUpgradeService = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Port|Services")
+	TArray<FName> OfferedUpgradeIds;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Port|Services", meta = (ClampMin = "0", ClampMax = "10"))
+	int32 MaxOfferedUpgrades = 3;
+
 	static TArray<FName> BuildPrioritizedMissionIds(
 		const TArray<FPortMissionWeightedOffer>& InWeightedOffers,
 		const TArray<FName>& InFallbackOffers,

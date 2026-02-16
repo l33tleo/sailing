@@ -38,3 +38,13 @@ void UPortMissionBoardWidget::RequestRepairService()
 {
 	OnRepairRequested.Broadcast();
 }
+
+void UPortMissionBoardWidget::RequestPurchaseUpgrade(FName UpgradeId)
+{
+	if (UpgradeId.IsNone())
+	{
+		return;
+	}
+
+	OnUpgradePurchaseRequested.Broadcast(UpgradeId);
+}

@@ -6,6 +6,7 @@
 #include "SailingPlayerController.h"
 #include "SaveGameSailing.h"
 #include "Systems/SailingCoreSubsystems.h"
+#include "Data/BoatUpgradeDataAsset.h"
 #include "UI/SailingHUDOverlayWidget.h"
 #include "UI/PortMissionBoardWidget.h"
 #include "Engine/Canvas.h"
@@ -50,6 +51,7 @@ void ASailingHUD::EnsurePortMissionBoardWidget()
 		PortMissionBoardWidget->OnAcceptMissionRequested.AddDynamic(this, &ASailingHUD::HandleMissionAcceptedRequest);
 		PortMissionBoardWidget->OnCloseRequested.AddDynamic(this, &ASailingHUD::HandleMissionBoardCloseRequest);
 		PortMissionBoardWidget->OnRepairRequested.AddDynamic(this, &ASailingHUD::HandleRepairRequest);
+		PortMissionBoardWidget->OnUpgradePurchaseRequested.AddDynamic(this, &ASailingHUD::HandleUpgradePurchaseRequest);
 		PortMissionBoardWidget->AddToViewport(2);
 		PortMissionBoardWidget->SetVisibility(ESlateVisibility::Hidden);
 	}
@@ -58,7 +60,8 @@ void ASailingHUD::EnsurePortMissionBoardWidget()
 void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayName,
 	const TArray<FName>& OfferedMissionIds, FName CurrentMissionId,
 	bool bMissionBoardOnCooldown, float CooldownRemainingSeconds,
-	bool bAutoRepairAtPort, int32 RepairCostPerPercentPoint)
+	bool bAutoRepairAtPort, int32 RepairCostPerPercentPoint,
+	bool bOfferUpgradeService, const TArray<FName>& OfferedUpgradeIds)
 {
 	EnsurePortMissionBoardWidget();
 	if (!PortMissionBoardWidget)
@@ -77,6 +80,11 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 	Data.bAwaitingMissionSwitchConfirmation = false;
 	Data.PendingMissionSwitchId = NAME_None;
 	Data.MissionSwitchConfirmationStatus = FText::GetEmpty();
+	Data.bSupportsUpgradeService = bOfferUpgradeService;
+	Data.OfferedUpgradeIds = OfferedUpgradeIds;
+	Data.UpgradeStatus = bOfferUpgradeService
+		? FText::FromString(TEXT("Tilgjengelige oppgraderinger i denne havnen."))
+		: FText::FromString(TEXT("Ingen oppgraderingsservice i denne havnen."));
 	if (Data.bMissionBoardOnCooldown)
 	{
 		Data.AvailabilityStatus = FText::FromString(FString::Printf(TEXT("Tavlen oppdateres om %.0f sekunder"), Data.CooldownRemainingSeconds));
@@ -115,6 +123,44 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 			{
 				Data.RepairStatus = FText::FromString(FString::Printf(TEXT("Mangler kreditter til reparasjon (%d)."), Data.EstimatedRepairCostCredits));
 			}
+
+			if (Data.bSupportsUpgradeService)
+			{
+				int32 AffordableUpgradeCount = 0;
+				for (const FName& UpgradeId : OfferedUpgradeIds)
+				{
+					if (const UBoatUpgradeDataAsset* UpgradeData = EconomySubsystem->GetUpgradeAssetById(UpgradeId))
+					{
+						FPortUpgradeOfferEntry OfferEntry;
+						OfferEntry.UpgradeId = UpgradeData->UpgradeId;
+						OfferEntry.UpgradeTitle = UpgradeData->DisplayName.IsEmpty()
+							? FText::FromName(UpgradeData->UpgradeId)
+							: UpgradeData->DisplayName;
+						OfferEntry.CreditCost = FMath::Max(0, UpgradeData->CreditCost);
+						OfferEntry.bUnlocked = EconomySubsystem->IsUpgradeUnlocked(UpgradeData->UpgradeId);
+						OfferEntry.bAffordable = EconomySubsystem->GetCredits() >= OfferEntry.CreditCost;
+						Data.OfferedUpgrades.Add(OfferEntry);
+
+						if (!OfferEntry.bUnlocked && OfferEntry.bAffordable)
+						{
+							AffordableUpgradeCount++;
+						}
+					}
+				}
+
+				if (Data.OfferedUpgrades.Num() == 0)
+				{
+					Data.UpgradeStatus = FText::FromString(TEXT("Ingen gyldige oppgraderinger konfigurert for havnen."));
+				}
+				else if (AffordableUpgradeCount > 0)
+				{
+					Data.UpgradeStatus = FText::FromString(FString::Printf(TEXT("%d oppgradering(er) kan kjøpes nå."), AffordableUpgradeCount));
+				}
+				else
+				{
+					Data.UpgradeStatus = FText::FromString(TEXT("Ingen oppgraderinger kan kjøpes akkurat nå."));
+				}
+			}
 		}
 
 		if (UMissionSubsystem* MissionSubsystem = GI->GetSubsystem<UMissionSubsystem>())
@@ -141,6 +187,8 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 	LastMissionBoardCooldownRemainingSeconds = FMath::Max(0.0f, CooldownRemainingSeconds);
 	bLastMissionBoardAutoRepairAtPort = bAutoRepairAtPort;
 	LastMissionBoardRepairCostPerPercentPoint = FMath::Max(0, RepairCostPerPercentPoint);
+	bLastMissionBoardOfferUpgradeService = bOfferUpgradeService;
+	LastMissionBoardOfferedUpgradeIds = OfferedUpgradeIds;
 
 	GetWorldTimerManager().ClearTimer(MissionBoardHideTimer);
 	GetWorldTimerManager().SetTimer(MissionBoardHideTimer, this, &ASailingHUD::HidePortMissionBoard, 5.0f, false);
@@ -289,6 +337,65 @@ bool ASailingHUD::RequestRepairFromBoard()
 	return true;
 }
 
+bool ASailingHUD::RequestUpgradePurchaseFromBoard(FName UpgradeId)
+{
+	if (!bLastMissionBoardOfferUpgradeService || UpgradeId.IsNone())
+	{
+		return false;
+	}
+
+	if (LastMissionBoardOfferedUpgradeIds.Num() > 0 && !LastMissionBoardOfferedUpgradeIds.Contains(UpgradeId))
+	{
+		return false;
+	}
+
+	UGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
+	if (!GI)
+	{
+		return false;
+	}
+
+	UEconomySubsystem* EconomySubsystem = GI->GetSubsystem<UEconomySubsystem>();
+	if (!EconomySubsystem)
+	{
+		return false;
+	}
+
+	const UBoatUpgradeDataAsset* UpgradeData = EconomySubsystem->GetUpgradeAssetById(UpgradeId);
+	if (!UpgradeData)
+	{
+		ShowDiscoveryPopup(FString::Printf(TEXT("Oppgradering '%s' finnes ikke i registeret."), *UpgradeId.ToString()));
+		return false;
+	}
+
+	if (EconomySubsystem->IsUpgradeUnlocked(UpgradeData->UpgradeId))
+	{
+		ShowDiscoveryPopup(FString::Printf(TEXT("Oppgradering allerede låst opp: %s"), *UpgradeId.ToString()));
+		return true;
+	}
+
+	const bool bPurchased = EconomySubsystem->PurchaseUpgrade(UpgradeData);
+	if (!bPurchased)
+	{
+		ShowDiscoveryPopup(FString::Printf(TEXT("Ikke nok kreditter til %s (%d)."), *UpgradeId.ToString(), FMath::Max(0, UpgradeData->CreditCost)));
+		return false;
+	}
+
+	ShowDiscoveryPopup(FString::Printf(TEXT("Kjøpt oppgradering: %s"), *UpgradeId.ToString()));
+	if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
+	{
+		TelemetrySubsystem->RecordCounterEvent(TEXT("PortUpgradesPurchased"), 1);
+	}
+
+	if (ASailingGameMode* GM = Cast<ASailingGameMode>(UGameplayStatics::GetGameMode(GetWorld())))
+	{
+		GM->SaveGame_();
+	}
+
+	CloseMissionBoard();
+	return true;
+}
+
 void ASailingHUD::CloseMissionBoard()
 {
 	HidePortMissionBoard();
@@ -299,6 +406,8 @@ void ASailingHUD::CloseMissionBoard()
 	LastMissionBoardCooldownRemainingSeconds = 0.0f;
 	bLastMissionBoardAutoRepairAtPort = true;
 	LastMissionBoardRepairCostPerPercentPoint = 1;
+	bLastMissionBoardOfferUpgradeService = false;
+	LastMissionBoardOfferedUpgradeIds.Reset();
 	LastMissionBoardData = FPortMissionBoardData();
 }
 
@@ -323,6 +432,11 @@ void ASailingHUD::HandleMissionBoardCloseRequest()
 void ASailingHUD::HandleRepairRequest()
 {
 	RequestRepairFromBoard();
+}
+
+void ASailingHUD::HandleUpgradePurchaseRequest(FName UpgradeId)
+{
+	RequestUpgradePurchaseFromBoard(UpgradeId);
 }
 
 void ASailingHUD::PushOverlayData(int32 DiscoveredIslands, int32 Credits, FName ActiveMissionId,

@@ -9,6 +9,7 @@
 #include "MissionObjectiveActor.h"
 #include "PortMarkerActor.h"
 #include "Data/PortDataAsset.h"
+#include "Data/BoatUpgradeDataAsset.h"
 #include "Data/SailingMissionDataAsset.h"
 #include "SaveGameSailing.h"
 #include "Systems/SailingCoreSubsystems.h"
@@ -57,6 +58,59 @@ void ASailingGameMode::BeginPlay()
 
 		if (UEconomySubsystem* EconomySubsystem = GI->GetSubsystem<UEconomySubsystem>())
 		{
+			auto EnsureUpgrade = [this, EconomySubsystem](
+				FName UpgradeId,
+				int32 CreditCost,
+				float MaxSpeedMultiplier,
+				float DragMultiplier,
+				float TurnRateMultiplier,
+				const TCHAR* DisplayNameText,
+				const TCHAR* DescriptionText)
+				-> UBoatUpgradeDataAsset*
+			{
+				if (const UBoatUpgradeDataAsset* ExistingUpgrade = EconomySubsystem->GetUpgradeAssetById(UpgradeId))
+				{
+					return const_cast<UBoatUpgradeDataAsset*>(ExistingUpgrade);
+				}
+
+				UBoatUpgradeDataAsset* RuntimeFallbackUpgrade = NewObject<UBoatUpgradeDataAsset>(this);
+				RuntimeFallbackUpgrade->UpgradeId = UpgradeId;
+				RuntimeFallbackUpgrade->DisplayName = FText::FromString(DisplayNameText);
+				RuntimeFallbackUpgrade->Description = FText::FromString(DescriptionText);
+				RuntimeFallbackUpgrade->CreditCost = FMath::Max(0, CreditCost);
+				RuntimeFallbackUpgrade->MaxSpeedMultiplier = FMath::Max(0.1f, MaxSpeedMultiplier);
+				RuntimeFallbackUpgrade->DragMultiplier = FMath::Max(0.1f, DragMultiplier);
+				RuntimeFallbackUpgrade->TurnRateMultiplier = FMath::Max(0.1f, TurnRateMultiplier);
+				EconomySubsystem->RegisterUpgradeAsset(RuntimeFallbackUpgrade);
+				UE_LOG(LogTemp, Warning, TEXT("SailingGameMode: Bruker runtime fallback for oppgradering '%s'."), *UpgradeId.ToString());
+				return RuntimeFallbackUpgrade;
+			};
+
+			EnsureUpgrade(
+				TEXT("SkrogTrimV1"),
+				450,
+				1.06f,
+				0.96f,
+				1.0f,
+				TEXT("Skrogtrim V1"),
+				TEXT("Lett skrogtrim som reduserer motstand i moderate hastigheter."));
+			EnsureUpgrade(
+				TEXT("RorResponsV1"),
+				600,
+				1.0f,
+				1.0f,
+				1.15f,
+				TEXT("Rorrespons V1"),
+				TEXT("Forbedret rorutslag for raskere vending i trange farvann."));
+			EnsureUpgrade(
+				TEXT("RiggeffektivitetV1"),
+				850,
+				1.1f,
+				0.94f,
+				1.05f,
+				TEXT("Riggeffektivitet V1"),
+				TEXT("Optimaliserte seiltrimlinjer for bedre fremdrift i kryss."));
+
 			EconomySubsystem->SetCredits(SaveGame ? SaveGame->PlayerCredits : 0);
 			EconomySubsystem->SetBoatConditionPercent(SaveGame ? SaveGame->BoatConditionPercent : 100);
 			EconomySubsystem->SetUnlockedUpgrades(SaveGame ? SaveGame->UnlockedUpgradeIds : TArray<FName>());
@@ -230,6 +284,8 @@ void ASailingGameMode::BeginPlay()
 				}
 				PortNord->bCycleMissionOnDock = true;
 				PortNord->MissionBoardCooldownSeconds = 12.0f;
+				PortNord->bOfferUpgradeService = true;
+				PortNord->OfferedUpgradeIds = { TEXT("SkrogTrimV1"), TEXT("RorResponsV1") };
 				PortDefinitions.Add(PortNord);
 
 				UPortDataAsset* PortVest = NewObject<UPortDataAsset>(this);
@@ -246,6 +302,8 @@ void ASailingGameMode::BeginPlay()
 				}
 				PortVest->bCycleMissionOnDock = true;
 				PortVest->MissionBoardCooldownSeconds = 12.0f;
+				PortVest->bOfferUpgradeService = true;
+				PortVest->OfferedUpgradeIds = { TEXT("RorResponsV1"), TEXT("RiggeffektivitetV1") };
 				PortDefinitions.Add(PortVest);
 
 				UPortDataAsset* PortSor = NewObject<UPortDataAsset>(this);
@@ -263,6 +321,8 @@ void ASailingGameMode::BeginPlay()
 				}
 				PortSor->bCycleMissionOnDock = true;
 				PortSor->MissionBoardCooldownSeconds = 12.0f;
+				PortSor->bOfferUpgradeService = true;
+				PortSor->OfferedUpgradeIds = { TEXT("SkrogTrimV1"), TEXT("RiggeffektivitetV1") };
 				PortDefinitions.Add(PortSor);
 			}
 
@@ -288,6 +348,9 @@ void ASailingGameMode::BeginPlay()
 				PortMarker->WeightedOfferedMissions = PortData->WeightedOfferedMissions;
 				PortMarker->MaxOfferedMissionsAtBoard = PortData->MaxOfferedMissionsAtBoard;
 				PortMarker->MissionBoardCooldownSeconds = PortData->MissionBoardCooldownSeconds;
+				PortMarker->bOfferUpgradeService = PortData->bOfferUpgradeService;
+				PortMarker->OfferedUpgradeIds = PortData->OfferedUpgradeIds;
+				PortMarker->MaxOfferedUpgrades = PortData->MaxOfferedUpgrades;
 
 				SpawnedPortMarkers.Add(PortMarker);
 				WorldStreamingSubsystem->RegisterPortPoint(PortData->PortId, PortData->WorldLocation);

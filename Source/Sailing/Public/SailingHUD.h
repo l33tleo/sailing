@@ -24,13 +24,17 @@ public:
 	void ShowPortMissionBoard(FName PortId, const FText& PortDisplayName,
 		const TArray<FName>& OfferedMissionIds, FName CurrentMissionId,
 		bool bMissionBoardOnCooldown, float CooldownRemainingSeconds,
-		bool bAutoRepairAtPort, int32 RepairCostPerPercentPoint);
+		bool bAutoRepairAtPort, int32 RepairCostPerPercentPoint,
+		bool bOfferUpgradeService, const TArray<FName>& OfferedUpgradeIds);
 
 	UFUNCTION(BlueprintCallable, Category = "HUD|MissionBoard")
 	bool AcceptMissionFromBoard(FName MissionId);
 
 	UFUNCTION(BlueprintCallable, Category = "HUD|MissionBoard")
 	bool RequestRepairFromBoard();
+
+	UFUNCTION(BlueprintCallable, Category = "HUD|MissionBoard")
+	bool RequestUpgradePurchaseFromBoard(FName UpgradeId);
 
 	UFUNCTION(BlueprintCallable, Category = "HUD|MissionBoard")
 	void CloseMissionBoard();
@@ -108,6 +112,8 @@ private:
 	void HandleMissionBoardCloseRequest();
 	UFUNCTION()
 	void HandleRepairRequest();
+	UFUNCTION()
+	void HandleUpgradePurchaseRequest(FName UpgradeId);
 	void PushOverlayData(int32 DiscoveredIslands, int32 Credits, FName ActiveMissionId,
 		const FText& ActiveMissionTitle, float ObjectiveDistanceMeters, int32 BoatConditionPercent,
 		float ObjectiveBearingDegrees, FName LastVisitedPortId);
@@ -142,4 +148,6 @@ private:
 	float LastMissionBoardCooldownRemainingSeconds = 0.0f;
 	bool bLastMissionBoardAutoRepairAtPort = true;
 	int32 LastMissionBoardRepairCostPerPercentPoint = 1;
+	bool bLastMissionBoardOfferUpgradeService = false;
+	TArray<FName> LastMissionBoardOfferedUpgradeIds;
 };

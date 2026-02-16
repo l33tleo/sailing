@@ -512,11 +512,13 @@ TArray<FMissionBoardSelectionEntry> UMissionSubsystem::GetRecentMissionBoardSele
 void UEconomySubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
+	ReloadUpgradeAssets();
 	UE_LOG(LogTemp, Log, TEXT("EconomySubsystem initialized. Credits=%d Condition=%d%%"), Credits, BoatConditionPercent);
 }
 
 void UEconomySubsystem::Deinitialize()
 {
+	RegisteredUpgrades.Empty();
 	UE_LOG(LogTemp, Log, TEXT("EconomySubsystem deinitialized."));
 	Super::Deinitialize();
 }
@@ -600,6 +602,67 @@ bool UEconomySubsystem::PurchaseUpgrade(const UBoatUpgradeDataAsset* UpgradeData
 
 	UnlockedUpgradeIds.Add(UpgradeData->UpgradeId);
 	return true;
+}
+
+bool UEconomySubsystem::RegisterUpgradeAsset(const UBoatUpgradeDataAsset* UpgradeData)
+{
+	if (!UpgradeData || UpgradeData->UpgradeId.IsNone())
+	{
+		return false;
+	}
+
+	RegisteredUpgrades.FindOrAdd(UpgradeData->UpgradeId) = const_cast<UBoatUpgradeDataAsset*>(UpgradeData);
+	return true;
+}
+
+int32 UEconomySubsystem::ReloadUpgradeAssets()
+{
+	RegisteredUpgrades.Empty();
+
+	const FName ScanPath = UpgradeAssetPath.IsNone() ? FName(TEXT("/Game")) : UpgradeAssetPath;
+
+	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>(TEXT("AssetRegistry"));
+	FARFilter Filter;
+	Filter.PackagePaths.Add(ScanPath);
+	Filter.ClassPaths.Add(UBoatUpgradeDataAsset::StaticClass()->GetClassPathName());
+	Filter.bRecursivePaths = true;
+
+	TArray<FAssetData> UpgradeAssets;
+	AssetRegistryModule.Get().GetAssets(Filter, UpgradeAssets);
+
+	int32 RegisteredCount = 0;
+	for (const FAssetData& AssetData : UpgradeAssets)
+	{
+		if (const UBoatUpgradeDataAsset* UpgradeData = Cast<UBoatUpgradeDataAsset>(AssetData.GetAsset()))
+		{
+			RegisteredCount += RegisterUpgradeAsset(UpgradeData) ? 1 : 0;
+		}
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("EconomySubsystem: Registered %d upgrade assets from %s"), RegisteredCount, *ScanPath.ToString());
+	return RegisteredCount;
+}
+
+TArray<FName> UEconomySubsystem::GetRegisteredUpgradeIds() const
+{
+	TArray<FName> UpgradeIds;
+	RegisteredUpgrades.GenerateKeyArray(UpgradeIds);
+	UpgradeIds.Sort(FNameLexicalLess());
+	return UpgradeIds;
+}
+
+const UBoatUpgradeDataAsset* UEconomySubsystem::GetUpgradeAssetById(FName UpgradeId) const
+{
+	if (UpgradeId.IsNone())
+	{
+		return nullptr;
+	}
+
+	if (const TObjectPtr<UBoatUpgradeDataAsset>* UpgradePtr = RegisteredUpgrades.Find(UpgradeId))
+	{
+		return UpgradePtr ? UpgradePtr->Get() : nullptr;
+	}
+	return nullptr;
 }
 
 void UEconomySubsystem::SetUnlockedUpgrades(const TArray<FName>& UpgradeIds)

@@ -73,6 +73,11 @@ bool FSailingEconomyPurchaseUpgradeTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("Purchase should succeed with enough credits"), bPurchaseSucceeded);
 	TestEqual(TEXT("Credits should be reduced by cost"), Economy->GetCredits(), 200);
 	TestTrue(TEXT("Upgrade should be unlocked after purchase"), Economy->IsUpgradeUnlocked(Upgrade->UpgradeId));
+	TestTrue(TEXT("Upgrade registration should succeed"), Economy->RegisterUpgradeAsset(Upgrade));
+	TestNotNull(TEXT("Upgrade lookup by id should return registered asset"), Economy->GetUpgradeAssetById(Upgrade->UpgradeId));
+	const TArray<FName> RegisteredUpgradeIds = Economy->GetRegisteredUpgradeIds();
+	TestTrue(TEXT("Registered upgrades should include purchased upgrade"), RegisteredUpgradeIds.Contains(Upgrade->UpgradeId));
+	TestNull(TEXT("Unknown upgrade lookup should return null"), Economy->GetUpgradeAssetById(TEXT("UnknownUpgrade")));
 	return true;
 }
 

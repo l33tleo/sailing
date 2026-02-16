@@ -66,6 +66,15 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Port|MissionBoard", meta = (ClampMin = "0"))
 	float MissionBoardCooldownSeconds = 0.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Port|Services")
+	bool bOfferUpgradeService = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Port|Services")
+	TArray<FName> OfferedUpgradeIds;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Port|Services", meta = (ClampMin = "0", ClampMax = "10"))
+	int32 MaxOfferedUpgrades = 3;
+
 private:
 	bool bVisitedInSession = false;
 	float NextMissionBoardAvailableTime = 0.0f;

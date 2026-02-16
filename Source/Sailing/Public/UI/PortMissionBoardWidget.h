@@ -8,6 +8,7 @@
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPortMissionAcceptRequested, FName, MissionId);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPortMissionBoardCloseRequested);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPortRepairRequested);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPortUpgradePurchaseRequested, FName, UpgradeId);
 
 USTRUCT(BlueprintType)
 struct SAILING_API FPortMissionOfferEntry
@@ -19,6 +20,27 @@ struct SAILING_API FPortMissionOfferEntry
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
 	FText MissionTitle;
+};
+
+USTRUCT(BlueprintType)
+struct SAILING_API FPortUpgradeOfferEntry
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	FName UpgradeId = NAME_None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	FText UpgradeTitle;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	int32 CreditCost = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	bool bUnlocked = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	bool bAffordable = false;
 };
 
 USTRUCT(BlueprintType)
@@ -66,6 +88,18 @@ struct SAILING_API FPortMissionBoardData
 	FText MissionSwitchConfirmationStatus;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	bool bSupportsUpgradeService = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	TArray<FName> OfferedUpgradeIds;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	TArray<FPortUpgradeOfferEntry> OfferedUpgrades;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	FText UpgradeStatus;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
 	bool bSupportsRepairService = false;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
@@ -105,6 +139,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MissionBoard|Service")
 	void RequestRepairService();
 
+	UFUNCTION(BlueprintCallable, Category = "MissionBoard|Service")
+	void RequestPurchaseUpgrade(FName UpgradeId);
+
 	UFUNCTION(BlueprintPure, Category = "MissionBoard")
 	const FPortMissionBoardData& GetLastData() const { return LastData; }
 
@@ -116,6 +153,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable, Category = "MissionBoard|Service")
 	FOnPortRepairRequested OnRepairRequested;
+
+	UPROPERTY(BlueprintAssignable, Category = "MissionBoard|Service")
+	FOnPortUpgradePurchaseRequested OnUpgradePurchaseRequested;
 
 protected:
 	UFUNCTION(BlueprintImplementableEvent, Category = "MissionBoard")
