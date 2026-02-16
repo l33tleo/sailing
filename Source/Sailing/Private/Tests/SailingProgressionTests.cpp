@@ -352,6 +352,10 @@ bool FSailingMissionDisplayNameLookupTest::RunTest(const FString& Parameters)
 	Mission->MissionType = ESailingMissionType::Delivery;
 
 	MissionSubsystem->RegisterMissionAsset(Mission);
+	const USailingMissionDataAsset* FoundMission = MissionSubsystem->GetMissionAssetById(Mission->MissionId);
+	TestNotNull(TEXT("Mission lookup by id should return registered mission"), FoundMission);
+	TestNull(TEXT("Mission lookup by id should return null for unknown mission"),
+		MissionSubsystem->GetMissionAssetById(TEXT("UnknownMission")));
 
 	const FText FoundTitle = MissionSubsystem->GetMissionDisplayNameById(Mission->MissionId);
 	TestEqual(TEXT("Display name lookup should return registered title"), FoundTitle.ToString(), FString(TEXT("Visningsnavn")));
