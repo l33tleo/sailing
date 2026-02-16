@@ -136,7 +136,6 @@ void AChunkManager::OnIslandDiscovered(AIslandActor* Island, const FString& Isla
 	SaveGame->MarkIslandDiscovered(Data);
 
 	int32 CreditsGranted = 0;
-	bool bMissionObjectiveSyncNeeded = false;
 	if (UGameInstance* GI = GetGameInstance())
 	{
 		if (UEconomySubsystem* EconomySubsystem = GI->GetSubsystem<UEconomySubsystem>())
@@ -149,10 +148,7 @@ void AChunkManager::OnIslandDiscovered(AIslandActor* Island, const FString& Isla
 
 			if (UMissionSubsystem* MissionSubsystem = GI->GetSubsystem<UMissionSubsystem>())
 			{
-				const FName MissionIdBeforeCompletion = MissionSubsystem->GetActiveMissionId();
 				const int32 MissionReward = MissionSubsystem->CompleteActiveMissionByTrigger(ESailingMissionType::NavigationChallenge);
-				const FName MissionIdAfterCompletion = MissionSubsystem->GetActiveMissionId();
-				bMissionObjectiveSyncNeeded = MissionIdBeforeCompletion != MissionIdAfterCompletion;
 				if (MissionReward > 0)
 				{
 					EconomySubsystem->AddCredits(MissionReward);
@@ -174,10 +170,6 @@ void AChunkManager::OnIslandDiscovered(AIslandActor* Island, const FString& Isla
 	// Auto-save via game mode to preserve subsystem-backed progression state.
 	if (ASailingGameMode* GM = Cast<ASailingGameMode>(UGameplayStatics::GetGameMode(this)))
 	{
-		if (bMissionObjectiveSyncNeeded)
-		{
-			GM->SyncActiveMissionObjectiveMarker();
-		}
 		GM->SaveGame_();
 	}
 	else
