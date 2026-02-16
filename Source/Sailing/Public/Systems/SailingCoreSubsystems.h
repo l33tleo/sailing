@@ -131,6 +131,9 @@ public:
 	bool ActivateFallbackMission();
 
 	UFUNCTION(BlueprintCallable, Category = "Sailing|Mission")
+	bool CycleToNextMission();
+
+	UFUNCTION(BlueprintCallable, Category = "Sailing|Mission")
 	void SetCompletedMissionIds(const TArray<FName>& MissionIds);
 
 	UFUNCTION(BlueprintPure, Category = "Sailing|Mission")

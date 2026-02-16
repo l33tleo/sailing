@@ -198,6 +198,35 @@ bool FSailingMissionFallbackSelectionTest::RunTest(const FString& Parameters)
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSailingMissionCycleSelectionTest,
+	"Sailing.Progression.Mission.CycleToNextMission",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSailingMissionCycleSelectionTest::RunTest(const FString& Parameters)
+{
+	UMissionSubsystem* MissionSubsystem = NewObject<UMissionSubsystem>();
+
+	USailingMissionDataAsset* MissionA = NewObject<USailingMissionDataAsset>();
+	MissionA->MissionId = TEXT("Mission_A");
+	MissionA->MissionType = ESailingMissionType::NavigationChallenge;
+	MissionA->bRepeatable = false;
+
+	USailingMissionDataAsset* MissionB = NewObject<USailingMissionDataAsset>();
+	MissionB->MissionId = TEXT("Mission_B");
+	MissionB->MissionType = ESailingMissionType::Delivery;
+	MissionB->bRepeatable = true;
+
+	MissionSubsystem->RegisterMissionAsset(MissionA);
+	MissionSubsystem->RegisterMissionAsset(MissionB);
+	MissionSubsystem->SetCompletedMissionIds({ MissionA->MissionId });
+	MissionSubsystem->SetActiveMissionId(MissionA->MissionId);
+
+	TestTrue(TEXT("Cycle should select next available mission"), MissionSubsystem->CycleToNextMission());
+	TestEqual(TEXT("Cycle should land on Mission_B"), MissionSubsystem->GetActiveMissionId(), MissionB->MissionId);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FSailingEconomyRepairFlowTest,
 	"Sailing.Progression.Economy.RepairFlow",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

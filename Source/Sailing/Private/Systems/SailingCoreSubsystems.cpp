@@ -282,6 +282,48 @@ bool UMissionSubsystem::ActivateFallbackMission()
 	return false;
 }
 
+bool UMissionSubsystem::CycleToNextMission()
+{
+	const TArray<FName> MissionIds = GetRegisteredMissionIds();
+	if (MissionIds.Num() == 0)
+	{
+		return false;
+	}
+
+	int32 StartIndex = 0;
+	if (!ActiveMissionId.IsNone())
+	{
+		const int32 CurrentIndex = MissionIds.IndexOfByKey(ActiveMissionId);
+		if (CurrentIndex != INDEX_NONE)
+		{
+			StartIndex = (CurrentIndex + 1) % MissionIds.Num();
+		}
+	}
+
+	for (int32 Offset = 0; Offset < MissionIds.Num(); ++Offset)
+	{
+		const int32 Idx = (StartIndex + Offset) % MissionIds.Num();
+		const FName CandidateId = MissionIds[Idx];
+		const TObjectPtr<USailingMissionDataAsset>* MissionPtr = RegisteredMissions.Find(CandidateId);
+		const USailingMissionDataAsset* Mission = MissionPtr ? MissionPtr->Get() : nullptr;
+		if (!Mission)
+		{
+			continue;
+		}
+
+		const bool bCompleted = CompletedMissionIds.Contains(CandidateId);
+		if (bCompleted && !Mission->bRepeatable)
+		{
+			continue;
+		}
+
+		ActiveMissionId = CandidateId;
+		return true;
+	}
+
+	return false;
+}
+
 void UMissionSubsystem::SetCompletedMissionIds(const TArray<FName>& MissionIds)
 {
 	CompletedMissionIds.Empty();

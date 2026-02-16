@@ -51,6 +51,8 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 
 	int32 GrantedCredits = 0;
 	bool bBoatRepaired = false;
+	bool bMissionUpdated = false;
+	FName NewMissionId = NAME_None;
 	if (UGameInstance* GI = GetGameInstance())
 	{
 		if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
@@ -80,6 +82,26 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 				bBoatRepaired = EconomySubsystem->RepairBoatToFull(RepairCostPerPercentPoint);
 			}
 		}
+
+		if (bOfferMissionBoard)
+		{
+			if (UMissionSubsystem* MissionSubsystem = GI->GetSubsystem<UMissionSubsystem>())
+			{
+				if (bCycleMissionOnDock)
+				{
+					bMissionUpdated = MissionSubsystem->CycleToNextMission();
+				}
+				else if (MissionSubsystem->GetActiveMissionId().IsNone())
+				{
+					bMissionUpdated = MissionSubsystem->ActivateFallbackMission();
+				}
+
+				if (bMissionUpdated)
+				{
+					NewMissionId = MissionSubsystem->GetActiveMissionId();
+				}
+			}
+		}
 	}
 
 	bVisitedInSession = true;
@@ -88,9 +110,15 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 	{
 		if (ASailingHUD* HUD = Cast<ASailingHUD>(PC->GetHUD()))
 		{
-			const FString PopupText = GrantedCredits > 0
+			FString PopupText = GrantedCredits > 0
 				? FString::Printf(TEXT("%s: Havnebonus +%d%s"), *PortId.ToString(), GrantedCredits, bBoatRepaired ? TEXT(" | Båt reparert") : TEXT(""))
 				: FString::Printf(TEXT("%s: Havn anløpt%s"), *PortId.ToString(), bBoatRepaired ? TEXT(" | Båt reparert") : TEXT(""));
+
+			if (bMissionUpdated && !NewMissionId.IsNone())
+			{
+				PopupText += FString::Printf(TEXT(" | Oppdrag: %s"), *NewMissionId.ToString());
+			}
+
 			HUD->ShowDiscoveryPopup(PopupText);
 		}
 	}
