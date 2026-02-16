@@ -229,13 +229,14 @@ def get_popular_stocks(market: str = "all") -> list[StockSearchResult]:
             t = yf.Ticker(ticker)
             fi = t.fast_info
             if fi:
+                price = getattr(fi, "last_price", None)
                 results.append(
                     StockSearchResult(
                         ticker=ticker,
                         name=STOCK_NAMES.get(ticker, ticker.replace(".OL", "")),
                         sector=None,
                         market="Oslo Børs" if ticker.endswith(".OL") else "US",
-                        current_price=getattr(fi, "last_price", None),
+                        current_price=round(price, 2) if price is not None else None,
                         currency=getattr(fi, "currency", None),
                     )
                 )
