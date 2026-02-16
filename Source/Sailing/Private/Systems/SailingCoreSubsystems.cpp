@@ -312,6 +312,28 @@ void UTelemetrySubsystem::RecordCounterEvent(FName EventName, int32 Delta)
 	EventCounters.FindOrAdd(EventName) += Delta;
 }
 
+void UTelemetrySubsystem::SetCounterValue(FName EventName, int32 Value)
+{
+	if (EventName.IsNone())
+	{
+		return;
+	}
+
+	EventCounters.FindOrAdd(EventName) = FMath::Max(0, Value);
+}
+
+void UTelemetrySubsystem::SetAllCounters(const TMap<FName, int32>& InCounters)
+{
+	EventCounters.Empty();
+	for (const TPair<FName, int32>& Pair : InCounters)
+	{
+		if (!Pair.Key.IsNone())
+		{
+			EventCounters.Add(Pair.Key, FMath::Max(0, Pair.Value));
+		}
+	}
+}
+
 int32 UTelemetrySubsystem::GetCounterValue(FName EventName) const
 {
 	if (const int32* Counter = EventCounters.Find(EventName))

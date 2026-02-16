@@ -65,6 +65,9 @@ public:
 	UPROPERTY(BlueprintReadWrite, Category = "Save|Mission")
 	FName ActiveMissionId = NAME_None;
 
+	UPROPERTY(BlueprintReadWrite, Category = "Save|Telemetry")
+	TMap<FName, int32> TelemetryCounters;
+
 	// Helper functions
 	bool IsIslandDiscovered(FIntPoint ChunkCoord, int32 IslandIndex) const;
 	void MarkIslandDiscovered(const FIslandData& IslandData);

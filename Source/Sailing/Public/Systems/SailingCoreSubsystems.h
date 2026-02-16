@@ -213,8 +213,17 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Sailing|Telemetry")
 	void RecordCounterEvent(FName EventName, int32 Delta = 1);
 
+	UFUNCTION(BlueprintCallable, Category = "Sailing|Telemetry")
+	void SetCounterValue(FName EventName, int32 Value);
+
+	UFUNCTION(BlueprintCallable, Category = "Sailing|Telemetry")
+	void SetAllCounters(const TMap<FName, int32>& InCounters);
+
 	UFUNCTION(BlueprintPure, Category = "Sailing|Telemetry")
 	int32 GetCounterValue(FName EventName) const;
+
+	UFUNCTION(BlueprintPure, Category = "Sailing|Telemetry")
+	TMap<FName, int32> GetAllCounters() const { return EventCounters; }
 
 private:
 	UPROPERTY()

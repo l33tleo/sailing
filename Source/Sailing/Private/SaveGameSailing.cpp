@@ -10,6 +10,7 @@ USaveGameSailing::USaveGameSailing()
 	PlayerCredits = 0;
 	UnlockedUpgradeIds.Empty();
 	ActiveMissionId = NAME_None;
+	TelemetryCounters.Empty();
 }
 
 bool USaveGameSailing::IsIslandDiscovered(FIntPoint ChunkCoord, int32 IslandIndex) const
@@ -72,5 +73,9 @@ void USaveGameSailing::EnsureCompatibility()
 	}
 
 	PlayerCredits = FMath::Max(0, PlayerCredits);
+	for (TPair<FName, int32>& Pair : TelemetryCounters)
+	{
+		Pair.Value = FMath::Max(0, Pair.Value);
+	}
 	SaveSchemaVersion = CurrentSaveSchemaVersion;
 }

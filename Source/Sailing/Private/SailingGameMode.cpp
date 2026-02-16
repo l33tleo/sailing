@@ -101,6 +101,11 @@ void ASailingGameMode::BeginPlay()
 
 			UE_LOG(LogTemp, Log, TEXT("SailingGameMode: Aktivt oppdrag '%s'."), *MissionSubsystem->GetActiveMissionId().ToString());
 		}
+
+		if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
+		{
+			TelemetrySubsystem->SetAllCounters(SaveGame ? SaveGame->TelemetryCounters : TMap<FName, int32>());
+		}
 	}
 
 	FActorSpawnParameters Params;
@@ -197,6 +202,11 @@ void ASailingGameMode::SaveGame_()
 			if (UMissionSubsystem* MissionSubsystem = GI->GetSubsystem<UMissionSubsystem>())
 			{
 				SaveGame->ActiveMissionId = MissionSubsystem->GetActiveMissionId();
+			}
+
+			if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
+			{
+				SaveGame->TelemetryCounters = TelemetrySubsystem->GetAllCounters();
 			}
 		}
 

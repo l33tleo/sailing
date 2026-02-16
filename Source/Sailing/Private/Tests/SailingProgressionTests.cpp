@@ -57,4 +57,31 @@ bool FSailingEconomyPurchaseUpgradeTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSailingTelemetryCounterSanitizationTest,
+	"Sailing.Progression.Telemetry.CounterSanitization",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSailingTelemetryCounterSanitizationTest::RunTest(const FString& Parameters)
+{
+	USaveGameSailing* Save = NewObject<USaveGameSailing>();
+	Save->TelemetryCounters.Add(TEXT("MissionCompleted"), -5);
+	Save->TelemetryCounters.Add(TEXT("CreditsGranted"), 150);
+	Save->EnsureCompatibility();
+
+	TestEqual(TEXT("Negative telemetry values should be clamped to zero"), Save->TelemetryCounters.FindRef(TEXT("MissionCompleted")), 0);
+	TestEqual(TEXT("Positive telemetry values should remain unchanged"), Save->TelemetryCounters.FindRef(TEXT("CreditsGranted")), 150);
+
+	UTelemetrySubsystem* Telemetry = NewObject<UTelemetrySubsystem>();
+	TMap<FName, int32> InCounters;
+	InCounters.Add(TEXT("IslandDiscovered"), 3);
+	InCounters.Add(TEXT("CreditsGranted"), -10);
+	Telemetry->SetAllCounters(InCounters);
+	Telemetry->RecordCounterEvent(TEXT("IslandDiscovered"), 2);
+
+	TestEqual(TEXT("SetAllCounters should sanitize negatives"), Telemetry->GetCounterValue(TEXT("CreditsGranted")), 0);
+	TestEqual(TEXT("RecordCounterEvent should increment stored values"), Telemetry->GetCounterValue(TEXT("IslandDiscovered")), 5);
+	return true;
+}
+
 #endif
