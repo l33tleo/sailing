@@ -64,6 +64,9 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 	const TArray<FName>& OfferedMissionIds, FName CurrentMissionId,
 	bool bMissionBoardOnCooldown, float CooldownRemainingSeconds,
 	EPortBoardRefreshContext RefreshContext,
+	bool bAllowManualBoardRefresh,
+	float ManualBoardRefreshCooldownSeconds,
+	int32 ManualBoardRefreshCreditCost,
 	const TArray<FPortMissionWeightedOffer>& WeightedOfferedMissionRules,
 	bool bUsedWeightedMissionRules,
 	bool bUsedFallbackMissionOffers,
@@ -96,6 +99,18 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 	Data.bMissionBoardOnCooldown = bMissionBoardOnCooldown;
 	Data.CooldownRemainingSeconds = FMath::Max(0.0f, CooldownRemainingSeconds);
 	Data.PortVisitCount = FMath::Max(0, CurrentPortVisitCount);
+	Data.bSupportsManualRefresh = bAllowManualBoardRefresh;
+	Data.ManualRefreshCreditCost = FMath::Max(0, ManualBoardRefreshCreditCost);
+	const float CurrentTimeSeconds = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+	if (LastMissionBoardPortId != PortId)
+	{
+		LastMissionBoardManualRefreshNextAvailableTime = 0.0f;
+	}
+	Data.bManualRefreshOnCooldown = Data.bSupportsManualRefresh && (CurrentTimeSeconds < LastMissionBoardManualRefreshNextAvailableTime);
+	Data.ManualRefreshCooldownRemainingSeconds = Data.bManualRefreshOnCooldown
+		? (LastMissionBoardManualRefreshNextAvailableTime - CurrentTimeSeconds)
+		: 0.0f;
+	Data.bCanAffordManualRefresh = Data.ManualRefreshCreditCost <= 0;
 	Data.bAwaitingMissionSwitchConfirmation = false;
 	Data.PendingMissionSwitchId = NAME_None;
 	Data.MissionSwitchConfirmationStatus = FText::GetEmpty();
@@ -150,6 +165,7 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 			Data.EstimatedRepairCostCredits = MissingCondition * CostPerPoint;
 			Data.bSupportsRepairService = !bAutoRepairAtPort;
 			Data.bCanAffordRepair = EconomySubsystem->GetCredits() >= Data.EstimatedRepairCostCredits;
+			Data.bCanAffordManualRefresh = EconomySubsystem->GetCredits() >= Data.ManualRefreshCreditCost;
 			if (!Data.bSupportsRepairService)
 			{
 				Data.RepairStatus = FText::FromString(TEXT("Reparasjon utføres automatisk ved anløp."));
@@ -248,6 +264,12 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 			Data.RecentSelections = MissionSubsystem->GetRecentMissionBoardSelectionsForPort(PortId, 5);
 		}
 	}
+	Data.ManualRefreshStatus = UPortMissionBoardWidget::BuildManualRefreshStatusText(
+		Data.bSupportsManualRefresh,
+		Data.bManualRefreshOnCooldown,
+		Data.ManualRefreshCooldownRemainingSeconds,
+		Data.ManualRefreshCreditCost,
+		Data.bCanAffordManualRefresh);
 	LastMissionBoardData = Data;
 	PortMissionBoardWidget->PushMissionBoardData(LastMissionBoardData);
 	PortMissionBoardWidget->SetVisibility(ESlateVisibility::Visible);
@@ -257,6 +279,9 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 	LastMissionBoardOfferedIds = OfferedMissionIds;
 	bLastMissionBoardOnCooldown = bMissionBoardOnCooldown;
 	LastMissionBoardCooldownRemainingSeconds = FMath::Max(0.0f, CooldownRemainingSeconds);
+	bLastMissionBoardAllowManualRefresh = bAllowManualBoardRefresh;
+	LastMissionBoardManualRefreshCooldownSeconds = FMath::Max(0.0f, ManualBoardRefreshCooldownSeconds);
+	LastMissionBoardManualRefreshCreditCost = FMath::Max(0, ManualBoardRefreshCreditCost);
 	bLastMissionBoardAutoRepairAtPort = bAutoRepairAtPort;
 	LastMissionBoardRepairCostPerPercentPoint = FMath::Max(0, RepairCostPerPercentPoint);
 	bLastMissionBoardOfferUpgradeService = bOfferUpgradeService;
@@ -524,6 +549,129 @@ void ASailingHUD::RefreshCurrentMissionBoard()
 		return;
 	}
 
+	if (!bLastMissionBoardAllowManualRefresh)
+	{
+		LastMissionBoardData.bSupportsManualRefresh = false;
+		LastMissionBoardData.ManualRefreshStatus = UPortMissionBoardWidget::BuildManualRefreshStatusText(
+			false,
+			false,
+			0.0f,
+			LastMissionBoardData.ManualRefreshCreditCost,
+			true);
+		PortMissionBoardWidget->PushMissionBoardData(LastMissionBoardData);
+		ShowDiscoveryPopup(TEXT("Manuell oppfriskning er deaktivert i denne havnen."));
+		return;
+	}
+
+	const float CurrentTimeSeconds = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+	if (CurrentTimeSeconds < LastMissionBoardManualRefreshNextAvailableTime)
+	{
+		LastMissionBoardData.bManualRefreshOnCooldown = true;
+		LastMissionBoardData.ManualRefreshCooldownRemainingSeconds = LastMissionBoardManualRefreshNextAvailableTime - CurrentTimeSeconds;
+		LastMissionBoardData.ManualRefreshStatus = UPortMissionBoardWidget::BuildManualRefreshStatusText(
+			true,
+			true,
+			LastMissionBoardData.ManualRefreshCooldownRemainingSeconds,
+			LastMissionBoardData.ManualRefreshCreditCost,
+			LastMissionBoardData.bCanAffordManualRefresh);
+		LastMissionBoardData.RefreshContext = EPortBoardRefreshContext::CooldownBlocked;
+		LastMissionBoardData.RefreshContextStatus = UPortMissionBoardWidget::BuildRefreshContextStatusText(
+			LastMissionBoardData.RefreshContext);
+		PortMissionBoardWidget->PushMissionBoardData(LastMissionBoardData);
+		ShowDiscoveryPopup(FString::Printf(TEXT("Tavlen kan oppfriskes om %.0f sekunder."), LastMissionBoardData.ManualRefreshCooldownRemainingSeconds));
+		return;
+	}
+
+	UGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
+	UEconomySubsystem* EconomySubsystem = GI ? GI->GetSubsystem<UEconomySubsystem>() : nullptr;
+	const int32 RefreshCost = FMath::Max(0, LastMissionBoardManualRefreshCreditCost);
+	if (RefreshCost > 0 && !EconomySubsystem)
+	{
+		ShowDiscoveryPopup(TEXT("Kunne ikke belaste kreditter for oppfriskning."));
+		return;
+	}
+	if (RefreshCost > 0 && EconomySubsystem)
+	{
+		if (!EconomySubsystem->SpendCredits(RefreshCost))
+		{
+			LastMissionBoardData.bCanAffordManualRefresh = false;
+			LastMissionBoardData.ManualRefreshStatus = UPortMissionBoardWidget::BuildManualRefreshStatusText(
+				true,
+				false,
+				0.0f,
+				RefreshCost,
+				false);
+			PortMissionBoardWidget->PushMissionBoardData(LastMissionBoardData);
+			ShowDiscoveryPopup(FString::Printf(TEXT("Ikke nok kreditter til oppfriskning (%d)."), RefreshCost));
+			return;
+		}
+	}
+
+	if (LastMissionBoardManualRefreshCooldownSeconds > 0.0f)
+	{
+		LastMissionBoardManualRefreshNextAvailableTime = CurrentTimeSeconds + LastMissionBoardManualRefreshCooldownSeconds;
+	}
+
+	if (EconomySubsystem)
+	{
+		LastMissionBoardData.CurrentBoatConditionPercent = EconomySubsystem->GetBoatConditionPercent();
+		const int32 MissingCondition = 100 - FMath::Clamp(LastMissionBoardData.CurrentBoatConditionPercent, 0, 100);
+		LastMissionBoardData.EstimatedRepairCostCredits = MissingCondition * FMath::Max(0, LastMissionBoardRepairCostPerPercentPoint);
+		LastMissionBoardData.bCanAffordRepair = EconomySubsystem->GetCredits() >= LastMissionBoardData.EstimatedRepairCostCredits;
+		LastMissionBoardData.bCanAffordManualRefresh = EconomySubsystem->GetCredits() >= RefreshCost;
+
+		int32 AffordableUpgradeCount = 0;
+		int32 ValidUpgradeOfferCount = 0;
+		for (FPortUpgradeOfferEntry& UpgradeEntry : LastMissionBoardData.OfferedUpgrades)
+		{
+			UpgradeEntry.bUnlocked = EconomySubsystem->IsUpgradeUnlocked(UpgradeEntry.UpgradeId);
+			UpgradeEntry.bAffordable = EconomySubsystem->GetCredits() >= UpgradeEntry.CreditCost;
+			ValidUpgradeOfferCount++;
+			if (!UpgradeEntry.bUnlocked && UpgradeEntry.bAffordable)
+			{
+				AffordableUpgradeCount++;
+			}
+		}
+		LastMissionBoardData.UpgradeAvailabilityReason = UPortMissionBoardWidget::DetermineUpgradeAvailabilityReason(
+			LastMissionBoardData.bSupportsUpgradeService,
+			ValidUpgradeOfferCount,
+			AffordableUpgradeCount);
+		LastMissionBoardData.UpgradeStatus = UPortMissionBoardWidget::BuildUpgradeAvailabilityStatusText(
+			LastMissionBoardData.UpgradeAvailabilityReason,
+			AffordableUpgradeCount);
+	}
+
+	if (GI)
+	{
+		if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
+		{
+			TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardManualRefreshes"), 1);
+			if (RefreshCost > 0)
+			{
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardManualRefreshCreditsSpent"), RefreshCost);
+			}
+		}
+		if (RefreshCost > 0)
+		{
+			if (ASailingGameMode* GM = Cast<ASailingGameMode>(UGameplayStatics::GetGameMode(GetWorld())))
+			{
+				GM->SaveGame_();
+			}
+		}
+	}
+
+	LastMissionBoardData.bManualRefreshOnCooldown = LastMissionBoardManualRefreshCooldownSeconds > 0.0f;
+	LastMissionBoardData.ManualRefreshCooldownRemainingSeconds = LastMissionBoardData.bManualRefreshOnCooldown
+		? LastMissionBoardManualRefreshCooldownSeconds
+		: 0.0f;
+	LastMissionBoardData.ManualRefreshCreditCost = RefreshCost;
+	LastMissionBoardData.ManualRefreshStatus = UPortMissionBoardWidget::BuildManualRefreshStatusText(
+		true,
+		LastMissionBoardData.bManualRefreshOnCooldown,
+		LastMissionBoardData.ManualRefreshCooldownRemainingSeconds,
+		RefreshCost,
+		LastMissionBoardData.bCanAffordManualRefresh);
+
 	LastMissionBoardData.RefreshContext = EPortBoardRefreshContext::ManualRefresh;
 	LastMissionBoardData.RefreshContextStatus = UPortMissionBoardWidget::BuildRefreshContextStatusText(
 		LastMissionBoardData.RefreshContext);
@@ -541,6 +689,10 @@ void ASailingHUD::CloseMissionBoard()
 	LastMissionBoardPortDisplayName = FText::GetEmpty();
 	bLastMissionBoardOnCooldown = false;
 	LastMissionBoardCooldownRemainingSeconds = 0.0f;
+	bLastMissionBoardAllowManualRefresh = true;
+	LastMissionBoardManualRefreshCooldownSeconds = 0.0f;
+	LastMissionBoardManualRefreshCreditCost = 0;
+	LastMissionBoardManualRefreshNextAvailableTime = 0.0f;
 	bLastMissionBoardAutoRepairAtPort = true;
 	LastMissionBoardRepairCostPerPercentPoint = 1;
 	bLastMissionBoardOfferUpgradeService = false;

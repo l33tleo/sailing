@@ -27,6 +27,9 @@ public:
 		const TArray<FName>& OfferedMissionIds, FName CurrentMissionId,
 		bool bMissionBoardOnCooldown, float CooldownRemainingSeconds,
 		EPortBoardRefreshContext RefreshContext,
+		bool bAllowManualBoardRefresh,
+		float ManualBoardRefreshCooldownSeconds,
+		int32 ManualBoardRefreshCreditCost,
 		const TArray<FPortMissionWeightedOffer>& WeightedOfferedMissionRules,
 		bool bUsedWeightedMissionRules,
 		bool bUsedFallbackMissionOffers,
@@ -166,6 +169,10 @@ private:
 	FText LastMissionBoardPortDisplayName;
 	bool bLastMissionBoardOnCooldown = false;
 	float LastMissionBoardCooldownRemainingSeconds = 0.0f;
+	bool bLastMissionBoardAllowManualRefresh = true;
+	float LastMissionBoardManualRefreshCooldownSeconds = 0.0f;
+	int32 LastMissionBoardManualRefreshCreditCost = 0;
+	float LastMissionBoardManualRefreshNextAvailableTime = 0.0f;
 	bool bLastMissionBoardAutoRepairAtPort = true;
 	int32 LastMissionBoardRepairCostPerPercentPoint = 1;
 	bool bLastMissionBoardOfferUpgradeService = false;

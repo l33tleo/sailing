@@ -179,6 +179,24 @@ struct SAILING_API FPortMissionBoardData
 	FText RefreshContextStatus;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	bool bSupportsManualRefresh = true;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	bool bManualRefreshOnCooldown = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	float ManualRefreshCooldownRemainingSeconds = 0.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	int32 ManualRefreshCreditCost = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	bool bCanAffordManualRefresh = true;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	FText ManualRefreshStatus;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
 	int32 PortVisitCount = 0;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
@@ -341,6 +359,14 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "MissionBoard")
 	static FText BuildRefreshContextStatusText(EPortBoardRefreshContext RefreshContext);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard")
+	static FText BuildManualRefreshStatusText(
+		bool bSupportsManualRefresh,
+		bool bManualRefreshOnCooldown,
+		float CooldownRemainingSeconds,
+		int32 ManualRefreshCreditCost,
+		bool bCanAffordManualRefresh);
 
 	UFUNCTION(BlueprintCallable, Category = "MissionBoard")
 	void RequestCloseBoard();

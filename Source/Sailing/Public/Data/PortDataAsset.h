@@ -127,6 +127,15 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Port|MissionBoard", meta = (ClampMin = "0"))
 	float MissionBoardCooldownSeconds = 0.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Port|MissionBoard")
+	bool bAllowManualBoardRefresh = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Port|MissionBoard", meta = (ClampMin = "0"))
+	float ManualBoardRefreshCooldownSeconds = 4.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Port|MissionBoard", meta = (ClampMin = "0"))
+	int32 ManualBoardRefreshCreditCost = 0;
+
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Port|Services")
 	bool bOfferUpgradeService = false;
 

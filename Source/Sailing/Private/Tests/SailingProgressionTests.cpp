@@ -593,6 +593,21 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 	TestEqual(TEXT("Refresh context helper should map manual refresh text"),
 		UPortMissionBoardWidget::BuildRefreshContextStatusText(EPortBoardRefreshContext::ManualRefresh).ToString(),
 		FString(TEXT("Tavle manuelt oppdatert.")));
+	TestEqual(TEXT("Manual refresh helper should report disabled state"),
+		UPortMissionBoardWidget::BuildManualRefreshStatusText(false, false, 0.0f, 0, true).ToString(),
+		FString(TEXT("Manuell oppfriskning er deaktivert i denne havnen.")));
+	TestEqual(TEXT("Manual refresh helper should report cooldown state"),
+		UPortMissionBoardWidget::BuildManualRefreshStatusText(true, true, 5.2f, 25, true).ToString(),
+		FString(TEXT("Manuell oppfriskning klar om 5 sekunder.")));
+	TestEqual(TEXT("Manual refresh helper should report free refresh state"),
+		UPortMissionBoardWidget::BuildManualRefreshStatusText(true, false, 0.0f, 0, true).ToString(),
+		FString(TEXT("Manuell oppfriskning er gratis.")));
+	TestEqual(TEXT("Manual refresh helper should report affordable paid refresh"),
+		UPortMissionBoardWidget::BuildManualRefreshStatusText(true, false, 0.0f, 40, true).ToString(),
+		FString(TEXT("Manuell oppfriskning tilgjengelig (40 kreditter).")));
+	TestEqual(TEXT("Manual refresh helper should report insufficient credits"),
+		UPortMissionBoardWidget::BuildManualRefreshStatusText(true, false, 0.0f, 40, false).ToString(),
+		FString(TEXT("Mangler kreditter til manuell oppfriskning (40).")));
 	return true;
 }
 

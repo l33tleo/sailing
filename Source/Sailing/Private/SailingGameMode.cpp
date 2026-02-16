@@ -365,6 +365,9 @@ void ASailingGameMode::BeginPlay()
 				}
 				PortNord->bCycleMissionOnDock = true;
 				PortNord->MissionBoardCooldownSeconds = 12.0f;
+				PortNord->bAllowManualBoardRefresh = true;
+				PortNord->ManualBoardRefreshCooldownSeconds = 6.0f;
+				PortNord->ManualBoardRefreshCreditCost = 15;
 				PortNord->bOfferUpgradeService = true;
 				PortNord->OfferedUpgradeIds = { TEXT("SkrogTrimV1"), TEXT("RorResponsV1") };
 				{
@@ -398,6 +401,9 @@ void ASailingGameMode::BeginPlay()
 				}
 				PortVest->bCycleMissionOnDock = true;
 				PortVest->MissionBoardCooldownSeconds = 12.0f;
+				PortVest->bAllowManualBoardRefresh = true;
+				PortVest->ManualBoardRefreshCooldownSeconds = 4.0f;
+				PortVest->ManualBoardRefreshCreditCost = 25;
 				PortVest->bOfferUpgradeService = true;
 				PortVest->OfferedUpgradeIds = { TEXT("RorResponsV1"), TEXT("RiggeffektivitetV1") };
 				{
@@ -432,6 +438,9 @@ void ASailingGameMode::BeginPlay()
 				}
 				PortSor->bCycleMissionOnDock = true;
 				PortSor->MissionBoardCooldownSeconds = 12.0f;
+				PortSor->bAllowManualBoardRefresh = false;
+				PortSor->ManualBoardRefreshCooldownSeconds = 0.0f;
+				PortSor->ManualBoardRefreshCreditCost = 0;
 				PortSor->bOfferUpgradeService = true;
 				PortSor->OfferedUpgradeIds = { TEXT("SkrogTrimV1"), TEXT("RiggeffektivitetV1") };
 				{
@@ -487,6 +496,9 @@ void ASailingGameMode::BeginPlay()
 				PortMarker->WeightedOfferedMissions = PortData->WeightedOfferedMissions;
 				PortMarker->MaxOfferedMissionsAtBoard = PortData->MaxOfferedMissionsAtBoard;
 				PortMarker->MissionBoardCooldownSeconds = PortData->MissionBoardCooldownSeconds;
+				PortMarker->bAllowManualBoardRefresh = PortData->bAllowManualBoardRefresh;
+				PortMarker->ManualBoardRefreshCooldownSeconds = PortData->ManualBoardRefreshCooldownSeconds;
+				PortMarker->ManualBoardRefreshCreditCost = PortData->ManualBoardRefreshCreditCost;
 				PortMarker->bOfferUpgradeService = PortData->bOfferUpgradeService;
 				PortMarker->OfferedUpgradeIds = PortData->OfferedUpgradeIds;
 				PortMarker->WeightedOfferedUpgrades = PortData->WeightedOfferedUpgrades;

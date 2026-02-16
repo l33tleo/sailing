@@ -335,6 +335,37 @@ FText UPortMissionBoardWidget::BuildRefreshContextStatusText(EPortBoardRefreshCo
 	}
 }
 
+FText UPortMissionBoardWidget::BuildManualRefreshStatusText(
+	bool bSupportsManualRefresh,
+	bool bManualRefreshOnCooldown,
+	float CooldownRemainingSeconds,
+	int32 ManualRefreshCreditCost,
+	bool bCanAffordManualRefresh)
+{
+	if (!bSupportsManualRefresh)
+	{
+		return FText::FromString(TEXT("Manuell oppfriskning er deaktivert i denne havnen."));
+	}
+
+	if (bManualRefreshOnCooldown)
+	{
+		return FText::FromString(FString::Printf(TEXT("Manuell oppfriskning klar om %.0f sekunder."), FMath::Max(0.0f, CooldownRemainingSeconds)));
+	}
+
+	const int32 SafeRefreshCost = FMath::Max(0, ManualRefreshCreditCost);
+	if (SafeRefreshCost <= 0)
+	{
+		return FText::FromString(TEXT("Manuell oppfriskning er gratis."));
+	}
+
+	if (bCanAffordManualRefresh)
+	{
+		return FText::FromString(FString::Printf(TEXT("Manuell oppfriskning tilgjengelig (%d kreditter)."), SafeRefreshCost));
+	}
+
+	return FText::FromString(FString::Printf(TEXT("Mangler kreditter til manuell oppfriskning (%d)."), SafeRefreshCost));
+}
+
 void UPortMissionBoardWidget::RequestCloseBoard()
 {
 	OnCloseRequested.Broadcast();
