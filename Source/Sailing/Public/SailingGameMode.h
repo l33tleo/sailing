@@ -27,6 +27,10 @@ public:
 	// Get chunk manager
 	AChunkManager* GetChunkManager() const;
 
+	// Synchronize objective marker with active mission objective policy.
+	UFUNCTION(BlueprintCallable, Category = "Mission")
+	bool SyncActiveMissionObjectiveMarker();
+
 	// Save the game
 	UFUNCTION(BlueprintCallable, Category = "Save")
 	void SaveGame_();

@@ -35,9 +35,6 @@ void ASailingGameMode::BeginPlay()
 	const FVector DeliveryObjectiveLocation(6500.0f, -2500.0f, 120.0f);
 	const FName DiscoveryMissionId(TEXT("OppdagForsteOy"));
 	const FName DeliveryMissionId(TEXT("LeveringTilBoye"));
-	FVector EffectiveDeliveryObjectiveLocation = DeliveryObjectiveLocation;
-	ESailingMissionType DeliveryObjectiveTriggerType = ESailingMissionType::Delivery;
-	bool bShouldSpawnDeliveryObjective = false;
 	int32 StartupRegisteredMissionCount = 0;
 	int32 StartupRegisteredUpgradeCount = 0;
 	int32 StartupPortDefinitionCount = 0;
@@ -264,33 +261,6 @@ void ASailingGameMode::BeginPlay()
 				}
 			}
 
-			if (MissionSubsystem->GetMissionObjectiveMarkerConfig(
-				DeliveryMissionId,
-				EffectiveDeliveryObjectiveLocation,
-				DeliveryObjectiveTriggerType))
-			{
-				bShouldSpawnDeliveryObjective = true;
-				if (EffectiveDeliveryObjectiveLocation.IsNearlyZero())
-				{
-					EffectiveDeliveryObjectiveLocation = DeliveryObjectiveLocation;
-				}
-			}
-			else if (const USailingMissionDataAsset* DeliveryMissionAsset = MissionSubsystem->GetMissionAssetById(DeliveryMissionId))
-			{
-				UE_LOG(LogTemp, Warning, TEXT("SailingGameMode: Leveringsoppdrag '%s' krever ikke lokasjonsmarkor; hopper over objective actor."),
-					*DeliveryMissionId.ToString());
-				UE_LOG(LogTemp, Warning, TEXT("SailingGameMode: Oppdragstype=%d bRequireLocationMatch=%s"),
-					static_cast<int32>(DeliveryMissionAsset->MissionType),
-					DeliveryMissionAsset->bRequireLocationMatch ? TEXT("true") : TEXT("false"));
-			}
-			else
-			{
-				UE_LOG(LogTemp, Warning, TEXT("SailingGameMode: Fant ikke oppdrag '%s' for objective marker."), *DeliveryMissionId.ToString());
-				if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
-				{
-					TelemetrySubsystem->RecordCounterEvent(TEXT("MissingDeliveryObjectiveMission"), 1);
-				}
-			}
 			StartupRegisteredMissionCount = MissionSubsystem->GetRegisteredMissionIds().Num();
 			if (RequiredStartupMissionIds.Num() > 0)
 			{
@@ -408,47 +378,8 @@ void ASailingGameMode::BeginPlay()
 	SpawnedOcean = GetWorld()->SpawnActor<AOceanPlaneActor>(
 		AOceanPlaneActor::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Params);
 
-	// Spawn concrete delivery mission objective marker when mission content requires it.
-	if (bShouldSpawnDeliveryObjective)
-	{
-		SpawnedMissionObjective = GetWorld()->SpawnActor<AMissionObjectiveActor>(
-			AMissionObjectiveActor::StaticClass(), EffectiveDeliveryObjectiveLocation, FRotator::ZeroRotator, Params);
-		if (SpawnedMissionObjective)
-		{
-			SpawnedMissionObjective->SetTriggerType(DeliveryObjectiveTriggerType);
-			if (GI)
-			{
-				if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
-				{
-					TelemetrySubsystem->RecordCounterEvent(TEXT("DeliveryObjectiveSpawned"), 1);
-					TelemetrySubsystem->SetCounterValue(TEXT("DeliveryObjectiveTriggerType"), static_cast<int32>(DeliveryObjectiveTriggerType));
-				}
-			}
-		}
-		else
-		{
-			UE_LOG(LogTemp, Warning, TEXT("SailingGameMode: Klarte ikke å spawne objective actor ved %s."),
-				*EffectiveDeliveryObjectiveLocation.ToCompactString());
-			if (GI)
-			{
-				if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
-				{
-					TelemetrySubsystem->RecordCounterEvent(TEXT("DeliveryObjectiveSpawnFailed"), 1);
-				}
-			}
-		}
-	}
-	else
-	{
-		UE_LOG(LogTemp, Log, TEXT("SailingGameMode: Hopper over objective actor; ingen lokasjonsbasert leveringsoppdrag registrert."));
-		if (GI)
-		{
-			if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
-			{
-				TelemetrySubsystem->RecordCounterEvent(TEXT("DeliveryObjectiveSkipped"), 1);
-			}
-		}
-	}
+	// Align objective marker with whichever mission is currently active.
+	SyncActiveMissionObjectiveMarker();
 
 	// Spawn simple harbor markers and register with world subsystem
 	if (GI)
@@ -868,6 +799,92 @@ void ASailingGameMode::LoadOrCreateSaveGame()
 AChunkManager* ASailingGameMode::GetChunkManager() const
 {
 	return Cast<AChunkManager>(SpawnedChunkManager);
+}
+
+bool ASailingGameMode::SyncActiveMissionObjectiveMarker()
+{
+	USailingGameInstance* GI = Cast<USailingGameInstance>(GetGameInstance());
+	UMissionSubsystem* MissionSubsystem = GI ? GI->GetSubsystem<UMissionSubsystem>() : nullptr;
+	if (!MissionSubsystem)
+	{
+		if (SpawnedMissionObjective)
+		{
+			SpawnedMissionObjective->Destroy();
+			SpawnedMissionObjective = nullptr;
+		}
+		if (UTelemetrySubsystem* TelemetrySubsystem = GI ? GI->GetSubsystem<UTelemetrySubsystem>() : nullptr)
+		{
+			TelemetrySubsystem->SetCounterValue(TEXT("ActiveMissionObjectivePresent"), 0);
+		}
+		return false;
+	}
+
+	FVector ObjectiveLocation = FVector::ZeroVector;
+	ESailingMissionType ObjectiveTriggerType = ESailingMissionType::NavigationChallenge;
+	const bool bRequiresObjectiveMarker = MissionSubsystem->GetMissionObjectiveMarkerConfig(
+		MissionSubsystem->GetActiveMissionId(),
+		ObjectiveLocation,
+		ObjectiveTriggerType);
+	if (!bRequiresObjectiveMarker)
+	{
+		if (SpawnedMissionObjective)
+		{
+			SpawnedMissionObjective->Destroy();
+			SpawnedMissionObjective = nullptr;
+			if (UTelemetrySubsystem* TelemetrySubsystem = GI ? GI->GetSubsystem<UTelemetrySubsystem>() : nullptr)
+			{
+				TelemetrySubsystem->RecordCounterEvent(TEXT("ActiveMissionObjectiveRemoved"), 1);
+				TelemetrySubsystem->SetCounterValue(TEXT("ActiveMissionObjectivePresent"), 0);
+				TelemetrySubsystem->RecordCounterEvent(TEXT("DeliveryObjectiveSkipped"), 1);
+			}
+		}
+		else if (UTelemetrySubsystem* TelemetrySubsystem = GI ? GI->GetSubsystem<UTelemetrySubsystem>() : nullptr)
+		{
+			TelemetrySubsystem->SetCounterValue(TEXT("ActiveMissionObjectivePresent"), 0);
+			TelemetrySubsystem->RecordCounterEvent(TEXT("DeliveryObjectiveSkipped"), 1);
+		}
+		return false;
+	}
+
+	if (!SpawnedMissionObjective)
+	{
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		SpawnedMissionObjective = GetWorld()->SpawnActor<AMissionObjectiveActor>(
+			AMissionObjectiveActor::StaticClass(), ObjectiveLocation, FRotator::ZeroRotator, Params);
+		if (!SpawnedMissionObjective)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("SailingGameMode: Klarte ikke å spawne objective actor ved %s."),
+				*ObjectiveLocation.ToCompactString());
+			if (UTelemetrySubsystem* TelemetrySubsystem = GI ? GI->GetSubsystem<UTelemetrySubsystem>() : nullptr)
+			{
+				TelemetrySubsystem->RecordCounterEvent(TEXT("DeliveryObjectiveSpawnFailed"), 1);
+				TelemetrySubsystem->SetCounterValue(TEXT("ActiveMissionObjectivePresent"), 0);
+			}
+			return false;
+		}
+
+		SpawnedMissionObjective->bDestroyAfterCompletion = false;
+		if (UTelemetrySubsystem* TelemetrySubsystem = GI ? GI->GetSubsystem<UTelemetrySubsystem>() : nullptr)
+		{
+			TelemetrySubsystem->RecordCounterEvent(TEXT("DeliveryObjectiveSpawned"), 1);
+			TelemetrySubsystem->RecordCounterEvent(TEXT("ActiveMissionObjectiveSpawned"), 1);
+		}
+	}
+
+	SpawnedMissionObjective->SetActorLocation(ObjectiveLocation);
+	SpawnedMissionObjective->SetTriggerType(ObjectiveTriggerType);
+	SpawnedMissionObjective->SetActorHiddenInGame(false);
+	SpawnedMissionObjective->SetActorEnableCollision(true);
+
+	if (UTelemetrySubsystem* TelemetrySubsystem = GI ? GI->GetSubsystem<UTelemetrySubsystem>() : nullptr)
+	{
+		TelemetrySubsystem->SetCounterValue(TEXT("ActiveMissionObjectivePresent"), 1);
+		TelemetrySubsystem->SetCounterValue(TEXT("DeliveryObjectiveTriggerType"), static_cast<int32>(ObjectiveTriggerType));
+		TelemetrySubsystem->SetCounterValue(TEXT("ActiveMissionObjectiveTriggerType"), static_cast<int32>(ObjectiveTriggerType));
+	}
+
+	return true;
 }
 
 void ASailingGameMode::SaveGame_()

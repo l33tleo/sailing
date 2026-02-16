@@ -420,6 +420,7 @@ bool ASailingHUD::AcceptMissionFromBoard(FName MissionId)
 		ShowDiscoveryPopup(FString::Printf(TEXT("Oppdrag valgt: %s"), *MissionId.ToString()));
 		if (ASailingGameMode* GM = Cast<ASailingGameMode>(UGameplayStatics::GetGameMode(GetWorld())))
 		{
+			GM->SyncActiveMissionObjectiveMarker();
 			GM->SaveGame_();
 		}
 		CloseMissionBoard();

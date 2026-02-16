@@ -87,6 +87,7 @@ void AMissionObjectiveActor::OnObjectiveOverlap(UPrimitiveComponent* OverlappedC
 
 	if (ASailingGameMode* GM = Cast<ASailingGameMode>(UGameplayStatics::GetGameMode(this)))
 	{
+		GM->SyncActiveMissionObjectiveMarker();
 		GM->SaveGame_();
 	}
 
