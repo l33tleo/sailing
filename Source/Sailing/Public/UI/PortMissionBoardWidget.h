@@ -28,6 +28,14 @@ enum class EPortUpgradeAvailabilityReason : uint8
 	NoAffordableOffers
 };
 
+UENUM(BlueprintType)
+enum class EPortUpgradeOfferSource : uint8
+{
+	None,
+	WeightedRules,
+	FallbackList
+};
+
 USTRUCT(BlueprintType)
 struct SAILING_API FPortMissionOfferEntry
 {
@@ -71,6 +79,9 @@ struct SAILING_API FPortUpgradeOfferEntry
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
 	bool bVisitGateSatisfied = true;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	FText VisitRequirementStatus;
 };
 
 USTRUCT(BlueprintType)
@@ -143,6 +154,21 @@ struct SAILING_API FPortMissionBoardData
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
 	EPortUpgradeAvailabilityReason UpgradeAvailabilityReason = EPortUpgradeAvailabilityReason::ServiceUnavailable;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	EPortUpgradeOfferSource UpgradeOfferSource = EPortUpgradeOfferSource::None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	int32 EligibleWeightedUpgradeRuleCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	int32 VisitGatedWeightedUpgradeRuleCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	int32 HiddenUnlockedUpgradeOfferCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
+	FText UpgradeOfferSourceStatus;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard|Service")
 	float UpgradeCostMultiplier = 1.0f;
@@ -224,6 +250,24 @@ public:
 	static FText BuildUpgradeAvailabilityStatusText(
 		EPortUpgradeAvailabilityReason Reason,
 		int32 AffordableUpgradeOfferCount);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard|Service")
+	static EPortUpgradeOfferSource DetermineUpgradeOfferSource(
+		bool bSupportsUpgradeService,
+		bool bUsedWeightedRules,
+		bool bUsedFallbackOffers);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard|Service")
+	static FText BuildUpgradeOfferSourceStatusText(
+		EPortUpgradeOfferSource Source,
+		int32 EligibleWeightedRuleCount,
+		int32 VisitGatedRuleCount,
+		int32 HiddenUnlockedCount);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard|Service")
+	static FText BuildUpgradeVisitRequirementStatusText(
+		int32 MinPortVisits,
+		int32 CurrentPortVisitCount);
 
 	UFUNCTION(BlueprintCallable, Category = "MissionBoard")
 	void RequestCloseBoard();

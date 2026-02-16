@@ -34,6 +34,27 @@ struct SAILING_API FPortUpgradeWeightedOffer
 	int32 MinPortVisits = 0;
 };
 
+USTRUCT(BlueprintType)
+struct SAILING_API FPortUpgradeOfferSelectionResult
+{
+	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadOnly, Category = "Port|Services")
+	TArray<FName> UpgradeIds;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Port|Services")
+	bool bUsedWeightedRules = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Port|Services")
+	bool bUsedFallbackOffers = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Port|Services")
+	int32 EligibleWeightedRuleCount = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Port|Services")
+	int32 VisitGatedRuleCount = 0;
+};
+
 /**
  * Data-driven harbor definition for world feature spawning.
  */
@@ -119,6 +140,13 @@ public:
 		bool bRotateByVisits);
 
 	static TArray<FName> BuildPrioritizedUpgradeIds(
+		const TArray<FPortUpgradeWeightedOffer>& InWeightedOffers,
+		const TArray<FName>& InFallbackOffers,
+		int32 PortVisitCount,
+		int32 MaxOffers,
+		bool bRotateByVisits);
+
+	static FPortUpgradeOfferSelectionResult BuildPrioritizedUpgradeSelection(
 		const TArray<FPortUpgradeWeightedOffer>& InWeightedOffers,
 		const TArray<FName>& InFallbackOffers,
 		int32 PortVisitCount,

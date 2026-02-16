@@ -106,6 +106,22 @@ TArray<FName> UPortDataAsset::BuildPrioritizedUpgradeIds(
 	int32 MaxOffers,
 	bool bRotateByVisits)
 {
+	return BuildPrioritizedUpgradeSelection(
+		InWeightedOffers,
+		InFallbackOffers,
+		PortVisitCount,
+		MaxOffers,
+		bRotateByVisits).UpgradeIds;
+}
+
+FPortUpgradeOfferSelectionResult UPortDataAsset::BuildPrioritizedUpgradeSelection(
+	const TArray<FPortUpgradeWeightedOffer>& InWeightedOffers,
+	const TArray<FName>& InFallbackOffers,
+	int32 PortVisitCount,
+	int32 MaxOffers,
+	bool bRotateByVisits)
+{
+	FPortUpgradeOfferSelectionResult SelectionResult;
 	TArray<FName> WeightedIds;
 	TArray<FPortUpgradeWeightedOffer> EligibleWeightedOffers;
 
@@ -118,10 +134,12 @@ TArray<FName> UPortDataAsset::BuildPrioritizedUpgradeIds(
 
 		if (PortVisitCount < FMath::Max(0, Offer.MinPortVisits))
 		{
+			SelectionResult.VisitGatedRuleCount++;
 			continue;
 		}
 
 		EligibleWeightedOffers.Add(Offer);
+		SelectionResult.EligibleWeightedRuleCount++;
 	}
 
 	EligibleWeightedOffers.Sort([](const FPortUpgradeWeightedOffer& A, const FPortUpgradeWeightedOffer& B)
@@ -140,10 +158,14 @@ TArray<FName> UPortDataAsset::BuildPrioritizedUpgradeIds(
 
 	if (WeightedIds.Num() > 0)
 	{
-		return BuildRotatedUpgradeIds(WeightedIds, PortVisitCount, MaxOffers, bRotateByVisits);
+		SelectionResult.UpgradeIds = BuildRotatedUpgradeIds(WeightedIds, PortVisitCount, MaxOffers, bRotateByVisits);
+		SelectionResult.bUsedWeightedRules = SelectionResult.UpgradeIds.Num() > 0;
+		return SelectionResult;
 	}
 
-	return BuildRotatedUpgradeIds(InFallbackOffers, PortVisitCount, MaxOffers, bRotateByVisits);
+	SelectionResult.UpgradeIds = BuildRotatedUpgradeIds(InFallbackOffers, PortVisitCount, MaxOffers, bRotateByVisits);
+	SelectionResult.bUsedFallbackOffers = SelectionResult.UpgradeIds.Num() > 0;
+	return SelectionResult;
 }
 
 TArray<FName> UPortDataAsset::FilterUpgradeIdsByUnlockedState(

@@ -59,6 +59,8 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 	int32 PortVisitCount = 0;
 	TArray<FName> EffectiveOfferedMissionIds;
 	TArray<FName> EffectiveOfferedUpgradeIds;
+	FPortUpgradeOfferSelectionResult UpgradeSelectionResult;
+	int32 HiddenUnlockedUpgradeOfferCount = 0;
 	if (UGameInstance* GI = GetGameInstance())
 	{
 		if (UWorldStreamingSubsystem* WorldSubsystem = GI->GetSubsystem<UWorldStreamingSubsystem>())
@@ -69,12 +71,13 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 
 		EffectiveOfferedMissionIds = UPortDataAsset::BuildPrioritizedMissionIds(
 			WeightedOfferedMissions, OfferedMissionIds, PortVisitCount, MaxOfferedMissionsAtBoard);
-		EffectiveOfferedUpgradeIds = UPortDataAsset::BuildPrioritizedUpgradeIds(
+		UpgradeSelectionResult = UPortDataAsset::BuildPrioritizedUpgradeSelection(
 			WeightedOfferedUpgrades,
 			OfferedUpgradeIds,
 			PortVisitCount,
 			MaxOfferedUpgrades,
 			bRotateUpgradeStockByVisits);
+		EffectiveOfferedUpgradeIds = UpgradeSelectionResult.UpgradeIds;
 		if (UEconomySubsystem* EconomySubsystem = GI->GetSubsystem<UEconomySubsystem>())
 		{
 			TSet<FName> UnlockedUpgradeSet;
@@ -85,10 +88,12 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 					UnlockedUpgradeSet.Add(UpgradeId);
 				}
 			}
+			const int32 BeforeFilterCount = EffectiveOfferedUpgradeIds.Num();
 			EffectiveOfferedUpgradeIds = UPortDataAsset::FilterUpgradeIdsByUnlockedState(
 				EffectiveOfferedUpgradeIds,
 				UnlockedUpgradeSet,
 				bHideUnlockedUpgradesOnBoard);
+			HiddenUnlockedUpgradeOfferCount = FMath::Max(0, BeforeFilterCount - EffectiveOfferedUpgradeIds.Num());
 		}
 
 		if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
@@ -166,12 +171,13 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 	{
 		EffectiveOfferedMissionIds = UPortDataAsset::BuildPrioritizedMissionIds(
 			WeightedOfferedMissions, OfferedMissionIds, PortVisitCount, MaxOfferedMissionsAtBoard);
-		EffectiveOfferedUpgradeIds = UPortDataAsset::BuildPrioritizedUpgradeIds(
+		UpgradeSelectionResult = UPortDataAsset::BuildPrioritizedUpgradeSelection(
 			WeightedOfferedUpgrades,
 			OfferedUpgradeIds,
 			PortVisitCount,
 			MaxOfferedUpgrades,
 			bRotateUpgradeStockByVisits);
+		EffectiveOfferedUpgradeIds = UpgradeSelectionResult.UpgradeIds;
 	}
 
 	bVisitedInSession = true;
@@ -208,7 +214,12 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 					bMissionBoardOnCooldown, MissionBoardCooldownRemaining,
 					bAutoRepairAtPort, RepairCostPerPercentPoint,
 					bOfferUpgradeService, EffectiveOfferedUpgradeIds,
-					UpgradeCostMultiplier, PortVisitCount, WeightedOfferedUpgrades);
+					UpgradeCostMultiplier, PortVisitCount, WeightedOfferedUpgrades,
+					UpgradeSelectionResult.bUsedWeightedRules,
+					UpgradeSelectionResult.bUsedFallbackOffers,
+					UpgradeSelectionResult.EligibleWeightedRuleCount,
+					UpgradeSelectionResult.VisitGatedRuleCount,
+					HiddenUnlockedUpgradeOfferCount);
 			}
 		}
 	}

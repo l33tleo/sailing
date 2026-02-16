@@ -65,7 +65,12 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 	bool bAutoRepairAtPort, int32 RepairCostPerPercentPoint,
 	bool bOfferUpgradeService, const TArray<FName>& OfferedUpgradeIds,
 	float UpgradeCostMultiplier, int32 CurrentPortVisitCount,
-	const TArray<FPortUpgradeWeightedOffer>& WeightedOfferedUpgradeRules)
+	const TArray<FPortUpgradeWeightedOffer>& WeightedOfferedUpgradeRules,
+	bool bUsedWeightedUpgradeRules,
+	bool bUsedFallbackUpgradeOffers,
+	int32 EligibleWeightedUpgradeRuleCount,
+	int32 VisitGatedWeightedUpgradeRuleCount,
+	int32 HiddenUnlockedUpgradeOfferCount)
 {
 	EnsurePortMissionBoardWidget();
 	if (!PortMissionBoardWidget)
@@ -89,6 +94,18 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 	Data.bSupportsUpgradeService = bOfferUpgradeService;
 	Data.OfferedUpgradeIds = OfferedUpgradeIds;
 	Data.bHasWeightedUpgradeRules = WeightedOfferedUpgradeRules.Num() > 0;
+	Data.UpgradeOfferSource = UPortMissionBoardWidget::DetermineUpgradeOfferSource(
+		bOfferUpgradeService,
+		bUsedWeightedUpgradeRules,
+		bUsedFallbackUpgradeOffers);
+	Data.EligibleWeightedUpgradeRuleCount = FMath::Max(0, EligibleWeightedUpgradeRuleCount);
+	Data.VisitGatedWeightedUpgradeRuleCount = FMath::Max(0, VisitGatedWeightedUpgradeRuleCount);
+	Data.HiddenUnlockedUpgradeOfferCount = FMath::Max(0, HiddenUnlockedUpgradeOfferCount);
+	Data.UpgradeOfferSourceStatus = UPortMissionBoardWidget::BuildUpgradeOfferSourceStatusText(
+		Data.UpgradeOfferSource,
+		Data.EligibleWeightedUpgradeRuleCount,
+		Data.VisitGatedWeightedUpgradeRuleCount,
+		Data.HiddenUnlockedUpgradeOfferCount);
 	Data.UpgradeCostMultiplier = FMath::Max(0.1f, UpgradeCostMultiplier);
 	Data.UpgradeStatus = bOfferUpgradeService
 		? FText::FromString(TEXT("Tilgjengelige oppgraderinger i denne havnen."))
@@ -159,6 +176,9 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 							OfferEntry.MinPortVisits = FMath::Max(0, WeightedRule->MinPortVisits);
 						}
 						OfferEntry.bVisitGateSatisfied = Data.PortVisitCount >= OfferEntry.MinPortVisits;
+						OfferEntry.VisitRequirementStatus = UPortMissionBoardWidget::BuildUpgradeVisitRequirementStatusText(
+							OfferEntry.MinPortVisits,
+							Data.PortVisitCount);
 						Data.OfferedUpgrades.Add(OfferEntry);
 						ValidUpgradeOfferCount++;
 

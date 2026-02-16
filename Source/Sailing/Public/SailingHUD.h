@@ -29,7 +29,12 @@ public:
 		bool bAutoRepairAtPort, int32 RepairCostPerPercentPoint,
 		bool bOfferUpgradeService, const TArray<FName>& OfferedUpgradeIds,
 		float UpgradeCostMultiplier, int32 CurrentPortVisitCount,
-		const TArray<FPortUpgradeWeightedOffer>& WeightedOfferedUpgradeRules);
+		const TArray<FPortUpgradeWeightedOffer>& WeightedOfferedUpgradeRules,
+		bool bUsedWeightedUpgradeRules,
+		bool bUsedFallbackUpgradeOffers,
+		int32 EligibleWeightedUpgradeRuleCount,
+		int32 VisitGatedWeightedUpgradeRuleCount,
+		int32 HiddenUnlockedUpgradeOfferCount);
 
 	UFUNCTION(BlueprintCallable, Category = "HUD|MissionBoard")
 	bool AcceptMissionFromBoard(FName MissionId);

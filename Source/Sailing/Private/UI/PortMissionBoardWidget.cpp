@@ -169,6 +169,81 @@ FText UPortMissionBoardWidget::BuildUpgradeAvailabilityStatusText(
 	}
 }
 
+EPortUpgradeOfferSource UPortMissionBoardWidget::DetermineUpgradeOfferSource(
+	bool bSupportsUpgradeService,
+	bool bUsedWeightedRules,
+	bool bUsedFallbackOffers)
+{
+	if (!bSupportsUpgradeService)
+	{
+		return EPortUpgradeOfferSource::None;
+	}
+
+	if (bUsedWeightedRules)
+	{
+		return EPortUpgradeOfferSource::WeightedRules;
+	}
+
+	if (bUsedFallbackOffers)
+	{
+		return EPortUpgradeOfferSource::FallbackList;
+	}
+
+	return EPortUpgradeOfferSource::None;
+}
+
+FText UPortMissionBoardWidget::BuildUpgradeOfferSourceStatusText(
+	EPortUpgradeOfferSource Source,
+	int32 EligibleWeightedRuleCount,
+	int32 VisitGatedRuleCount,
+	int32 HiddenUnlockedCount)
+{
+	FString BaseText;
+	switch (Source)
+	{
+	case EPortUpgradeOfferSource::WeightedRules:
+		BaseText = FString::Printf(TEXT("Vektede oppgraderingsregler aktiv (%d kvalifiserte)."), FMath::Max(0, EligibleWeightedRuleCount));
+		break;
+	case EPortUpgradeOfferSource::FallbackList:
+		BaseText = TEXT("Standard oppgraderingsliste brukes.");
+		break;
+	case EPortUpgradeOfferSource::None:
+	default:
+		BaseText = TEXT("Ingen oppgraderingskilde aktiv.");
+		break;
+	}
+
+	if (VisitGatedRuleCount > 0)
+	{
+		BaseText += FString::Printf(TEXT(" %d regel(er) låst av havnebesøk."), FMath::Max(0, VisitGatedRuleCount));
+	}
+	if (HiddenUnlockedCount > 0)
+	{
+		BaseText += FString::Printf(TEXT(" %d opplåste skjult."), FMath::Max(0, HiddenUnlockedCount));
+	}
+
+	return FText::FromString(BaseText);
+}
+
+FText UPortMissionBoardWidget::BuildUpgradeVisitRequirementStatusText(
+	int32 MinPortVisits,
+	int32 CurrentPortVisitCount)
+{
+	const int32 SafeMinVisits = FMath::Max(0, MinPortVisits);
+	if (SafeMinVisits <= 0)
+	{
+		return FText::FromString(TEXT("Ingen havnekrav."));
+	}
+
+	const int32 SafeCurrentVisits = FMath::Max(0, CurrentPortVisitCount);
+	if (SafeCurrentVisits >= SafeMinVisits)
+	{
+		return FText::FromString(FString::Printf(TEXT("Krever %d havnebesøk (oppfylt)."), SafeMinVisits));
+	}
+
+	return FText::FromString(FString::Printf(TEXT("Krever %d havnebesøk (mangler %d)."), SafeMinVisits, SafeMinVisits - SafeCurrentVisits));
+}
+
 void UPortMissionBoardWidget::RequestCloseBoard()
 {
 	OnCloseRequested.Broadcast();

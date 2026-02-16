@@ -512,6 +512,25 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 		UPortMissionBoardWidget::BuildUpgradeAvailabilityStatusText(
 			EPortUpgradeAvailabilityReason::Ready, 3).ToString(),
 		FString(TEXT("3 oppgradering(er) kan kjøpes nå.")));
+	TestEqual(TEXT("Upgrade offer source should be none when service disabled"),
+		UPortMissionBoardWidget::DetermineUpgradeOfferSource(false, true, false),
+		EPortUpgradeOfferSource::None);
+	TestEqual(TEXT("Upgrade offer source should prefer weighted rules"),
+		UPortMissionBoardWidget::DetermineUpgradeOfferSource(true, true, true),
+		EPortUpgradeOfferSource::WeightedRules);
+	TestEqual(TEXT("Upgrade offer source should report fallback list when weighted unavailable"),
+		UPortMissionBoardWidget::DetermineUpgradeOfferSource(true, false, true),
+		EPortUpgradeOfferSource::FallbackList);
+	TestEqual(TEXT("Upgrade offer source status should include weighted and gated counts"),
+		UPortMissionBoardWidget::BuildUpgradeOfferSourceStatusText(
+			EPortUpgradeOfferSource::WeightedRules, 2, 1, 3).ToString(),
+		FString(TEXT("Vektede oppgraderingsregler aktiv (2 kvalifiserte). 1 regel(er) låst av havnebesøk. 3 opplåste skjult.")));
+	TestEqual(TEXT("Upgrade visit status should indicate no requirement"),
+		UPortMissionBoardWidget::BuildUpgradeVisitRequirementStatusText(0, 4).ToString(),
+		FString(TEXT("Ingen havnekrav.")));
+	TestEqual(TEXT("Upgrade visit status should indicate remaining visits"),
+		UPortMissionBoardWidget::BuildUpgradeVisitRequirementStatusText(5, 3).ToString(),
+		FString(TEXT("Krever 5 havnebesøk (mangler 2).")));
 	return true;
 }
 
