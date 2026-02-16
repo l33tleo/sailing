@@ -73,6 +73,12 @@ private:
 	TArray<TObjectPtr<APortMarkerActor>> SpawnedPortMarkers;
 
 	UPROPERTY()
+	bool bObjectiveMarkerWasRequiredLastSync = false;
+
+	UPROPERTY()
+	FName LastObjectiveMarkerMissionId = NAME_None;
+
+	UPROPERTY()
 	TObjectPtr<USaveGameSailing> SaveGame;
 
 	void LoadOrCreateSaveGame();

@@ -801,6 +801,7 @@ AChunkManager* ASailingGameMode::GetChunkManager() const
 bool ASailingGameMode::SyncActiveMissionObjectiveMarker()
 {
 	USailingGameInstance* GI = Cast<USailingGameInstance>(GetGameInstance());
+	UTelemetrySubsystem* TelemetrySubsystem = GI ? GI->GetSubsystem<UTelemetrySubsystem>() : nullptr;
 	UMissionSubsystem* MissionSubsystem = GI ? GI->GetSubsystem<UMissionSubsystem>() : nullptr;
 	if (!MissionSubsystem)
 	{
@@ -809,40 +810,53 @@ bool ASailingGameMode::SyncActiveMissionObjectiveMarker()
 			SpawnedMissionObjective->Destroy();
 			SpawnedMissionObjective = nullptr;
 		}
-		if (UTelemetrySubsystem* TelemetrySubsystem = GI ? GI->GetSubsystem<UTelemetrySubsystem>() : nullptr)
+		bObjectiveMarkerWasRequiredLastSync = false;
+		LastObjectiveMarkerMissionId = NAME_None;
+		if (TelemetrySubsystem)
 		{
 			TelemetrySubsystem->SetCounterValue(TEXT("ActiveMissionObjectivePresent"), 0);
+			TelemetrySubsystem->SetCounterValue(TEXT("ActiveMissionObjectiveTriggerType"), -1);
 		}
 		return false;
 	}
 
+	const FName ActiveMissionId = MissionSubsystem->GetActiveMissionId();
 	FVector ObjectiveLocation = FVector::ZeroVector;
 	ESailingMissionType ObjectiveTriggerType = ESailingMissionType::NavigationChallenge;
 	const bool bRequiresObjectiveMarker = MissionSubsystem->GetMissionObjectiveMarkerConfig(
-		MissionSubsystem->GetActiveMissionId(),
+		ActiveMissionId,
 		ObjectiveLocation,
 		ObjectiveTriggerType);
 	if (!bRequiresObjectiveMarker)
 	{
+		const bool bHadSpawnedObjectiveActor = SpawnedMissionObjective != nullptr;
 		if (SpawnedMissionObjective)
 		{
 			SpawnedMissionObjective->Destroy();
 			SpawnedMissionObjective = nullptr;
-			if (UTelemetrySubsystem* TelemetrySubsystem = GI ? GI->GetSubsystem<UTelemetrySubsystem>() : nullptr)
+		}
+
+		if (TelemetrySubsystem)
+		{
+			if (bHadSpawnedObjectiveActor)
 			{
 				TelemetrySubsystem->RecordCounterEvent(TEXT("ActiveMissionObjectiveRemoved"), 1);
-				TelemetrySubsystem->SetCounterValue(TEXT("ActiveMissionObjectivePresent"), 0);
+			}
+			if (bObjectiveMarkerWasRequiredLastSync || bHadSpawnedObjectiveActor)
+			{
 				TelemetrySubsystem->RecordCounterEvent(TEXT("DeliveryObjectiveSkipped"), 1);
 			}
-		}
-		else if (UTelemetrySubsystem* TelemetrySubsystem = GI ? GI->GetSubsystem<UTelemetrySubsystem>() : nullptr)
-		{
 			TelemetrySubsystem->SetCounterValue(TEXT("ActiveMissionObjectivePresent"), 0);
-			TelemetrySubsystem->RecordCounterEvent(TEXT("DeliveryObjectiveSkipped"), 1);
+			TelemetrySubsystem->SetCounterValue(TEXT("ActiveMissionObjectiveTriggerType"), -1);
+			TelemetrySubsystem->SetCounterValue(TEXT("DeliveryObjectiveTriggerType"), -1);
 		}
+
+		bObjectiveMarkerWasRequiredLastSync = false;
+		LastObjectiveMarkerMissionId = ActiveMissionId;
 		return false;
 	}
 
+	bool bSpawnedObjectiveActorNow = false;
 	if (!SpawnedMissionObjective)
 	{
 		FActorSpawnParameters Params;
@@ -853,16 +867,19 @@ bool ASailingGameMode::SyncActiveMissionObjectiveMarker()
 		{
 			UE_LOG(LogTemp, Warning, TEXT("SailingGameMode: Klarte ikke å spawne objective actor ved %s."),
 				*ObjectiveLocation.ToCompactString());
-			if (UTelemetrySubsystem* TelemetrySubsystem = GI ? GI->GetSubsystem<UTelemetrySubsystem>() : nullptr)
+			if (TelemetrySubsystem)
 			{
 				TelemetrySubsystem->RecordCounterEvent(TEXT("DeliveryObjectiveSpawnFailed"), 1);
 				TelemetrySubsystem->SetCounterValue(TEXT("ActiveMissionObjectivePresent"), 0);
 			}
+			bObjectiveMarkerWasRequiredLastSync = false;
+			LastObjectiveMarkerMissionId = ActiveMissionId;
 			return false;
 		}
 
+		bSpawnedObjectiveActorNow = true;
 		SpawnedMissionObjective->bDestroyAfterCompletion = false;
-		if (UTelemetrySubsystem* TelemetrySubsystem = GI ? GI->GetSubsystem<UTelemetrySubsystem>() : nullptr)
+		if (TelemetrySubsystem)
 		{
 			TelemetrySubsystem->RecordCounterEvent(TEXT("DeliveryObjectiveSpawned"), 1);
 			TelemetrySubsystem->RecordCounterEvent(TEXT("ActiveMissionObjectiveSpawned"), 1);
@@ -874,13 +891,20 @@ bool ASailingGameMode::SyncActiveMissionObjectiveMarker()
 	SpawnedMissionObjective->SetActorHiddenInGame(false);
 	SpawnedMissionObjective->SetActorEnableCollision(true);
 
-	if (UTelemetrySubsystem* TelemetrySubsystem = GI ? GI->GetSubsystem<UTelemetrySubsystem>() : nullptr)
+	if (TelemetrySubsystem)
 	{
+		if (!bSpawnedObjectiveActorNow
+			&& (LastObjectiveMarkerMissionId != ActiveMissionId || !bObjectiveMarkerWasRequiredLastSync))
+		{
+			TelemetrySubsystem->RecordCounterEvent(TEXT("ActiveMissionObjectiveUpdated"), 1);
+		}
 		TelemetrySubsystem->SetCounterValue(TEXT("ActiveMissionObjectivePresent"), 1);
 		TelemetrySubsystem->SetCounterValue(TEXT("DeliveryObjectiveTriggerType"), static_cast<int32>(ObjectiveTriggerType));
 		TelemetrySubsystem->SetCounterValue(TEXT("ActiveMissionObjectiveTriggerType"), static_cast<int32>(ObjectiveTriggerType));
 	}
 
+	bObjectiveMarkerWasRequiredLastSync = true;
+	LastObjectiveMarkerMissionId = ActiveMissionId;
 	return true;
 }
 
