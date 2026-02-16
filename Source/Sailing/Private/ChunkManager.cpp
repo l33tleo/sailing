@@ -1,6 +1,7 @@
 #include "ChunkManager.h"
 #include "IslandActor.h"
 #include "SaveGameSailing.h"
+#include "SailingGameMode.h"
 #include "Data/SailingMissionDataAsset.h"
 #include "Systems/SailingCoreSubsystems.h"
 #include "Kismet/GameplayStatics.h"
@@ -135,6 +136,7 @@ void AChunkManager::OnIslandDiscovered(AIslandActor* Island, const FString& Isla
 	SaveGame->MarkIslandDiscovered(Data);
 
 	int32 CreditsGranted = 0;
+	bool bMissionObjectiveSyncNeeded = false;
 	if (UGameInstance* GI = GetGameInstance())
 	{
 		if (UEconomySubsystem* EconomySubsystem = GI->GetSubsystem<UEconomySubsystem>())
@@ -147,7 +149,10 @@ void AChunkManager::OnIslandDiscovered(AIslandActor* Island, const FString& Isla
 
 			if (UMissionSubsystem* MissionSubsystem = GI->GetSubsystem<UMissionSubsystem>())
 			{
+				const FName MissionIdBeforeCompletion = MissionSubsystem->GetActiveMissionId();
 				const int32 MissionReward = MissionSubsystem->CompleteActiveMissionByTrigger(ESailingMissionType::NavigationChallenge);
+				const FName MissionIdAfterCompletion = MissionSubsystem->GetActiveMissionId();
+				bMissionObjectiveSyncNeeded = MissionIdBeforeCompletion != MissionIdAfterCompletion;
 				if (MissionReward > 0)
 				{
 					EconomySubsystem->AddCredits(MissionReward);
@@ -166,8 +171,19 @@ void AChunkManager::OnIslandDiscovered(AIslandActor* Island, const FString& Isla
 		}
 	}
 
-	// Auto-save
-	UGameplayStatics::SaveGameToSlot(SaveGame, USaveGameSailing::SaveSlotName, 0);
+	// Auto-save via game mode to preserve subsystem-backed progression state.
+	if (ASailingGameMode* GM = Cast<ASailingGameMode>(UGameplayStatics::GetGameMode(this)))
+	{
+		if (bMissionObjectiveSyncNeeded)
+		{
+			GM->SyncActiveMissionObjectiveMarker();
+		}
+		GM->SaveGame_();
+	}
+	else
+	{
+		UGameplayStatics::SaveGameToSlot(SaveGame, USaveGameSailing::SaveSlotName, 0);
+	}
 
 	UE_LOG(LogTemp, Log, TEXT("Lagret oppdagelse av %s. Totalt oppdaget: %d. Credits +%d"),
 		*IslandName, SaveGame->TotalIslandsDiscovered, CreditsGranted);
