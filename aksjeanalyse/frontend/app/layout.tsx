@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Sidebar from "@/components/layout/Sidebar";
+import { AuthProvider } from "@/lib/auth";
 
 export const metadata: Metadata = {
   title: "AksjeAnalyse — Aksjeanalyse og Anbefalinger",
@@ -16,8 +17,10 @@ export default function RootLayout({
   return (
     <html lang="nb">
       <body className="antialiased">
-        <Sidebar />
-        <main className="ml-64 min-h-screen p-6">{children}</main>
+        <AuthProvider>
+          <Sidebar />
+          <main className="ml-64 min-h-screen p-6">{children}</main>
+        </AuthProvider>
       </body>
     </html>
   );

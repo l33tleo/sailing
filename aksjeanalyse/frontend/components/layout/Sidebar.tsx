@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth";
 import {
   BarChart3,
   Search,
@@ -73,14 +74,55 @@ export default function Sidebar() {
         </ul>
       </nav>
 
-      {/* Footer */}
-      <div className="absolute bottom-4 left-0 right-0 px-6">
-        <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-3">
-          <p className="text-xs text-slate-500">
-            Data fra Yahoo Finance. Anbefalinger er ikke finansiell rådgivning.
+      {/* Footer with user */}
+      <div className="absolute bottom-4 left-0 right-0 px-4 space-y-2">
+        <UserFooter />
+        <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-2.5">
+          <p className="text-[10px] text-slate-600">
+            Data fra Yahoo Finance. Ikke finansiell rådgivning.
           </p>
         </div>
       </div>
     </aside>
+  );
+}
+
+function UserFooter() {
+  const { user, logout } = useAuth();
+
+  if (!user) {
+    return (
+      <Link
+        href="/login"
+        className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/50 p-3 text-sm text-slate-400 hover:border-blue-500/50 hover:text-blue-400"
+      >
+        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-800 text-xs">
+          👤
+        </div>
+        Logg inn / Registrer
+      </Link>
+    );
+  }
+
+  return (
+    <div className="rounded-lg border border-slate-800 bg-slate-900/50 p-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-blue-500/20 text-xs font-bold text-blue-400">
+            {user.name.charAt(0).toUpperCase()}
+          </div>
+          <div>
+            <p className="text-xs font-medium text-white">{user.name}</p>
+            <p className="text-[10px] text-slate-500">{user.email}</p>
+          </div>
+        </div>
+        <button
+          onClick={logout}
+          className="text-[10px] text-slate-600 hover:text-red-400"
+        >
+          Logg ut
+        </button>
+      </div>
+    </div>
   );
 }
