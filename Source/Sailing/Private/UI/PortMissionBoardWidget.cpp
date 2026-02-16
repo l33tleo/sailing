@@ -585,6 +585,8 @@ FPortMissionBoardData UPortMissionBoardWidget::BuildActionStateAnnotatedBoardDat
 	Result.bHasPurchasableUpgradeOffers = Result.PurchasableUpgradeOfferCount > 0;
 	Result.bHasAnyImmediateActions = Result.bHasSelectableMissionOffers || Result.bHasPurchasableUpgradeOffers;
 	Result.OfferActionSummaryStatus = BuildOfferActionSummaryStatusText(Result);
+	Result.PrimaryActionHint = DeterminePrimaryActionHint(Result);
+	Result.PrimaryActionHintStatus = BuildPrimaryActionHintStatusText(Result.PrimaryActionHint);
 	return Result;
 }
 
@@ -622,6 +624,42 @@ FText UPortMissionBoardWidget::BuildOfferActionSummaryStatusText(const FPortMiss
 	}
 
 	return FText::FromString(TEXT("Ingen handlinger tilgjengelig i denne havnen."));
+}
+
+EPortBoardPrimaryActionHint UPortMissionBoardWidget::DeterminePrimaryActionHint(const FPortMissionBoardData& BoardData)
+{
+	if (BoardData.bHasSelectableMissionOffers && BoardData.bHasPurchasableUpgradeOffers)
+	{
+		return EPortBoardPrimaryActionHint::SelectMissionOrBuyUpgrade;
+	}
+
+	if (BoardData.bHasSelectableMissionOffers)
+	{
+		return EPortBoardPrimaryActionHint::SelectMission;
+	}
+
+	if (BoardData.bHasPurchasableUpgradeOffers)
+	{
+		return EPortBoardPrimaryActionHint::BuyUpgrade;
+	}
+
+	return EPortBoardPrimaryActionHint::None;
+}
+
+FText UPortMissionBoardWidget::BuildPrimaryActionHintStatusText(EPortBoardPrimaryActionHint Hint)
+{
+	switch (Hint)
+	{
+	case EPortBoardPrimaryActionHint::SelectMission:
+		return FText::FromString(TEXT("Anbefalt neste steg: Velg et oppdrag."));
+	case EPortBoardPrimaryActionHint::BuyUpgrade:
+		return FText::FromString(TEXT("Anbefalt neste steg: Kjøp en oppgradering."));
+	case EPortBoardPrimaryActionHint::SelectMissionOrBuyUpgrade:
+		return FText::FromString(TEXT("Anbefalt neste steg: Velg oppdrag eller kjøp oppgradering."));
+	case EPortBoardPrimaryActionHint::None:
+	default:
+		return FText::FromString(TEXT("Ingen umiddelbare handlinger tilgjengelig."));
+	}
 }
 
 void UPortMissionBoardWidget::RequestCloseBoard()

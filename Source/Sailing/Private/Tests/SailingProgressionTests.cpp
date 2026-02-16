@@ -868,6 +868,12 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 	TestEqual(TEXT("Annotated board should track blocked upgrade count"), AnnotatedResult.BlockedUpgradeOfferCount, 1);
 	TestFalse(TEXT("Annotated board should mark no purchasable upgrades"), AnnotatedResult.bHasPurchasableUpgradeOffers);
 	TestFalse(TEXT("Annotated board should mark no immediate actions"), AnnotatedResult.bHasAnyImmediateActions);
+	TestEqual(TEXT("Annotated board should expose no primary action hint"),
+		AnnotatedResult.PrimaryActionHint,
+		EPortBoardPrimaryActionHint::None);
+	TestEqual(TEXT("Annotated board should expose no-action hint text"),
+		AnnotatedResult.PrimaryActionHintStatus.ToString(),
+		FString(TEXT("Ingen umiddelbare handlinger tilgjengelig.")));
 	TestEqual(TEXT("Annotated board should include action summary text"),
 		AnnotatedResult.OfferActionSummaryStatus.ToString(),
 		FString(TEXT("Valgbare oppdrag: 0 (1 blokkert) | Kjøpbare oppgraderinger: 0 (1 blokkert)")));
@@ -961,9 +967,34 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 	TestEqual(TEXT("Mixed annotated board should count blocked upgrades"), MixedAnnotatedResult.BlockedUpgradeOfferCount, 1);
 	TestTrue(TEXT("Mixed annotated board should mark purchasable upgrades"), MixedAnnotatedResult.bHasPurchasableUpgradeOffers);
 	TestTrue(TEXT("Mixed annotated board should mark immediate actions"), MixedAnnotatedResult.bHasAnyImmediateActions);
+	TestEqual(TEXT("Mixed annotated board should expose combined primary action hint"),
+		MixedAnnotatedResult.PrimaryActionHint,
+		EPortBoardPrimaryActionHint::SelectMissionOrBuyUpgrade);
+	TestEqual(TEXT("Mixed annotated board should expose combined hint text"),
+		MixedAnnotatedResult.PrimaryActionHintStatus.ToString(),
+		FString(TEXT("Anbefalt neste steg: Velg oppdrag eller kjøp oppgradering.")));
 	TestEqual(TEXT("Mixed annotated board should summarize mixed counts"),
 		MixedAnnotatedResult.OfferActionSummaryStatus.ToString(),
 		FString(TEXT("Valgbare oppdrag: 1 (1 blokkert) | Kjøpbare oppgraderinger: 1 (1 blokkert)")));
+
+	TestEqual(TEXT("Primary action helper should return mission-only hint"),
+		UPortMissionBoardWidget::DeterminePrimaryActionHint(MissionOnlySummaryData),
+		EPortBoardPrimaryActionHint::SelectMission);
+	TestEqual(TEXT("Primary action helper should return upgrade-only hint"),
+		UPortMissionBoardWidget::DeterminePrimaryActionHint(UpgradeOnlySummaryData),
+		EPortBoardPrimaryActionHint::BuyUpgrade);
+	TestEqual(TEXT("Primary action helper should return no-action hint"),
+		UPortMissionBoardWidget::DeterminePrimaryActionHint(NoActionSummaryData),
+		EPortBoardPrimaryActionHint::None);
+	TestEqual(TEXT("Primary action status helper should render mission-only text"),
+		UPortMissionBoardWidget::BuildPrimaryActionHintStatusText(EPortBoardPrimaryActionHint::SelectMission).ToString(),
+		FString(TEXT("Anbefalt neste steg: Velg et oppdrag.")));
+	TestEqual(TEXT("Primary action status helper should render upgrade-only text"),
+		UPortMissionBoardWidget::BuildPrimaryActionHintStatusText(EPortBoardPrimaryActionHint::BuyUpgrade).ToString(),
+		FString(TEXT("Anbefalt neste steg: Kjøp en oppgradering.")));
+	TestEqual(TEXT("Primary action status helper should render no-action text"),
+		UPortMissionBoardWidget::BuildPrimaryActionHintStatusText(EPortBoardPrimaryActionHint::None).ToString(),
+		FString(TEXT("Ingen umiddelbare handlinger tilgjengelig.")));
 	return true;
 }
 

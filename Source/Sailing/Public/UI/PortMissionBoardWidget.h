@@ -67,6 +67,15 @@ enum class EPortBoardRefreshContext : uint8
 	ManualRefresh
 };
 
+UENUM(BlueprintType)
+enum class EPortBoardPrimaryActionHint : uint8
+{
+	None,
+	SelectMission,
+	BuyUpgrade,
+	SelectMissionOrBuyUpgrade
+};
+
 USTRUCT(BlueprintType)
 struct SAILING_API FPortMissionOfferEntry
 {
@@ -245,6 +254,12 @@ struct SAILING_API FPortMissionBoardData
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
 	FText OfferActionSummaryStatus;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	EPortBoardPrimaryActionHint PrimaryActionHint = EPortBoardPrimaryActionHint::None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	FText PrimaryActionHintStatus;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
 	bool bAwaitingMissionSwitchConfirmation = false;
@@ -442,6 +457,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "MissionBoard")
 	static FText BuildOfferActionSummaryStatusText(const FPortMissionBoardData& BoardData);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard")
+	static EPortBoardPrimaryActionHint DeterminePrimaryActionHint(const FPortMissionBoardData& BoardData);
+
+	UFUNCTION(BlueprintPure, Category = "MissionBoard")
+	static FText BuildPrimaryActionHintStatusText(EPortBoardPrimaryActionHint Hint);
 
 	UFUNCTION(BlueprintCallable, Category = "MissionBoard")
 	void RequestCloseBoard();
