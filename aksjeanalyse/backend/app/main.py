@@ -6,8 +6,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import stocks, analysis, recommendations, portfolio, compare, news, export, market, alerts, screener
+from app.api import stocks, analysis, recommendations, portfolio, compare, news, export, market, alerts, screener, paper_trade, sectors
 from app.db.database import init_db
+from app.scheduler import start_scheduler, stop_scheduler
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -15,11 +16,13 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Application lifespan — init DB on startup."""
+    """Application lifespan — init DB and scheduler on startup."""
     logger.info("Starting AksjeAnalyse API...")
     await init_db()
     logger.info("Database initialized")
+    start_scheduler()
     yield
+    stop_scheduler()
     logger.info("Shutting down AksjeAnalyse API...")
 
 
@@ -50,6 +53,8 @@ app.include_router(export.router, prefix="/api")
 app.include_router(market.router, prefix="/api")
 app.include_router(alerts.router, prefix="/api")
 app.include_router(screener.router, prefix="/api")
+app.include_router(paper_trade.router, prefix="/api")
+app.include_router(sectors.router, prefix="/api")
 
 
 @app.get("/api/health")

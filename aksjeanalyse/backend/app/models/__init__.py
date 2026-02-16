@@ -3,6 +3,7 @@ from app.models.recommendation import Recommendation, RecommendationOutcome
 from app.models.portfolio import Portfolio, PortfolioHolding
 from app.models.watchlist import Watchlist
 from app.models.alert import Alert
+from app.models.paper_trade import PaperTrade
 
 __all__ = [
     "Stock",
@@ -12,4 +13,5 @@ __all__ = [
     "PortfolioHolding",
     "Watchlist",
     "Alert",
+    "PaperTrade",
 ]
