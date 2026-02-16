@@ -10,7 +10,7 @@ class UCapsuleComponent;
 class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
-class AWindActor;
+class UBoatSimulationComponent;
 
 UCLASS()
 class SAILING_API ASailboatPawn : public APawn
@@ -67,6 +67,9 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UCameraComponent> Camera;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UBoatSimulationComponent> BoatSimulation;
 
 	// Tuning
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Tuning")
@@ -141,9 +144,4 @@ private:
 	float TurnInput = 0.0f;
 	float CameraYawInput = 0.0f;
 	float CameraPitchInput = 0.0f;
-
-	UPROPERTY()
-	TWeakObjectPtr<AWindActor> CachedWind;
-
-	AWindActor* FindWind() const;
 };

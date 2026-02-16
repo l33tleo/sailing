@@ -1,12 +1,11 @@
 #include "SailboatPawn.h"
-#include "WindActor.h"
+#include "BoatSimulationComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
 #include "EnhancedInputComponent.h"
-#include "Kismet/GameplayStatics.h"
 #include "UObject/ConstructorHelpers.h"
 
 ASailboatPawn::ASailboatPawn()
@@ -194,6 +193,9 @@ ASailboatPawn::ASailboatPawn()
 	// Camera
 	Camera = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
 	Camera->SetupAttachment(SpringArm);
+
+	// Simulation component
+	BoatSimulation = CreateDefaultSubobject<UBoatSimulationComponent>(TEXT("BoatSimulation"));
 }
 
 void ASailboatPawn::BeginPlay()
@@ -388,83 +390,13 @@ void ASailboatPawn::Tick(float DeltaTime)
 	SetActorRotation(CurrentRot);
 	TurnInput = 0.0f;
 
-	// 2. Tilsynelatende vind (apparent wind) og polar-kurve
-	// V_apparent = V_true_wind - V_boat. Seilet drives av tilsynelatende vind.
-	FVector Forward = GetActorForwardVector();
-	AWindActor* Wind = FindWind();
-	if (Wind)
+	// 2-4. Seilsimulering (vind, motstand, fart, vannhøyde) håndteres av komponent.
+	if (BoatSimulation)
 	{
-		FVector TrueWindVec = Wind->GetWindDirection() * Wind->GetWindStrength();
-		FVector BoatVelocity = Forward * CurrentSpeed;
-		FVector ApparentWindVec = TrueWindVec - BoatVelocity;
-		float ApparentWindStr = ApparentWindVec.Size();
-
-		FVector WindDir;
-		float WindStr;
-		if (ApparentWindStr < 1.0f)
-		{
-			// Nesten ingen tilsynelatende vind (f.eks. lens i vind)
-			WindDir = Wind->GetWindDirection();
-			WindStr = 0.0f;
-		}
-		else
-		{
-			WindDir = ApparentWindVec.GetSafeNormal();
-			WindStr = ApparentWindStr;
-		}
-
-		// Vinkel båt–vind (tilsynelatende): CosAngle = 1 → mot vind, 0 → halv vind, -1 → lens
-		float CosAngle = FVector::DotProduct(Forward, WindDir);
-		float AngleToWind = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(CosAngle, -1.0f, 1.0f)));
-
-		float ForceMultiplier = 0.0f;
-		if (AngleToWind < NoGoZoneAngle)
-			ForceMultiplier = 0.0f;
-		else if (AngleToWind < 90.0f)
-		{
-			float T = (AngleToWind - NoGoZoneAngle) / (90.0f - NoGoZoneAngle);
-			ForceMultiplier = FMath::Lerp(CloseHauledForce, BeamReachForce, T);
-		}
-		else if (AngleToWind < 135.0f)
-		{
-			float T = (AngleToWind - 90.0f) / 45.0f;
-			ForceMultiplier = FMath::Lerp(BeamReachForce, BroadReachForce, T);
-		}
-		else
-		{
-			float T = (AngleToWind - 135.0f) / 45.0f;
-			ForceMultiplier = FMath::Lerp(BroadReachForce, RunningForce, T);
-		}
-
-		CurrentSailForce = WindStr * FMath::Pow(ForceMultiplier, PolarSharpness);
-	}
-	else
-	{
-		CurrentSailForce = 0.0f;
-	}
-
-	// 3. Hullmotstand og integrert fart: akselerasjon = seilkraft - drag
-	float Drag = DragCoefficient * FMath::Square(CurrentSpeed);
-	float Acceleration = CurrentSailForce - Drag;
-	float NewSpeed = FMath::Clamp(CurrentSpeed + Acceleration * DeltaTime, 0.0f, MaxBoatSpeed);
-	FVector Movement = Forward * NewSpeed * DeltaTime;
-	AddActorWorldOffset(Movement, false);
-	CurrentSpeed = NewSpeed;
-
-	// 4. Lock to water surface with simple sine heave
-	FVector Loc = GetActorLocation();
-	float Time = GetWorld()->GetTimeSeconds();
-	Loc.Z = WaterZ + FMath::Sin(Time * WaveFrequency * 2.0f * PI) * WaveAmplitude;
-	SetActorLocation(Loc, false);
-
-	// Debug: log movement every 2 seconds
-	static float DebugTimer = 0.0f;
-	DebugTimer += DeltaTime;
-	if (DebugTimer > 2.0f)
-	{
-		UE_LOG(LogTemp, Log, TEXT("Boat: Force=%.1f Speed=%.1f Movement=(%.1f,%.1f,%.1f) Pos=(%.0f,%.0f,%.0f)"),
-			CurrentSailForce, CurrentSpeed, Movement.X, Movement.Y, Movement.Z, Loc.X, Loc.Y, Loc.Z);
-		DebugTimer = 0.0f;
+		BoatSimulation->SetCurrentSpeed(CurrentSpeed);
+		BoatSimulation->Simulate(this, DeltaTime);
+		CurrentSailForce = BoatSimulation->GetCurrentSailForce();
+		CurrentSpeed = BoatSimulation->GetCurrentSpeed();
 	}
 
 	// 5. Camera orbit
@@ -477,21 +409,4 @@ void ASailboatPawn::Tick(float DeltaTime)
 	}
 	CameraYawInput = 0.0f;
 	CameraPitchInput = 0.0f;
-}
-
-AWindActor* ASailboatPawn::FindWind() const
-{
-	if (CachedWind.IsValid())
-	{
-		return CachedWind.Get();
-	}
-
-	TArray<AActor*> Found;
-	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AWindActor::StaticClass(), Found);
-	if (Found.Num() > 0)
-	{
-		const_cast<ASailboatPawn*>(this)->CachedWind = Cast<AWindActor>(Found[0]);
-		return CachedWind.Get();
-	}
-	return nullptr;
 }
