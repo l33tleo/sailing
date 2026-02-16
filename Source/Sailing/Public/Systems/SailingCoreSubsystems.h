@@ -127,6 +127,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Sailing|Mission")
 	int32 CompleteActiveMissionAtLocation(ESailingMissionType TriggerType, const FVector& CompletionLocation);
 
+	UFUNCTION(BlueprintCallable, Category = "Sailing|Mission")
+	bool ActivateFallbackMission();
+
+	UFUNCTION(BlueprintCallable, Category = "Sailing|Mission")
+	void SetCompletedMissionIds(const TArray<FName>& MissionIds);
+
+	UFUNCTION(BlueprintPure, Category = "Sailing|Mission")
+	TArray<FName> GetCompletedMissionIds() const;
+
 private:
 	UPROPERTY()
 	FName ActiveMissionId = NAME_None;

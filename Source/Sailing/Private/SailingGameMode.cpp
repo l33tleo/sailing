@@ -83,6 +83,7 @@ void ASailingGameMode::BeginPlay()
 			StarterDeliveryMission->bRepeatable = true;
 			MissionSubsystem->RegisterMissionAsset(StarterDeliveryMission);
 
+			MissionSubsystem->SetCompletedMissionIds(SaveGame ? SaveGame->CompletedMissionIds : TArray<FName>());
 			MissionSubsystem->SetActiveMissionId(SaveGame ? SaveGame->ActiveMissionId : NAME_None);
 			if (MissionSubsystem->GetActiveMissionId().IsNone() && SaveGame)
 			{
@@ -96,9 +97,15 @@ void ASailingGameMode::BeginPlay()
 				}
 			}
 
+			if (MissionSubsystem->GetActiveMissionId().IsNone())
+			{
+				MissionSubsystem->ActivateFallbackMission();
+			}
+
 			if (SaveGame)
 			{
 				SaveGame->ActiveMissionId = MissionSubsystem->GetActiveMissionId();
+				SaveGame->CompletedMissionIds = MissionSubsystem->GetCompletedMissionIds();
 			}
 
 			UE_LOG(LogTemp, Log, TEXT("SailingGameMode: Aktivt oppdrag '%s'."), *MissionSubsystem->GetActiveMissionId().ToString());
@@ -240,6 +247,7 @@ void ASailingGameMode::SaveGame_()
 			if (UMissionSubsystem* MissionSubsystem = GI->GetSubsystem<UMissionSubsystem>())
 			{
 				SaveGame->ActiveMissionId = MissionSubsystem->GetActiveMissionId();
+				SaveGame->CompletedMissionIds = MissionSubsystem->GetCompletedMissionIds();
 			}
 
 			if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())

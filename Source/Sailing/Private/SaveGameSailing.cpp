@@ -10,6 +10,7 @@ USaveGameSailing::USaveGameSailing()
 	PlayerCredits = 0;
 	UnlockedUpgradeIds.Empty();
 	ActiveMissionId = NAME_None;
+	CompletedMissionIds.Empty();
 	TelemetryCounters.Empty();
 }
 
@@ -73,6 +74,7 @@ void USaveGameSailing::EnsureCompatibility()
 	}
 
 	PlayerCredits = FMath::Max(0, PlayerCredits);
+	CompletedMissionIds.RemoveAll([](const FName& MissionId) { return MissionId.IsNone(); });
 	for (TPair<FName, int32>& Pair : TelemetryCounters)
 	{
 		Pair.Value = FMath::Max(0, Pair.Value);

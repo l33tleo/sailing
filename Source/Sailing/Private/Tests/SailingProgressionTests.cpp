@@ -169,4 +169,32 @@ bool FSailingWorldPortRegistryTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSailingMissionFallbackSelectionTest,
+	"Sailing.Progression.Mission.FallbackSelectionSkipsCompletedNonRepeatable",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSailingMissionFallbackSelectionTest::RunTest(const FString& Parameters)
+{
+	UMissionSubsystem* MissionSubsystem = NewObject<UMissionSubsystem>();
+
+	USailingMissionDataAsset* MissionA = NewObject<USailingMissionDataAsset>();
+	MissionA->MissionId = TEXT("Mission_A");
+	MissionA->MissionType = ESailingMissionType::NavigationChallenge;
+	MissionA->bRepeatable = false;
+
+	USailingMissionDataAsset* MissionB = NewObject<USailingMissionDataAsset>();
+	MissionB->MissionId = TEXT("Mission_B");
+	MissionB->MissionType = ESailingMissionType::Delivery;
+	MissionB->bRepeatable = true;
+
+	MissionSubsystem->RegisterMissionAsset(MissionA);
+	MissionSubsystem->RegisterMissionAsset(MissionB);
+	MissionSubsystem->SetCompletedMissionIds({ MissionA->MissionId });
+
+	TestTrue(TEXT("Fallback should find a mission"), MissionSubsystem->ActivateFallbackMission());
+	TestEqual(TEXT("Fallback should skip completed non-repeatable mission"), MissionSubsystem->GetActiveMissionId(), MissionB->MissionId);
+	return true;
+}
+
 #endif

@@ -65,6 +65,9 @@ public:
 	UPROPERTY(BlueprintReadWrite, Category = "Save|Mission")
 	FName ActiveMissionId = NAME_None;
 
+	UPROPERTY(BlueprintReadWrite, Category = "Save|Mission")
+	TArray<FName> CompletedMissionIds;
+
 	UPROPERTY(BlueprintReadWrite, Category = "Save|Telemetry")
 	TMap<FName, int32> TelemetryCounters;
 

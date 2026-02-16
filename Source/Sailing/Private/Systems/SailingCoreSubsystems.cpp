@@ -102,6 +102,11 @@ bool UMissionSubsystem::ActivateMissionAsset(const USailingMissionDataAsset* Mis
 		return false;
 	}
 
+	if (CompletedMissionIds.Contains(MissionData->MissionId) && !MissionData->bRepeatable)
+	{
+		return false;
+	}
+
 	ActiveMissionId = MissionData->MissionId;
 	return true;
 }
@@ -238,7 +243,63 @@ int32 UMissionSubsystem::CompleteActiveMissionAtLocation(ESailingMissionType Tri
 
 	UE_LOG(LogTemp, Log, TEXT("MissionSubsystem: Completed '%s', next='%s', reward=%d"),
 		*CompletedMissionId.ToString(), *ActiveMissionId.ToString(), RewardCredits);
+
+	if (ActiveMissionId.IsNone())
+	{
+		ActivateFallbackMission();
+	}
+
 	return RewardCredits;
+}
+
+bool UMissionSubsystem::ActivateFallbackMission()
+{
+	if (!ActiveMissionId.IsNone())
+	{
+		return false;
+	}
+
+	TArray<FName> MissionIds = GetRegisteredMissionIds();
+	for (const FName& MissionId : MissionIds)
+	{
+		const TObjectPtr<USailingMissionDataAsset>* MissionPtr = RegisteredMissions.Find(MissionId);
+		const USailingMissionDataAsset* Mission = MissionPtr ? MissionPtr->Get() : nullptr;
+		if (!Mission)
+		{
+			continue;
+		}
+
+		const bool bAlreadyCompleted = CompletedMissionIds.Contains(MissionId);
+		if (bAlreadyCompleted && !Mission->bRepeatable)
+		{
+			continue;
+		}
+
+		ActiveMissionId = MissionId;
+		return true;
+	}
+
+	return false;
+}
+
+void UMissionSubsystem::SetCompletedMissionIds(const TArray<FName>& MissionIds)
+{
+	CompletedMissionIds.Empty();
+	for (const FName& MissionId : MissionIds)
+	{
+		if (!MissionId.IsNone())
+		{
+			CompletedMissionIds.Add(MissionId);
+		}
+	}
+}
+
+TArray<FName> UMissionSubsystem::GetCompletedMissionIds() const
+{
+	TArray<FName> Result;
+	CompletedMissionIds.GenerateKeyArray(Result);
+	Result.Sort(FNameLexicalLess());
+	return Result;
 }
 
 void UEconomySubsystem::Initialize(FSubsystemCollectionBase& Collection)
