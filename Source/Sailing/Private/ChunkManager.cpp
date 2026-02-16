@@ -1,6 +1,8 @@
 #include "ChunkManager.h"
 #include "IslandActor.h"
 #include "SaveGameSailing.h"
+#include "Data/SailingMissionDataAsset.h"
+#include "Systems/SailingCoreSubsystems.h"
 #include "Kismet/GameplayStatics.h"
 
 AChunkManager::AChunkManager()
@@ -117,11 +119,43 @@ void AChunkManager::OnIslandDiscovered(AIslandActor* Island, const FString& Isla
 
 	SaveGame->MarkIslandDiscovered(Data);
 
+	int32 CreditsGranted = 0;
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UEconomySubsystem* EconomySubsystem = GI->GetSubsystem<UEconomySubsystem>())
+		{
+			if (DiscoveryCreditReward > 0)
+			{
+				EconomySubsystem->AddCredits(DiscoveryCreditReward);
+				CreditsGranted += DiscoveryCreditReward;
+			}
+
+			if (UMissionSubsystem* MissionSubsystem = GI->GetSubsystem<UMissionSubsystem>())
+			{
+				const int32 MissionReward = MissionSubsystem->CompleteActiveMissionByTrigger(ESailingMissionType::NavigationChallenge);
+				if (MissionReward > 0)
+				{
+					EconomySubsystem->AddCredits(MissionReward);
+					CreditsGranted += MissionReward;
+				}
+			}
+		}
+
+		if (UTelemetrySubsystem* TelemetrySubsystem = GI->GetSubsystem<UTelemetrySubsystem>())
+		{
+			TelemetrySubsystem->RecordCounterEvent(TEXT("IslandDiscovered"), 1);
+			if (CreditsGranted > 0)
+			{
+				TelemetrySubsystem->RecordCounterEvent(TEXT("CreditsGranted"), CreditsGranted);
+			}
+		}
+	}
+
 	// Auto-save
 	UGameplayStatics::SaveGameToSlot(SaveGame, USaveGameSailing::SaveSlotName, 0);
 
-	UE_LOG(LogTemp, Log, TEXT("Lagret oppdagelse av %s. Totalt oppdaget: %d"),
-		*IslandName, SaveGame->TotalIslandsDiscovered);
+	UE_LOG(LogTemp, Log, TEXT("Lagret oppdagelse av %s. Totalt oppdaget: %d. Credits +%d"),
+		*IslandName, SaveGame->TotalIslandsDiscovered, CreditsGranted);
 }
 
 void AChunkManager::UnloadDistantChunks(FIntPoint PlayerChunk)

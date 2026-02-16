@@ -6,6 +6,7 @@
 #include "WindActor.h"
 #include "ChunkManager.h"
 #include "OceanPlaneActor.h"
+#include "Data/SailingMissionDataAsset.h"
 #include "SaveGameSailing.h"
 #include "Systems/SailingCoreSubsystems.h"
 #include "Kismet/GameplayStatics.h"
@@ -56,6 +57,21 @@ void ASailingGameMode::BeginPlay()
 		if (UMissionSubsystem* MissionSubsystem = GI->GetSubsystem<UMissionSubsystem>())
 		{
 			MissionSubsystem->SetActiveMissionId(SaveGame ? SaveGame->ActiveMissionId : NAME_None);
+
+			if (MissionSubsystem->GetActiveMissionId().IsNone() &&
+				SaveGame && SaveGame->TotalIslandsDiscovered == 0)
+			{
+				USailingMissionDataAsset* StarterMission = NewObject<USailingMissionDataAsset>(this);
+				StarterMission->MissionId = TEXT("OppdagForsteOy");
+				StarterMission->DisplayName = FText::FromString(TEXT("Oppdag første øy"));
+				StarterMission->Description = FText::FromString(TEXT("Seil ut og oppdag din første øy."));
+				StarterMission->MissionType = ESailingMissionType::NavigationChallenge;
+				StarterMission->RewardCredits = 250;
+				StarterMission->bRepeatable = false;
+				MissionSubsystem->ActivateMissionAsset(StarterMission);
+				SaveGame->ActiveMissionId = StarterMission->MissionId;
+				UE_LOG(LogTemp, Log, TEXT("SailingGameMode: Aktivert startoppdrag '%s'."), *StarterMission->MissionId.ToString());
+			}
 		}
 	}
 

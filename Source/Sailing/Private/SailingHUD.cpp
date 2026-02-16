@@ -5,6 +5,7 @@
 #include "SailingGameMode.h"
 #include "SailingPlayerController.h"
 #include "SaveGameSailing.h"
+#include "Systems/SailingCoreSubsystems.h"
 #include "Engine/Canvas.h"
 #include "Engine/Font.h"
 #include "Kismet/GameplayStatics.h"
@@ -443,13 +444,37 @@ void ASailingHUD::DrawDiscoveryCounter()
 	// Top-left with background
 	float BoxX = 10.0f;
 	float BoxY = 10.0f;
-	float BoxW = 200.0f;
-	float BoxH = 35.0f;
+	float BoxW = 320.0f;
+	float BoxH = 82.0f;
 	DrawRect(FLinearColor(0.0f, 0.05f, 0.15f, 0.7f), BoxX, BoxY, BoxW, BoxH);
 
 	FString CounterText = FString::Printf(TEXT("OYER: %d oppdaget"), SaveGame->TotalIslandsDiscovered);
 	DrawText(CounterText, FLinearColor(0.5f, 0.9f, 1.0f, 1.0f),
 		BoxX + 10.0f, BoxY + 8.0f, nullptr, 1.2f);
+
+	int32 Credits = 0;
+	FName ActiveMissionId = NAME_None;
+	if (UGameInstance* GI = GetWorld()->GetGameInstance())
+	{
+		if (UEconomySubsystem* EconomySubsystem = GI->GetSubsystem<UEconomySubsystem>())
+		{
+			Credits = EconomySubsystem->GetCredits();
+		}
+		if (UMissionSubsystem* MissionSubsystem = GI->GetSubsystem<UMissionSubsystem>())
+		{
+			ActiveMissionId = MissionSubsystem->GetActiveMissionId();
+		}
+	}
+
+	const FString CreditsText = FString::Printf(TEXT("KREDITTER: %d"), Credits);
+	DrawText(CreditsText, FLinearColor(1.0f, 0.9f, 0.35f, 1.0f),
+		BoxX + 10.0f, BoxY + 32.0f, nullptr, 1.2f);
+
+	const FString MissionText = ActiveMissionId.IsNone()
+		? FString(TEXT("AKTIVT OPPDRAG: Ingen"))
+		: FString::Printf(TEXT("AKTIVT OPPDRAG: %s"), *ActiveMissionId.ToString());
+	DrawText(MissionText, FLinearColor(0.7f, 1.0f, 0.8f, 1.0f),
+		BoxX + 10.0f, BoxY + 56.0f, nullptr, 1.0f);
 }
 
 bool ASailingHUD::PauseMenuButtonHit(float X, float Y, float Bx, float By, float Bw, float Bh) const

@@ -7,6 +7,7 @@
 class UBoatUpgradeDataAsset;
 class USailingMissionDataAsset;
 class USaveGameSailing;
+enum class ESailingMissionType : uint8;
 
 /**
  * Subsystem skeleton for sailing simulation systems.
@@ -87,9 +88,21 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Sailing|Mission")
 	bool ActivateMissionAsset(const USailingMissionDataAsset* MissionData);
 
+	UFUNCTION(BlueprintCallable, Category = "Sailing|Mission")
+	bool RegisterMissionAsset(const USailingMissionDataAsset* MissionData);
+
+	UFUNCTION(BlueprintCallable, Category = "Sailing|Mission")
+	int32 CompleteActiveMissionByTrigger(ESailingMissionType TriggerType);
+
 private:
 	UPROPERTY()
 	FName ActiveMissionId = NAME_None;
+
+	UPROPERTY()
+	TMap<FName, TObjectPtr<USailingMissionDataAsset>> RegisteredMissions;
+
+	UPROPERTY()
+	TSet<FName> CompletedMissionIds;
 };
 
 UCLASS()

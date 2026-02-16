@@ -60,13 +60,49 @@ void UMissionSubsystem::Deinitialize()
 
 bool UMissionSubsystem::ActivateMissionAsset(const USailingMissionDataAsset* MissionData)
 {
-	if (!MissionData || MissionData->MissionId.IsNone())
+	if (!RegisterMissionAsset(MissionData))
 	{
 		return false;
 	}
 
 	ActiveMissionId = MissionData->MissionId;
 	return true;
+}
+
+bool UMissionSubsystem::RegisterMissionAsset(const USailingMissionDataAsset* MissionData)
+{
+	if (!MissionData || MissionData->MissionId.IsNone())
+	{
+		return false;
+	}
+
+	RegisteredMissions.FindOrAdd(MissionData->MissionId) = const_cast<USailingMissionDataAsset*>(MissionData);
+	return true;
+}
+
+int32 UMissionSubsystem::CompleteActiveMissionByTrigger(ESailingMissionType TriggerType)
+{
+	if (ActiveMissionId.IsNone())
+	{
+		return 0;
+	}
+
+	const TObjectPtr<USailingMissionDataAsset>* MissionPtr = RegisteredMissions.Find(ActiveMissionId);
+	if (!MissionPtr || !(*MissionPtr))
+	{
+		return 0;
+	}
+
+	const USailingMissionDataAsset* ActiveMission = MissionPtr->Get();
+	if (!ActiveMission || ActiveMission->MissionType != TriggerType)
+	{
+		return 0;
+	}
+
+	const int32 RewardCredits = FMath::Max(0, ActiveMission->RewardCredits);
+	CompletedMissionIds.Add(ActiveMissionId);
+	ActiveMissionId = NAME_None;
+	return RewardCredits;
 }
 
 void UEconomySubsystem::Initialize(FSubsystemCollectionBase& Collection)

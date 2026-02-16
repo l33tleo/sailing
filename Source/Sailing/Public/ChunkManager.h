@@ -32,6 +32,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Chunks")
 	TSubclassOf<AIslandActor> IslandClass;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Economy", meta = (ClampMin = "0"))
+	int32 DiscoveryCreditReward = 25;
+
 	// Set save game reference for persistence
 	void SetSaveGame(USaveGameSailing* InSaveGame);
 
