@@ -628,17 +628,20 @@ FText UPortMissionBoardWidget::BuildOfferActionSummaryStatusText(const FPortMiss
 
 EPortBoardPrimaryActionHint UPortMissionBoardWidget::DeterminePrimaryActionHint(const FPortMissionBoardData& BoardData)
 {
-	if (BoardData.bHasSelectableMissionOffers && BoardData.bHasPurchasableUpgradeOffers)
+	const bool bHasSelectableMissionOffers = BoardData.bHasSelectableMissionOffers || BoardData.SelectableMissionOfferCount > 0;
+	const bool bHasPurchasableUpgradeOffers = BoardData.bHasPurchasableUpgradeOffers || BoardData.PurchasableUpgradeOfferCount > 0;
+
+	if (bHasSelectableMissionOffers && bHasPurchasableUpgradeOffers)
 	{
 		return EPortBoardPrimaryActionHint::SelectMissionOrBuyUpgrade;
 	}
 
-	if (BoardData.bHasSelectableMissionOffers)
+	if (bHasSelectableMissionOffers)
 	{
 		return EPortBoardPrimaryActionHint::SelectMission;
 	}
 
-	if (BoardData.bHasPurchasableUpgradeOffers)
+	if (bHasPurchasableUpgradeOffers)
 	{
 		return EPortBoardPrimaryActionHint::BuyUpgrade;
 	}
