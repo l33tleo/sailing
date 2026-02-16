@@ -839,6 +839,44 @@ bool FSailingUpgradePurchaseRequestValidationTest::RunTest(const FString& Parame
 	TestEqual(TEXT("Action summary helper should render compact counts"),
 		UPortMissionBoardWidget::BuildOfferActionSummaryStatusText(SummaryBoardData).ToString(),
 		FString(TEXT("Valgbare oppdrag: 2 (1 blokkert) | Kjøpbare oppgraderinger: 3 (2 blokkert)")));
+
+	FPortMissionBoardData MixedBoardData;
+	MixedBoardData.bSupportsMissionBoard = true;
+	MixedBoardData.CurrentMissionId = TEXT("Mission_A");
+	MixedBoardData.OfferedMissionIds = { TEXT("Mission_A"), TEXT("Mission_B") };
+	FPortMissionOfferEntry MixedMissionA;
+	MixedMissionA.MissionId = TEXT("Mission_A");
+	MixedBoardData.OfferedMissions.Add(MixedMissionA);
+	FPortMissionOfferEntry MixedMissionB;
+	MixedMissionB.MissionId = TEXT("Mission_B");
+	MixedBoardData.OfferedMissions.Add(MixedMissionB);
+
+	MixedBoardData.bSupportsUpgradeService = true;
+	MixedBoardData.UpgradeAvailabilityReason = EPortUpgradeAvailabilityReason::Ready;
+	MixedBoardData.OfferedUpgradeIds = { TEXT("Upgrade_A"), TEXT("Upgrade_B") };
+	FPortUpgradeOfferEntry MixedUpgradeA;
+	MixedUpgradeA.UpgradeId = TEXT("Upgrade_A");
+	MixedUpgradeA.CreditCost = 100;
+	MixedUpgradeA.bAffordable = true;
+	MixedUpgradeA.bUnlocked = false;
+	MixedUpgradeA.bVisitGateSatisfied = true;
+	MixedBoardData.OfferedUpgrades.Add(MixedUpgradeA);
+	FPortUpgradeOfferEntry MixedUpgradeB;
+	MixedUpgradeB.UpgradeId = TEXT("Upgrade_B");
+	MixedUpgradeB.CreditCost = 400;
+	MixedUpgradeB.bAffordable = false;
+	MixedUpgradeB.bUnlocked = false;
+	MixedUpgradeB.bVisitGateSatisfied = true;
+	MixedBoardData.OfferedUpgrades.Add(MixedUpgradeB);
+
+	const FPortMissionBoardData MixedAnnotatedResult = UPortMissionBoardWidget::BuildActionStateAnnotatedBoardData(MixedBoardData);
+	TestEqual(TEXT("Mixed annotated board should count selectable missions"), MixedAnnotatedResult.SelectableMissionOfferCount, 1);
+	TestEqual(TEXT("Mixed annotated board should count blocked missions"), MixedAnnotatedResult.BlockedMissionOfferCount, 1);
+	TestEqual(TEXT("Mixed annotated board should count purchasable upgrades"), MixedAnnotatedResult.PurchasableUpgradeOfferCount, 1);
+	TestEqual(TEXT("Mixed annotated board should count blocked upgrades"), MixedAnnotatedResult.BlockedUpgradeOfferCount, 1);
+	TestEqual(TEXT("Mixed annotated board should summarize mixed counts"),
+		MixedAnnotatedResult.OfferActionSummaryStatus.ToString(),
+		FString(TEXT("Valgbare oppdrag: 1 (1 blokkert) | Kjøpbare oppgraderinger: 1 (1 blokkert)")));
 	return true;
 }
 
