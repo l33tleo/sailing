@@ -9,9 +9,10 @@ import { formatNumber, formatPercent, formatDate } from "@/lib/utils";
 import {
   getRecommendations,
   runEvaluation,
+  getExportCsvUrl,
   type Recommendation,
 } from "@/lib/api";
-import { RefreshCw, Filter } from "lucide-react";
+import { RefreshCw, Filter, Download } from "lucide-react";
 
 export default function AnbefalingerPage() {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
@@ -63,16 +64,26 @@ export default function AnbefalingerPage() {
             Alle anbefalinger med utfall og treffsikkerhet
           </p>
         </div>
-        <button
-          onClick={handleEvaluate}
-          disabled={evaluating}
-          className="flex items-center gap-2 rounded-lg border border-slate-700 px-4 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-800 disabled:opacity-50"
-        >
-          <RefreshCw
-            className={`h-4 w-4 ${evaluating ? "animate-spin" : ""}`}
-          />
-          {evaluating ? "Evaluerer..." : "Evaluer anbefalinger"}
-        </button>
+        <div className="flex gap-2">
+          <a
+            href={getExportCsvUrl()}
+            download
+            className="flex items-center gap-2 rounded-lg border border-slate-700 px-4 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-800"
+          >
+            <Download className="h-4 w-4" />
+            Eksporter CSV
+          </a>
+          <button
+            onClick={handleEvaluate}
+            disabled={evaluating}
+            className="flex items-center gap-2 rounded-lg border border-slate-700 px-4 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-800 disabled:opacity-50"
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${evaluating ? "animate-spin" : ""}`}
+            />
+            {evaluating ? "Evaluerer..." : "Evaluer anbefalinger"}
+          </button>
+        </div>
       </div>
 
       {error && (

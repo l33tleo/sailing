@@ -321,3 +321,116 @@ export async function getWatchlist(): Promise<WatchlistItem[]> {
 export async function removeFromWatchlist(id: number): Promise<void> {
   return fetchAPI(`/watchlist/${id}`, { method: "DELETE" });
 }
+
+// --- Compare endpoints ---
+
+export interface ComparisonStock {
+  ticker: string;
+  name: string;
+  price: number | null;
+  change_percent: number | null;
+  currency: string | null;
+  market_cap: number | null;
+  pe_ratio: number | null;
+  forward_pe: number | null;
+  pb_ratio: number | null;
+  ev_ebitda: number | null;
+  debt_to_equity: number | null;
+  revenue_growth: number | null;
+  dividend_yield: number | null;
+  roe: number | null;
+  beta: number | null;
+  free_cash_flow: number | null;
+  technical_score: number;
+  fundamental_score: number;
+  combined_score: number;
+  recommendation: string;
+  rsi: number | null;
+  sma_signal: string | null;
+  macd_signal: string | null;
+  price_history_dates: string[];
+  price_history_close: number[];
+}
+
+export async function compareStocks(tickers: string[]): Promise<{ stocks: ComparisonStock[] }> {
+  return fetchAPI(`/compare/?tickers=${tickers.join(",")}`);
+}
+
+// --- News endpoints ---
+
+export interface NewsItem {
+  title: string;
+  publisher: string;
+  link: string;
+  published: string;
+  thumbnail: string | null;
+  related_tickers: string[];
+}
+
+export async function getStockNews(ticker: string, limit = 10): Promise<NewsItem[]> {
+  return fetchAPI(`/news/${encodeURIComponent(ticker)}?limit=${limit}`);
+}
+
+// --- Market endpoints ---
+
+export interface MarketIndex {
+  name: string;
+  ticker: string;
+  price: number;
+  change: number;
+  change_percent: number;
+  currency: string | null;
+}
+
+export async function getMarketIndices(): Promise<{ indices: MarketIndex[] }> {
+  return fetchAPI("/market/indices");
+}
+
+// --- Alert endpoints ---
+
+export interface AlertItem {
+  id: number;
+  ticker: string;
+  stock_name: string;
+  condition_type: string;
+  threshold: number;
+  is_active: boolean;
+  last_triggered: string | null;
+  created_at: string;
+}
+
+export interface AlertCheckResult {
+  alert_id: number;
+  ticker: string;
+  condition_type: string;
+  threshold: number;
+  current_value: number;
+  triggered: boolean;
+  message: string;
+}
+
+export async function createAlert(data: {
+  ticker: string;
+  condition_type: string;
+  threshold: number;
+}): Promise<AlertItem> {
+  return fetchAPI("/alerts/", { method: "POST", body: JSON.stringify(data) });
+}
+
+export async function getAlerts(activeOnly = true): Promise<AlertItem[]> {
+  return fetchAPI(`/alerts/?active_only=${activeOnly}`);
+}
+
+export async function deleteAlert(id: number): Promise<void> {
+  return fetchAPI(`/alerts/${id}`, { method: "DELETE" });
+}
+
+export async function checkAlerts(): Promise<AlertCheckResult[]> {
+  return fetchAPI("/alerts/check", { method: "POST" });
+}
+
+// --- Export ---
+
+export function getExportCsvUrl(): string {
+  return `${API_BASE}/export/recommendations/csv`;
+}

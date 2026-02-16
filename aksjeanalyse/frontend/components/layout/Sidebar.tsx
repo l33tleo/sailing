@@ -10,14 +10,18 @@ import {
   Target,
   Briefcase,
   LayoutDashboard,
+  GitCompareArrows,
+  Bell,
 } from "lucide-react";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/aksjer", label: "Aksjer", icon: Search },
   { href: "/anbefalinger", label: "Anbefalinger", icon: TrendingUp },
+  { href: "/sammenligning", label: "Sammenligning", icon: GitCompareArrows },
   { href: "/scorecard", label: "Treffsikkerhet", icon: Target },
   { href: "/portefolje", label: "Portefølje", icon: Briefcase },
+  { href: "/varsler", label: "Varsler", icon: Bell },
 ];
 
 export default function Sidebar() {

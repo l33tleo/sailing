@@ -23,11 +23,13 @@ import {
   getFullAnalysis,
   generateRecommendation,
   getRecommendations,
+  getStockNews,
   type StockQuote,
   type StockPriceHistory,
   type StockKeyMetrics,
   type FullAnalysis,
   type Recommendation,
+  type NewsItem,
 } from "@/lib/api";
 import {
   ArrowLeft,
@@ -35,6 +37,8 @@ import {
   TrendingDown,
   BarChart3,
   Zap,
+  Newspaper,
+  ExternalLink,
 } from "lucide-react";
 
 export default function StockDetailPage() {
@@ -46,6 +50,7 @@ export default function StockDetailPage() {
   const [metrics, setMetrics] = useState<StockKeyMetrics | null>(null);
   const [analysis, setAnalysis] = useState<FullAnalysis | null>(null);
   const [pastRecs, setPastRecs] = useState<Recommendation[]>([]);
+  const [news, setNews] = useState<NewsItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [analyzing, setAnalyzing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -55,16 +60,18 @@ export default function StockDetailPage() {
   useEffect(() => {
     async function load() {
       try {
-        const [q, h, m, recs] = await Promise.all([
+        const [q, h, m, recs, n] = await Promise.all([
           getStockQuote(ticker),
           getStockHistory(ticker),
           getStockMetrics(ticker).catch(() => null),
           getRecommendations({ ticker, limit: 10 }).catch(() => []),
+          getStockNews(ticker, 5).catch(() => []),
         ]);
         setQuote(q);
         setHistory(h);
         setMetrics(m);
         setPastRecs(recs);
+        setNews(n);
       } catch (e: any) {
         setError(e.message);
       } finally {
@@ -390,6 +397,45 @@ export default function StockDetailPage() {
           </div>
         )}
       </Card>
+
+      {/* News */}
+      {news.length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Newspaper className="h-5 w-5 text-blue-400" />
+              <CardTitle>Nyheter</CardTitle>
+            </div>
+          </CardHeader>
+          <div className="space-y-3">
+            {news.map((n, i) => (
+              <a
+                key={i}
+                href={n.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-start gap-3 rounded-lg border border-slate-800 p-3 transition-colors hover:border-blue-500/50 hover:bg-slate-800/30"
+              >
+                {n.thumbnail && (
+                  <img
+                    src={n.thumbnail}
+                    alt=""
+                    className="h-16 w-24 rounded object-cover"
+                  />
+                )}
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-white">{n.title}</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {n.publisher}
+                    {n.published && ` · ${formatDate(n.published)}`}
+                  </p>
+                </div>
+                <ExternalLink className="mt-1 h-4 w-4 flex-shrink-0 text-slate-600" />
+              </a>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Past recommendations for this stock */}
       {pastRecs.length > 0 && (

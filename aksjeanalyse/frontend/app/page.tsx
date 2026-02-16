@@ -9,26 +9,31 @@ import { formatNumber, formatPercent, formatLargeNumber, formatDate } from "@/li
 import {
   getRecommendations,
   getScorecard,
+  getMarketIndices,
   type Recommendation,
   type ScorecardStats,
+  type MarketIndex,
 } from "@/lib/api";
-import { TrendingUp, TrendingDown, Target, BarChart3, ArrowRight } from "lucide-react";
+import { TrendingUp, TrendingDown, Target, BarChart3, ArrowRight, Globe } from "lucide-react";
 
 export default function DashboardPage() {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [scorecard, setScorecard] = useState<ScorecardStats | null>(null);
+  const [indices, setIndices] = useState<MarketIndex[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
       try {
-        const [recs, sc] = await Promise.all([
+        const [recs, sc, mkt] = await Promise.all([
           getRecommendations({ limit: 5 }),
           getScorecard(),
+          getMarketIndices().catch(() => ({ indices: [] })),
         ]);
         setRecommendations(recs);
         setScorecard(sc);
+        setIndices(mkt.indices);
       } catch (e: any) {
         setError(e.message || "Kunne ikke laste data");
       } finally {
@@ -131,6 +136,41 @@ export default function DashboardPage() {
           </div>
         </Card>
       </div>
+
+      {/* Market indices */}
+      {indices.length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Globe className="h-5 w-5 text-blue-400" />
+              <CardTitle>Markedsindekser</CardTitle>
+            </div>
+          </CardHeader>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            {indices.map((idx) => (
+              <div
+                key={idx.ticker}
+                className="rounded-lg border border-slate-800 p-3"
+              >
+                <p className="text-xs text-slate-500">{idx.name}</p>
+                <p className="text-lg font-semibold text-white">
+                  {formatNumber(idx.price, 0)}
+                </p>
+                <p
+                  className={`text-sm font-medium ${
+                    idx.change_percent >= 0
+                      ? "text-emerald-400"
+                      : "text-red-400"
+                  }`}
+                >
+                  {idx.change_percent >= 0 ? "+" : ""}
+                  {idx.change_percent.toFixed(2)}%
+                </p>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
 
       {/* Recent recommendations */}
       <Card>
