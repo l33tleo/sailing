@@ -1,4 +1,11 @@
-"""Stock data service — fetches real-time and historical data via yfinance."""
+"""Stock data service — fetches real-time and historical data via yfinance.
+
+All yfinance calls are cached via TTLCache to reduce API load and improve
+response times. Cache TTLs:
+  - Quotes: 60s
+  - Info/metrics: 5 min
+  - Historical data: 10 min
+"""
 
 import logging
 from datetime import datetime, timedelta
@@ -7,6 +14,7 @@ from functools import lru_cache
 import yfinance as yf
 import pandas as pd
 
+from app.cache import quote_cache, info_cache, history_cache
 from app.schemas.stock import (
     StockKeyMetrics,
     StockPriceHistory,
@@ -56,21 +64,34 @@ STOCK_NAMES = {
 
 
 def get_ticker_info(ticker: str) -> dict:
-    """Fetch full info dict from yfinance for a ticker."""
+    """Fetch full info dict from yfinance for a ticker. Cached for 5 min."""
+    cache_key = f"info:{ticker}"
+    cached = info_cache.get(cache_key)
+    if cached is not None:
+        return cached
     try:
         t = yf.Ticker(ticker)
         info = t.info
-        return info if info else {}
+        result = info if info else {}
+        if result:
+            info_cache.set(cache_key, result)
+        return result
     except Exception as e:
         logger.error(f"Error fetching info for {ticker}: {e}")
         return {}
 
 
 def get_stock_quote(ticker: str) -> StockQuote | None:
-    """Get current quote for a single stock."""
+    """Get current quote for a single stock. Cached for 60s."""
+    cache_key = f"quote:{ticker}"
+    cached = quote_cache.get(cache_key)
+    if cached is not None:
+        return cached
     try:
         t = yf.Ticker(ticker)
         info = t.info
+        result: StockQuote | None = None
+
         if not info or "regularMarketPrice" not in info:
             # Try fast_info as fallback
             fi = t.fast_info
@@ -79,7 +100,7 @@ def get_stock_quote(ticker: str) -> StockQuote | None:
                 prev_close = getattr(fi, "previous_close", None) or price
                 change = price - prev_close
                 change_pct = (change / prev_close * 100) if prev_close else 0
-                return StockQuote(
+                result = StockQuote(
                     ticker=ticker,
                     name=ticker,
                     price=round(price, 2),
@@ -89,27 +110,30 @@ def get_stock_quote(ticker: str) -> StockQuote | None:
                     market_cap=getattr(fi, "market_cap", None),
                     currency=getattr(fi, "currency", None),
                 )
-            return None
+        else:
+            price = info.get("regularMarketPrice", 0) or info.get("currentPrice", 0) or 0
+            prev_close = info.get("regularMarketPreviousClose", price) or price
+            change = price - prev_close
+            change_pct = (change / prev_close * 100) if prev_close else 0
 
-        price = info.get("regularMarketPrice", 0) or info.get("currentPrice", 0) or 0
-        prev_close = info.get("regularMarketPreviousClose", price) or price
-        change = price - prev_close
-        change_pct = (change / prev_close * 100) if prev_close else 0
+            result = StockQuote(
+                ticker=ticker,
+                name=info.get("shortName", info.get("longName", ticker)),
+                price=round(price, 2),
+                change=round(change, 2),
+                change_percent=round(change_pct, 2),
+                volume=info.get("regularMarketVolume", 0) or 0,
+                market_cap=info.get("marketCap"),
+                pe_ratio=info.get("trailingPE"),
+                dividend_yield=info.get("dividendYield"),
+                fifty_two_week_high=info.get("fiftyTwoWeekHigh"),
+                fifty_two_week_low=info.get("fiftyTwoWeekLow"),
+                currency=info.get("currency"),
+            )
 
-        return StockQuote(
-            ticker=ticker,
-            name=info.get("shortName", info.get("longName", ticker)),
-            price=round(price, 2),
-            change=round(change, 2),
-            change_percent=round(change_pct, 2),
-            volume=info.get("regularMarketVolume", 0) or 0,
-            market_cap=info.get("marketCap"),
-            pe_ratio=info.get("trailingPE"),
-            dividend_yield=info.get("dividendYield"),
-            fifty_two_week_high=info.get("fiftyTwoWeekHigh"),
-            fifty_two_week_low=info.get("fiftyTwoWeekLow"),
-            currency=info.get("currency"),
-        )
+        if result is not None:
+            quote_cache.set(cache_key, result)
+        return result
     except Exception as e:
         logger.error(f"Error fetching quote for {ticker}: {e}")
         return None
@@ -118,13 +142,17 @@ def get_stock_quote(ticker: str) -> StockQuote | None:
 def get_price_history(
     ticker: str, period: str = "1y", interval: str = "1d"
 ) -> StockPriceHistory | None:
-    """Get historical price data for a stock."""
+    """Get historical price data for a stock. Cached for 10 min."""
+    cache_key = f"history:{ticker}:{period}:{interval}"
+    cached = history_cache.get(cache_key)
+    if cached is not None:
+        return cached
     try:
         t = yf.Ticker(ticker)
         hist = t.history(period=period, interval=interval)
         if hist.empty:
             return None
-        return StockPriceHistory(
+        result = StockPriceHistory(
             dates=[d.strftime("%Y-%m-%d") for d in hist.index],
             open=[round(v, 2) for v in hist["Open"].tolist()],
             high=[round(v, 2) for v in hist["High"].tolist()],
@@ -132,16 +160,17 @@ def get_price_history(
             close=[round(v, 2) for v in hist["Close"].tolist()],
             volume=[int(v) for v in hist["Volume"].tolist()],
         )
+        history_cache.set(cache_key, result)
+        return result
     except Exception as e:
         logger.error(f"Error fetching history for {ticker}: {e}")
         return None
 
 
 def get_key_metrics(ticker: str) -> StockKeyMetrics | None:
-    """Get fundamental key metrics for a stock."""
+    """Get fundamental key metrics for a stock. Uses cached info (5 min TTL)."""
     try:
-        t = yf.Ticker(ticker)
-        info = t.info
+        info = get_ticker_info(ticker)  # Already cached
         if not info:
             return None
 
@@ -247,12 +276,17 @@ def get_popular_stocks(market: str = "all") -> list[StockSearchResult]:
 
 
 def get_historical_dataframe(ticker: str, period: str = "1y") -> pd.DataFrame | None:
-    """Get raw pandas DataFrame of historical data for analysis services."""
+    """Get raw pandas DataFrame of historical data for analysis services. Cached for 10 min."""
+    cache_key = f"df:{ticker}:{period}"
+    cached = history_cache.get(cache_key)
+    if cached is not None:
+        return cached
     try:
         t = yf.Ticker(ticker)
         hist = t.history(period=period)
         if hist.empty:
             return None
+        history_cache.set(cache_key, hist)
         return hist
     except Exception as e:
         logger.error(f"Error fetching dataframe for {ticker}: {e}")

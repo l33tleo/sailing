@@ -1,9 +1,11 @@
-"""News API endpoint — stock news via yfinance."""
+"""News API endpoint — stock news via yfinance. Cached for 15 min."""
 
 import logging
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 import yfinance as yf
+
+from app.cache import news_cache
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +26,11 @@ async def get_stock_news(
     ticker: str,
     limit: int = Query(10, ge=1, le=50),
 ):
-    """Hent nyheter for en aksje via yfinance."""
+    """Hent nyheter for en aksje via yfinance. Cached for 15 min."""
+    cache_key = f"news:{ticker}:{limit}"
+    cached = news_cache.get(cache_key)
+    if cached is not None:
+        return cached
     try:
         t = yf.Ticker(ticker)
         news = t.news
@@ -86,6 +92,7 @@ async def get_stock_news(
                 )
             )
 
+        news_cache.set(cache_key, items)
         return items
     except Exception as e:
         logger.error(f"Error fetching news for {ticker}: {e}")

@@ -61,3 +61,26 @@ app.include_router(sectors.router, prefix="/api")
 async def health_check():
     """Health check endpoint."""
     return {"status": "ok", "service": "AksjeAnalyse API"}
+
+
+@app.get("/api/cache/stats")
+async def cache_stats():
+    """Cache statistics for monitoring."""
+    from app.cache import quote_cache, info_cache, history_cache, news_cache
+    return {
+        "quote_cache": quote_cache.stats,
+        "info_cache": info_cache.stats,
+        "history_cache": history_cache.stats,
+        "news_cache": news_cache.stats,
+    }
+
+
+@app.post("/api/cache/clear")
+async def clear_caches():
+    """Clear all caches."""
+    from app.cache import quote_cache, info_cache, history_cache, news_cache
+    quote_cache.clear()
+    info_cache.clear()
+    history_cache.clear()
+    news_cache.clear()
+    return {"message": "Alle cacher tømt"}
