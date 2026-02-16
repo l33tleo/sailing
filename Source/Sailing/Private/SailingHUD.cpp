@@ -36,7 +36,7 @@ void ASailingHUD::EnsureOverlayWidget()
 }
 
 void ASailingHUD::PushOverlayData(int32 DiscoveredIslands, int32 Credits, FName ActiveMissionId,
-	const FText& ActiveMissionTitle, float ObjectiveDistanceMeters)
+	const FText& ActiveMissionTitle, float ObjectiveDistanceMeters, int32 BoatConditionPercent)
 {
 	EnsureOverlayWidget();
 	if (!OverlayWidget)
@@ -50,6 +50,7 @@ void ASailingHUD::PushOverlayData(int32 DiscoveredIslands, int32 Credits, FName 
 	OverlayData.ActiveMissionId = ActiveMissionId;
 	OverlayData.ActiveMissionTitle = ActiveMissionTitle;
 	OverlayData.ObjectiveDistanceMeters = ObjectiveDistanceMeters;
+	OverlayData.BoatConditionPercent = BoatConditionPercent;
 	OverlayWidget->PushOverlayData(OverlayData);
 }
 
@@ -501,7 +502,7 @@ void ASailingHUD::DrawDiscoveryCounter()
 	float BoxX = 10.0f;
 	float BoxY = 10.0f;
 	float BoxW = 320.0f;
-	float BoxH = 82.0f;
+	float BoxH = 104.0f;
 	DrawRect(FLinearColor(0.0f, 0.05f, 0.15f, 0.7f), BoxX, BoxY, BoxW, BoxH);
 
 	FString CounterText = FString::Printf(TEXT("OYER: %d oppdaget"), SaveGame->TotalIslandsDiscovered);
@@ -509,6 +510,7 @@ void ASailingHUD::DrawDiscoveryCounter()
 		BoxX + 10.0f, BoxY + 8.0f, nullptr, 1.2f);
 
 	int32 Credits = 0;
+	int32 BoatCondition = 100;
 	FName ActiveMissionId = NAME_None;
 	FText ActiveMissionTitle = FText::GetEmpty();
 	float ObjectiveDistanceMeters = -1.0f;
@@ -517,6 +519,7 @@ void ASailingHUD::DrawDiscoveryCounter()
 		if (UEconomySubsystem* EconomySubsystem = GI->GetSubsystem<UEconomySubsystem>())
 		{
 			Credits = EconomySubsystem->GetCredits();
+			BoatCondition = EconomySubsystem->GetBoatConditionPercent();
 		}
 		if (UMissionSubsystem* MissionSubsystem = GI->GetSubsystem<UMissionSubsystem>())
 		{
@@ -558,7 +561,13 @@ void ASailingHUD::DrawDiscoveryCounter()
 			BoxX + 170.0f, BoxY + 32.0f, nullptr, 1.0f);
 	}
 
-	PushOverlayData(SaveGame->TotalIslandsDiscovered, Credits, ActiveMissionId, ActiveMissionTitle, ObjectiveDistanceMeters);
+	const FLinearColor ConditionColor = BoatCondition > 70
+		? FLinearColor(0.3f, 1.0f, 0.4f, 1.0f)
+		: (BoatCondition > 35 ? FLinearColor(1.0f, 0.9f, 0.3f, 1.0f) : FLinearColor(1.0f, 0.35f, 0.35f, 1.0f));
+	const FString ConditionText = FString::Printf(TEXT("SKROGTILSTAND: %d%%"), BoatCondition);
+	DrawText(ConditionText, ConditionColor, BoxX + 10.0f, BoxY + 80.0f, nullptr, 1.0f);
+
+	PushOverlayData(SaveGame->TotalIslandsDiscovered, Credits, ActiveMissionId, ActiveMissionTitle, ObjectiveDistanceMeters, BoatCondition);
 }
 
 bool ASailingHUD::PauseMenuButtonHit(float X, float Y, float Bx, float By, float Bw, float Bh) const

@@ -3,6 +3,7 @@
 #include "Simulation/SailingSimulationMath.h"
 #include "WindActor.h"
 #include "Kismet/GameplayStatics.h"
+#include "Systems/SailingCoreSubsystems.h"
 
 UBoatSimulationComponent::UBoatSimulationComponent()
 {
@@ -63,7 +64,21 @@ void UBoatSimulationComponent::Simulate(ASailboatPawn* OwnerPawn, float DeltaTim
 	const float NewSpeed = FMath::Clamp(CurrentSpeed + Acceleration * DeltaTime, 0.0f, OwnerPawn->MaxBoatSpeed);
 	const FVector Movement = Forward * NewSpeed * DeltaTime;
 	OwnerPawn->AddActorWorldOffset(Movement, false);
+	WearAccumulatedDistanceCm += Movement.Size();
 	CurrentSpeed = NewSpeed;
+
+	if (WearAccumulatedDistanceCm >= 15000.0f)
+	{
+		if (UGameInstance* GI = OwnerPawn->GetGameInstance())
+		{
+			if (UEconomySubsystem* EconomySubsystem = GI->GetSubsystem<UEconomySubsystem>())
+			{
+				const int32 WearSteps = FMath::FloorToInt(WearAccumulatedDistanceCm / 15000.0f);
+				EconomySubsystem->ApplyBoatWear(FMath::Max(1, WearSteps));
+				WearAccumulatedDistanceCm -= WearSteps * 15000.0f;
+			}
+		}
+	}
 
 	// Keep actor on water level with simple heave oscillation
 	if (UWorld* World = OwnerPawn->GetWorld())

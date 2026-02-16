@@ -59,6 +59,9 @@ public:
 	UPROPERTY(BlueprintReadWrite, Category = "Save|Economy")
 	int32 PlayerCredits = 0;
 
+	UPROPERTY(BlueprintReadWrite, Category = "Save|Economy", meta = (ClampMin = "0", ClampMax = "100"))
+	int32 BoatConditionPercent = 100;
+
 	UPROPERTY(BlueprintReadWrite, Category = "Save|Economy")
 	TArray<FName> UnlockedUpgradeIds;
 

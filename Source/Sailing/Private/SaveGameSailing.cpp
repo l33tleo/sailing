@@ -8,6 +8,7 @@ USaveGameSailing::USaveGameSailing()
 	TotalIslandsDiscovered = 0;
 	LastPlayerLocation = FVector::ZeroVector;
 	PlayerCredits = 0;
+	BoatConditionPercent = 100;
 	UnlockedUpgradeIds.Empty();
 	ActiveMissionId = NAME_None;
 	CompletedMissionIds.Empty();
@@ -74,6 +75,7 @@ void USaveGameSailing::EnsureCompatibility()
 	}
 
 	PlayerCredits = FMath::Max(0, PlayerCredits);
+	BoatConditionPercent = FMath::Clamp(BoatConditionPercent, 0, 100);
 	CompletedMissionIds.RemoveAll([](const FName& MissionId) { return MissionId.IsNone(); });
 	for (TPair<FName, int32>& Pair : TelemetryCounters)
 	{

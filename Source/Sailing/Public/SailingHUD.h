@@ -79,7 +79,7 @@ private:
 
 	void EnsureOverlayWidget();
 	void PushOverlayData(int32 DiscoveredIslands, int32 Credits, FName ActiveMissionId,
-		const FText& ActiveMissionTitle, float ObjectiveDistanceMeters);
+		const FText& ActiveMissionTitle, float ObjectiveDistanceMeters, int32 BoatConditionPercent);
 
 	// Oversiktskart (spiller sentrum, oppdagede øyer som prikker)
 	void DrawOverviewMap();

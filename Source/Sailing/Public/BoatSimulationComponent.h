@@ -34,6 +34,7 @@ private:
 	float CurrentSailForce = 0.0f;
 	float CurrentSpeed = 0.0f;
 	float DebugLogTimer = 0.0f;
+	float WearAccumulatedDistanceCm = 0.0f;
 
 	AWindActor* FindWind(UWorld* WorldContext);
 };

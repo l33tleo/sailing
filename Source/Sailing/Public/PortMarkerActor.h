@@ -35,6 +35,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Port")
 	bool bGrantOneTimeDockBonus = true;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Port")
+	bool bAutoRepairAtPort = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Port", meta = (ClampMin = "0"))
+	int32 RepairCostPerPercentPoint = 1;
+
 private:
 	bool bVisitedInSession = false;
 

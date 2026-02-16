@@ -168,8 +168,20 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Sailing|Economy")
 	void SetCredits(int32 InCredits);
 
+	UFUNCTION(BlueprintPure, Category = "Sailing|Economy")
+	int32 GetBoatConditionPercent() const { return BoatConditionPercent; }
+
+	UFUNCTION(BlueprintCallable, Category = "Sailing|Economy")
+	void SetBoatConditionPercent(int32 InPercent);
+
+	UFUNCTION(BlueprintCallable, Category = "Sailing|Economy")
+	void ApplyBoatWear(int32 WearAmount);
+
 	UFUNCTION(BlueprintCallable, Category = "Sailing|Economy")
 	bool SpendCredits(int32 Cost);
+
+	UFUNCTION(BlueprintCallable, Category = "Sailing|Economy")
+	bool RepairBoatToFull(int32 CostPerPercentPoint = 2);
 
 	UFUNCTION(BlueprintCallable, Category = "Sailing|Economy")
 	bool PurchaseUpgrade(const UBoatUpgradeDataAsset* UpgradeData);
@@ -186,6 +198,9 @@ public:
 private:
 	UPROPERTY()
 	int32 Credits = 0;
+
+	UPROPERTY()
+	int32 BoatConditionPercent = 100;
 
 	UPROPERTY()
 	TSet<FName> UnlockedUpgradeIds;

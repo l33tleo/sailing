@@ -55,6 +55,7 @@ void ASailingGameMode::BeginPlay()
 		if (UEconomySubsystem* EconomySubsystem = GI->GetSubsystem<UEconomySubsystem>())
 		{
 			EconomySubsystem->SetCredits(SaveGame ? SaveGame->PlayerCredits : 0);
+			EconomySubsystem->SetBoatConditionPercent(SaveGame ? SaveGame->BoatConditionPercent : 100);
 			EconomySubsystem->SetUnlockedUpgrades(SaveGame ? SaveGame->UnlockedUpgradeIds : TArray<FName>());
 		}
 
@@ -241,6 +242,7 @@ void ASailingGameMode::SaveGame_()
 			if (UEconomySubsystem* EconomySubsystem = GI->GetSubsystem<UEconomySubsystem>())
 			{
 				SaveGame->PlayerCredits = EconomySubsystem->GetCredits();
+				SaveGame->BoatConditionPercent = EconomySubsystem->GetBoatConditionPercent();
 				SaveGame->UnlockedUpgradeIds = EconomySubsystem->GetUnlockedUpgradeIds();
 			}
 

@@ -197,4 +197,25 @@ bool FSailingMissionFallbackSelectionTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FSailingEconomyRepairFlowTest,
+	"Sailing.Progression.Economy.RepairFlow",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FSailingEconomyRepairFlowTest::RunTest(const FString& Parameters)
+{
+	UEconomySubsystem* Economy = NewObject<UEconomySubsystem>();
+	Economy->SetCredits(1000);
+	Economy->SetBoatConditionPercent(70);
+	Economy->ApplyBoatWear(15);
+
+	TestEqual(TEXT("Boat condition should decrease with wear"), Economy->GetBoatConditionPercent(), 55);
+
+	const bool bRepairSucceeded = Economy->RepairBoatToFull(2);
+	TestTrue(TEXT("Repair should succeed with sufficient credits"), bRepairSucceeded);
+	TestEqual(TEXT("Repair should restore full condition"), Economy->GetBoatConditionPercent(), 100);
+	TestEqual(TEXT("Repair should consume credits based on missing condition"), Economy->GetCredits(), 910);
+	return true;
+}
+
 #endif

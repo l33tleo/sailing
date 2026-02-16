@@ -305,7 +305,7 @@ TArray<FName> UMissionSubsystem::GetCompletedMissionIds() const
 void UEconomySubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
 	Super::Initialize(Collection);
-	UE_LOG(LogTemp, Log, TEXT("EconomySubsystem initialized. Credits=%d"), Credits);
+	UE_LOG(LogTemp, Log, TEXT("EconomySubsystem initialized. Credits=%d Condition=%d%%"), Credits, BoatConditionPercent);
 }
 
 void UEconomySubsystem::Deinitialize()
@@ -324,6 +324,21 @@ void UEconomySubsystem::SetCredits(int32 InCredits)
 	Credits = FMath::Max(0, InCredits);
 }
 
+void UEconomySubsystem::SetBoatConditionPercent(int32 InPercent)
+{
+	BoatConditionPercent = FMath::Clamp(InPercent, 0, 100);
+}
+
+void UEconomySubsystem::ApplyBoatWear(int32 WearAmount)
+{
+	if (WearAmount <= 0)
+	{
+		return;
+	}
+
+	BoatConditionPercent = FMath::Clamp(BoatConditionPercent - WearAmount, 0, 100);
+}
+
 bool UEconomySubsystem::SpendCredits(int32 Cost)
 {
 	if (Cost <= 0)
@@ -337,6 +352,25 @@ bool UEconomySubsystem::SpendCredits(int32 Cost)
 	}
 
 	Credits -= Cost;
+	return true;
+}
+
+bool UEconomySubsystem::RepairBoatToFull(int32 CostPerPercentPoint)
+{
+	const int32 ClampedCostPerPoint = FMath::Max(0, CostPerPercentPoint);
+	const int32 MissingCondition = 100 - FMath::Clamp(BoatConditionPercent, 0, 100);
+	if (MissingCondition <= 0)
+	{
+		return true;
+	}
+
+	const int32 TotalCost = MissingCondition * ClampedCostPerPoint;
+	if (!SpendCredits(TotalCost))
+	{
+		return false;
+	}
+
+	BoatConditionPercent = 100;
 	return true;
 }
 
