@@ -15,10 +15,12 @@ import {
   CandlestickChart,
   Layers,
   SlidersHorizontal,
+  MessageCircle,
 } from "lucide-react";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/chat", label: "AI Chat", icon: MessageCircle },
   { href: "/aksjer", label: "Aksjer", icon: Search },
   { href: "/screener", label: "Screener", icon: SlidersHorizontal },
   { href: "/anbefalinger", label: "Anbefalinger", icon: TrendingUp },

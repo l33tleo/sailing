@@ -521,6 +521,19 @@ export async function getSectors(): Promise<{ sectors: SectorData[] }> {
   return fetchAPI("/sectors");
 }
 
+// --- Chat endpoints ---
+
+export interface ChatResponse {
+  reply: string;
+  ticker: string | null;
+  recommendation: string | null;
+  score: number | null;
+}
+
+export async function sendChatMessage(message: string): Promise<ChatResponse> {
+  return fetchAPI("/chat", { method: "POST", body: JSON.stringify({ message }) });
+}
+
 // --- Screener endpoints ---
 
 export interface ScreenerStock {
