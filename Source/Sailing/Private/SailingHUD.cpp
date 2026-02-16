@@ -908,7 +908,7 @@ void ASailingHUD::HandleUpgradePurchaseRequest(FName UpgradeId)
 	RequestUpgradePurchaseFromBoard(UpgradeId);
 }
 
-void ASailingHUD::HandleMissionBoardActionBlocked(EPortBoardActionType ActionType, const FText& Reason)
+void ASailingHUD::HandleMissionBoardActionBlocked(EPortBoardActionType ActionType, EPortBoardActionBlockedReason BlockedReasonType, const FText& Reason)
 {
 	UGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance() : nullptr;
 	if (GI)
@@ -930,6 +930,66 @@ void ASailingHUD::HandleMissionBoardActionBlocked(EPortBoardActionType ActionTyp
 			case EPortBoardActionType::UpgradePurchase:
 				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardWidgetActionBlocked_UpgradePurchase"), 1);
 				break;
+			default:
+				break;
+			}
+			switch (BlockedReasonType)
+			{
+			case EPortBoardActionBlockedReason::MissionInvalid:
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardWidgetBlockedReason_MissionInvalid"), 1);
+				break;
+			case EPortBoardActionBlockedReason::MissionBoardDisabled:
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardWidgetBlockedReason_MissionBoardDisabled"), 1);
+				break;
+			case EPortBoardActionBlockedReason::MissionBoardCooldown:
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardWidgetBlockedReason_MissionBoardCooldown"), 1);
+				break;
+			case EPortBoardActionBlockedReason::MissionNotOffered:
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardWidgetBlockedReason_MissionNotOffered"), 1);
+				break;
+			case EPortBoardActionBlockedReason::MissionAlreadyActive:
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardWidgetBlockedReason_MissionAlreadyActive"), 1);
+				break;
+			case EPortBoardActionBlockedReason::ManualRefreshDisabled:
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardWidgetBlockedReason_ManualRefreshDisabled"), 1);
+				break;
+			case EPortBoardActionBlockedReason::ManualRefreshCooldown:
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardWidgetBlockedReason_ManualRefreshCooldown"), 1);
+				break;
+			case EPortBoardActionBlockedReason::ManualRefreshNoCredits:
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardWidgetBlockedReason_ManualRefreshNoCredits"), 1);
+				break;
+			case EPortBoardActionBlockedReason::RepairServiceDisabled:
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardWidgetBlockedReason_RepairServiceDisabled"), 1);
+				break;
+			case EPortBoardActionBlockedReason::RepairAlreadyFullCondition:
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardWidgetBlockedReason_RepairAlreadyFull"), 1);
+				break;
+			case EPortBoardActionBlockedReason::RepairNoCredits:
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardWidgetBlockedReason_RepairNoCredits"), 1);
+				break;
+			case EPortBoardActionBlockedReason::UpgradeInvalid:
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardWidgetBlockedReason_UpgradeInvalid"), 1);
+				break;
+			case EPortBoardActionBlockedReason::UpgradeServiceDisabled:
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardWidgetBlockedReason_UpgradeServiceDisabled"), 1);
+				break;
+			case EPortBoardActionBlockedReason::UpgradeNotOffered:
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardWidgetBlockedReason_UpgradeNotOffered"), 1);
+				break;
+			case EPortBoardActionBlockedReason::UpgradeAlreadyUnlocked:
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardWidgetBlockedReason_UpgradeAlreadyUnlocked"), 1);
+				break;
+			case EPortBoardActionBlockedReason::UpgradeVisitRequirementNotMet:
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardWidgetBlockedReason_UpgradeVisitGate"), 1);
+				break;
+			case EPortBoardActionBlockedReason::UpgradeNoCredits:
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardWidgetBlockedReason_UpgradeNoCredits"), 1);
+				break;
+			case EPortBoardActionBlockedReason::UpgradeAvailabilityBlocked:
+				TelemetrySubsystem->RecordCounterEvent(TEXT("MissionBoardWidgetBlockedReason_UpgradeAvailabilityBlocked"), 1);
+				break;
+			case EPortBoardActionBlockedReason::None:
 			default:
 				break;
 			}

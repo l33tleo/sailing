@@ -20,7 +20,31 @@ enum class EPortBoardActionType : uint8
 	UpgradePurchase
 };
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnPortBoardActionBlocked, EPortBoardActionType, ActionType, FText, Reason);
+UENUM(BlueprintType)
+enum class EPortBoardActionBlockedReason : uint8
+{
+	None,
+	MissionInvalid,
+	MissionBoardDisabled,
+	MissionBoardCooldown,
+	MissionNotOffered,
+	MissionAlreadyActive,
+	ManualRefreshDisabled,
+	ManualRefreshCooldown,
+	ManualRefreshNoCredits,
+	RepairServiceDisabled,
+	RepairAlreadyFullCondition,
+	RepairNoCredits,
+	UpgradeInvalid,
+	UpgradeServiceDisabled,
+	UpgradeNotOffered,
+	UpgradeAlreadyUnlocked,
+	UpgradeVisitRequirementNotMet,
+	UpgradeNoCredits,
+	UpgradeAvailabilityBlocked
+};
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnPortBoardActionBlocked, EPortBoardActionType, ActionType, EPortBoardActionBlockedReason, BlockedReasonType, FText, Reason);
 
 UENUM(BlueprintType)
 enum class EPortMissionAvailabilityReason : uint8

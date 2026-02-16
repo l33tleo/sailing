@@ -1,5 +1,84 @@
 #include "UI/PortMissionBoardWidget.h"
 
+namespace
+{
+EPortBoardActionBlockedReason MapMissionBlockReasonToBoardReason(EPortMissionOfferActionBlockReason BlockReason)
+{
+	switch (BlockReason)
+	{
+	case EPortMissionOfferActionBlockReason::InvalidMission:
+		return EPortBoardActionBlockedReason::MissionInvalid;
+	case EPortMissionOfferActionBlockReason::MissionBoardDisabled:
+		return EPortBoardActionBlockedReason::MissionBoardDisabled;
+	case EPortMissionOfferActionBlockReason::MissionBoardCooldown:
+		return EPortBoardActionBlockedReason::MissionBoardCooldown;
+	case EPortMissionOfferActionBlockReason::NotOfferedAtPort:
+		return EPortBoardActionBlockedReason::MissionNotOffered;
+	case EPortMissionOfferActionBlockReason::AlreadyActiveMission:
+		return EPortBoardActionBlockedReason::MissionAlreadyActive;
+	case EPortMissionOfferActionBlockReason::None:
+	default:
+		return EPortBoardActionBlockedReason::None;
+	}
+}
+
+EPortBoardActionBlockedReason MapUpgradeBlockReasonToBoardReason(EPortUpgradeOfferActionBlockReason BlockReason)
+{
+	switch (BlockReason)
+	{
+	case EPortUpgradeOfferActionBlockReason::InvalidUpgrade:
+		return EPortBoardActionBlockedReason::UpgradeInvalid;
+	case EPortUpgradeOfferActionBlockReason::UpgradeServiceDisabled:
+		return EPortBoardActionBlockedReason::UpgradeServiceDisabled;
+	case EPortUpgradeOfferActionBlockReason::NotOfferedAtPort:
+		return EPortBoardActionBlockedReason::UpgradeNotOffered;
+	case EPortUpgradeOfferActionBlockReason::AlreadyUnlocked:
+		return EPortBoardActionBlockedReason::UpgradeAlreadyUnlocked;
+	case EPortUpgradeOfferActionBlockReason::VisitRequirementNotMet:
+		return EPortBoardActionBlockedReason::UpgradeVisitRequirementNotMet;
+	case EPortUpgradeOfferActionBlockReason::InsufficientCredits:
+		return EPortBoardActionBlockedReason::UpgradeNoCredits;
+	case EPortUpgradeOfferActionBlockReason::UpgradeAvailabilityBlocked:
+		return EPortBoardActionBlockedReason::UpgradeAvailabilityBlocked;
+	case EPortUpgradeOfferActionBlockReason::None:
+	default:
+		return EPortBoardActionBlockedReason::None;
+	}
+}
+
+EPortBoardActionBlockedReason MapRepairBlockReasonToBoardReason(EPortRepairActionBlockReason BlockReason)
+{
+	switch (BlockReason)
+	{
+	case EPortRepairActionBlockReason::RepairServiceDisabled:
+		return EPortBoardActionBlockedReason::RepairServiceDisabled;
+	case EPortRepairActionBlockReason::AlreadyAtFullCondition:
+		return EPortBoardActionBlockedReason::RepairAlreadyFullCondition;
+	case EPortRepairActionBlockReason::InsufficientCredits:
+		return EPortBoardActionBlockedReason::RepairNoCredits;
+	case EPortRepairActionBlockReason::None:
+	default:
+		return EPortBoardActionBlockedReason::None;
+	}
+}
+
+EPortBoardActionBlockedReason MapManualRefreshBlockReasonToBoardReason(EPortManualRefreshActionBlockReason BlockReason)
+{
+	switch (BlockReason)
+	{
+	case EPortManualRefreshActionBlockReason::ManualRefreshDisabled:
+		return EPortBoardActionBlockedReason::ManualRefreshDisabled;
+	case EPortManualRefreshActionBlockReason::ManualRefreshCooldown:
+		return EPortBoardActionBlockedReason::ManualRefreshCooldown;
+	case EPortManualRefreshActionBlockReason::InsufficientCredits:
+		return EPortBoardActionBlockedReason::ManualRefreshNoCredits;
+	case EPortManualRefreshActionBlockReason::None:
+	default:
+		return EPortBoardActionBlockedReason::None;
+	}
+}
+}
+
 void UPortMissionBoardWidget::PushMissionBoardData(const FPortMissionBoardData& InData)
 {
 	LastData = BuildActionStateAnnotatedBoardData(InData);
@@ -8,12 +87,16 @@ void UPortMissionBoardWidget::PushMissionBoardData(const FPortMissionBoardData& 
 
 void UPortMissionBoardWidget::RequestAcceptMission(FName MissionId)
 {
-	FText BlockedReason;
-	if (!CanRequestMissionAccept(LastData, MissionId, BlockedReason))
+	const EPortMissionOfferActionBlockReason BlockReason = DetermineMissionOfferActionBlockReason(LastData, MissionId);
+	if (BlockReason != EPortMissionOfferActionBlockReason::None)
 	{
-		if (!BlockedReason.IsEmpty())
+		const FText BlockedReasonText = BuildMissionOfferActionBlockReasonText(BlockReason, LastData, MissionId);
+		if (!BlockedReasonText.IsEmpty())
 		{
-			OnActionBlocked.Broadcast(EPortBoardActionType::MissionAccept, BlockedReason);
+			OnActionBlocked.Broadcast(
+				EPortBoardActionType::MissionAccept,
+				MapMissionBlockReasonToBoardReason(BlockReason),
+				BlockedReasonText);
 		}
 		return;
 	}
@@ -792,12 +875,16 @@ void UPortMissionBoardWidget::RequestCloseBoard()
 
 void UPortMissionBoardWidget::RequestRefreshBoard()
 {
-	FText BlockedReason;
-	if (!CanRequestManualRefresh(LastData, BlockedReason))
+	const EPortManualRefreshActionBlockReason BlockReason = DetermineManualRefreshActionBlockReason(LastData);
+	if (BlockReason != EPortManualRefreshActionBlockReason::None)
 	{
-		if (!BlockedReason.IsEmpty())
+		const FText BlockedReasonText = BuildManualRefreshActionBlockReasonText(BlockReason, LastData);
+		if (!BlockedReasonText.IsEmpty())
 		{
-			OnActionBlocked.Broadcast(EPortBoardActionType::ManualRefresh, BlockedReason);
+			OnActionBlocked.Broadcast(
+				EPortBoardActionType::ManualRefresh,
+				MapManualRefreshBlockReasonToBoardReason(BlockReason),
+				BlockedReasonText);
 		}
 		return;
 	}
@@ -807,12 +894,16 @@ void UPortMissionBoardWidget::RequestRefreshBoard()
 
 void UPortMissionBoardWidget::RequestRepairService()
 {
-	FText BlockedReason;
-	if (!CanRequestRepairService(LastData, BlockedReason))
+	const EPortRepairActionBlockReason BlockReason = DetermineRepairActionBlockReason(LastData);
+	if (BlockReason != EPortRepairActionBlockReason::None)
 	{
-		if (!BlockedReason.IsEmpty())
+		const FText BlockedReasonText = BuildRepairActionBlockReasonText(BlockReason, LastData);
+		if (!BlockedReasonText.IsEmpty())
 		{
-			OnActionBlocked.Broadcast(EPortBoardActionType::RepairService, BlockedReason);
+			OnActionBlocked.Broadcast(
+				EPortBoardActionType::RepairService,
+				MapRepairBlockReasonToBoardReason(BlockReason),
+				BlockedReasonText);
 		}
 		return;
 	}
@@ -822,12 +913,16 @@ void UPortMissionBoardWidget::RequestRepairService()
 
 void UPortMissionBoardWidget::RequestPurchaseUpgrade(FName UpgradeId)
 {
-	FText BlockedReason;
-	if (!CanRequestUpgradePurchase(LastData, UpgradeId, BlockedReason))
+	const EPortUpgradeOfferActionBlockReason BlockReason = DetermineUpgradeOfferActionBlockReason(LastData, UpgradeId);
+	if (BlockReason != EPortUpgradeOfferActionBlockReason::None)
 	{
-		if (!BlockedReason.IsEmpty())
+		const FText BlockedReasonText = BuildUpgradeOfferActionBlockReasonText(BlockReason, LastData, UpgradeId);
+		if (!BlockedReasonText.IsEmpty())
 		{
-			OnActionBlocked.Broadcast(EPortBoardActionType::UpgradePurchase, BlockedReason);
+			OnActionBlocked.Broadcast(
+				EPortBoardActionType::UpgradePurchase,
+				MapUpgradeBlockReasonToBoardReason(BlockReason),
+				BlockedReasonText);
 		}
 		return;
 	}
