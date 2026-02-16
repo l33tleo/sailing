@@ -40,6 +40,20 @@ POPULAR_GLOBAL_STOCKS = [
     "JPM", "V", "JNJ", "WMT", "PG", "UNH", "HD", "KO",
 ]
 
+# Pre-mapped names to avoid slow info lookups for popular stocks
+STOCK_NAMES = {
+    "EQNR.OL": "Equinor", "DNB.OL": "DNB Bank", "TEL.OL": "Telenor",
+    "MOWI.OL": "Mowi", "ORK.OL": "Orkla", "YAR.OL": "Yara International",
+    "AKRBP.OL": "Aker BP", "NHY.OL": "Norsk Hydro", "SALM.OL": "SalMar",
+    "SUBC.OL": "Subsea 7", "STB.OL": "Storebrand", "KOG.OL": "Kongsberg Gruppen",
+    "AKER.OL": "Aker", "BAKKA.OL": "Bakkafrost", "FRO.OL": "Frontline",
+    "AAPL": "Apple", "MSFT": "Microsoft", "GOOGL": "Alphabet",
+    "AMZN": "Amazon", "NVDA": "NVIDIA", "META": "Meta Platforms",
+    "TSLA": "Tesla", "JPM": "JPMorgan Chase", "V": "Visa",
+    "JNJ": "Johnson & Johnson", "WMT": "Walmart", "PG": "Procter & Gamble",
+    "UNH": "UnitedHealth", "HD": "Home Depot", "KO": "Coca-Cola",
+}
+
 
 def get_ticker_info(ticker: str) -> dict:
     """Fetch full info dict from yfinance for a ticker."""
@@ -218,7 +232,7 @@ def get_popular_stocks(market: str = "all") -> list[StockSearchResult]:
                 results.append(
                     StockSearchResult(
                         ticker=ticker,
-                        name=ticker.replace(".OL", ""),
+                        name=STOCK_NAMES.get(ticker, ticker.replace(".OL", "")),
                         sector=None,
                         market="Oslo Børs" if ticker.endswith(".OL") else "US",
                         current_price=getattr(fi, "last_price", None),
