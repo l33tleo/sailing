@@ -22,7 +22,8 @@ public:
 
 	/** Shows mission board data from current harbor interaction. */
 	void ShowPortMissionBoard(FName PortId, const FText& PortDisplayName,
-		const TArray<FName>& OfferedMissionIds, FName CurrentMissionId);
+		const TArray<FName>& OfferedMissionIds, FName CurrentMissionId,
+		bool bMissionBoardOnCooldown, float CooldownRemainingSeconds);
 
 	UFUNCTION(BlueprintCallable, Category = "HUD|MissionBoard")
 	bool AcceptMissionFromBoard(FName MissionId);
@@ -129,4 +130,6 @@ private:
 	TArray<FName> LastMissionBoardOfferedIds;
 	FName LastMissionBoardPortId = NAME_None;
 	FText LastMissionBoardPortDisplayName;
+	bool bLastMissionBoardOnCooldown = false;
+	float LastMissionBoardCooldownRemainingSeconds = 0.0f;
 };

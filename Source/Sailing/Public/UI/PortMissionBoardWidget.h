@@ -38,6 +38,12 @@ struct SAILING_API FPortMissionBoardData
 
 	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
 	FName CurrentMissionId = NAME_None;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	bool bMissionBoardOnCooldown = false;
+
+	UPROPERTY(BlueprintReadOnly, Category = "MissionBoard")
+	float CooldownRemainingSeconds = 0.0f;
 };
 
 /**

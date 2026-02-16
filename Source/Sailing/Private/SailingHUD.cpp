@@ -55,7 +55,8 @@ void ASailingHUD::EnsurePortMissionBoardWidget()
 }
 
 void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayName,
-	const TArray<FName>& OfferedMissionIds, FName CurrentMissionId)
+	const TArray<FName>& OfferedMissionIds, FName CurrentMissionId,
+	bool bMissionBoardOnCooldown, float CooldownRemainingSeconds)
 {
 	EnsurePortMissionBoardWidget();
 	if (!PortMissionBoardWidget)
@@ -68,6 +69,8 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 	Data.PortDisplayName = PortDisplayName;
 	Data.OfferedMissionIds = OfferedMissionIds;
 	Data.CurrentMissionId = CurrentMissionId;
+	Data.bMissionBoardOnCooldown = bMissionBoardOnCooldown;
+	Data.CooldownRemainingSeconds = FMath::Max(0.0f, CooldownRemainingSeconds);
 	if (UGameInstance* GI = GetWorld() ? GetWorld()->GetGameInstance() : nullptr)
 	{
 		if (UMissionSubsystem* MissionSubsystem = GI->GetSubsystem<UMissionSubsystem>())
@@ -87,6 +90,8 @@ void ASailingHUD::ShowPortMissionBoard(FName PortId, const FText& PortDisplayNam
 	LastMissionBoardPortId = PortId;
 	LastMissionBoardPortDisplayName = PortDisplayName;
 	LastMissionBoardOfferedIds = OfferedMissionIds;
+	bLastMissionBoardOnCooldown = bMissionBoardOnCooldown;
+	LastMissionBoardCooldownRemainingSeconds = FMath::Max(0.0f, CooldownRemainingSeconds);
 
 	GetWorldTimerManager().ClearTimer(MissionBoardHideTimer);
 	GetWorldTimerManager().SetTimer(MissionBoardHideTimer, this, &ASailingHUD::HidePortMissionBoard, 5.0f, false);
@@ -100,6 +105,11 @@ bool ASailingHUD::AcceptMissionFromBoard(FName MissionId)
 	}
 
 	if (LastMissionBoardOfferedIds.Num() > 0 && !LastMissionBoardOfferedIds.Contains(MissionId))
+	{
+		return false;
+	}
+
+	if (bLastMissionBoardOnCooldown)
 	{
 		return false;
 	}
@@ -141,6 +151,8 @@ void ASailingHUD::CloseMissionBoard()
 	LastMissionBoardOfferedIds.Reset();
 	LastMissionBoardPortId = NAME_None;
 	LastMissionBoardPortDisplayName = FText::GetEmpty();
+	bLastMissionBoardOnCooldown = false;
+	LastMissionBoardCooldownRemainingSeconds = 0.0f;
 }
 
 void ASailingHUD::HidePortMissionBoard()

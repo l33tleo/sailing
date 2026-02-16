@@ -158,9 +158,10 @@ void APortMarkerActor::OnDockTriggerOverlap(UPrimitiveComponent* OverlappedComp,
 
 			HUD->ShowDiscoveryPopup(PopupText);
 
-			if (bOfferMissionBoard && !bMissionBoardOnCooldown)
+			if (bOfferMissionBoard)
 			{
-				HUD->ShowPortMissionBoard(PortId, PortDisplayName, OfferedMissionIds, CurrentMissionId);
+				HUD->ShowPortMissionBoard(PortId, PortDisplayName, OfferedMissionIds, CurrentMissionId,
+					bMissionBoardOnCooldown, MissionBoardCooldownRemaining);
 			}
 		}
 	}
