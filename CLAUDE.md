@@ -66,6 +66,8 @@ HUD shows Norwegian point-of-sail names: I JERN, BIDEVIND, SLOR, HALV VIND, ROMS
 
 ## Blender → Unreal Asset Pipeline
 
+**Blender-konvensjoner:** Les `scripts/blender/CLAUDE.md` før du rører en Blender-scene eller FBX-eksport. Gjenbrukbare helpere: `scripts/blender/sailing_blender_utils.py` (hull fra stasjoner, FBX-eksport, ortho-rendering, collection-oppsett). Master-scene: `Optimist3735.blend` på repo-rot.
+
 ### MCP Servers
 MCP servers configured in `.cursor/mcp.json`:
 - **unrealMCP**: Programmatic Unreal Editor control (`~/.claude/mcp-servers/unreal-mcp/Python/unreal_mcp_server.py`, timeout increased to 60s for import operations)

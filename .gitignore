@@ -20,3 +20,14 @@ DerivedDataCache/
 
 # macOS
 .DS_Store
+
+# Python
+__pycache__/
+
+# Blender auto-backups
+*.blend1
+
+# Claude Code / skills tooling (lokalt)
+.claude/
+.agents/
+skills-lock.json

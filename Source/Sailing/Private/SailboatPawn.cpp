@@ -59,24 +59,24 @@ void ASailboatPawn::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// Last kombinert Laser-mesh (V3: skrog, cockpit, mast, bom, seil, ror, rorpinne, senterbord)
-	UStaticMesh* LaserCombinedMesh = LoadObject<UStaticMesh>(nullptr,
-		TEXT("/Game/ModelsV2/LaserBoatCombined.LaserBoatCombined"));
+	// Last kombinert Optimist-mesh (ny modell fra Blender)
+	UStaticMesh* BoatCombinedMesh = LoadObject<UStaticMesh>(nullptr,
+		TEXT("/Game/ModelsV2/Optimist3735.Optimist3735"));
 
-	if (LaserCombinedMesh && LaserCombinedMesh->GetNumLODs() > 0 && BoatMesh)
+	if (BoatCombinedMesh && BoatCombinedMesh->GetNumLODs() > 0 && BoatMesh)
 	{
-		UE_LOG(LogTemp, Log, TEXT("SailboatPawn: Bruker kombinert Laser-mesh fra ModelsV2: %s"), *LaserCombinedMesh->GetPathName());
-		BoatMesh->SetStaticMesh(LaserCombinedMesh);
+		UE_LOG(LogTemp, Log, TEXT("SailboatPawn: Bruker kombinert Optimist-mesh fra ModelsV2: %s"), *BoatCombinedMesh->GetPathName());
+		BoatMesh->SetStaticMesh(BoatCombinedMesh);
 		BoatMesh->SetVisibility(true);
 		BoatMesh->SetHiddenInGame(false);
 		BoatMesh->SetRelativeLocation(FVector(0.0f, 0.0f, BoatVisualZOffset));
 		BoatMesh->SetRelativeRotation(FRotator::ZeroRotator);
 		BoatMesh->SetRelativeScale3D(FVector(1.0f, 1.0f, 1.0f));
-		// FBX-materialer fra Blender brukes direkte (M_Hull, M_Sail, M_Spar osv.)
+		// FBX-materialer fra Blender brukes direkte (M_Hull, M_Sail, M_Wood, M_Board)
 	}
 	else
 	{
-		UE_LOG(LogTemp, Error, TEXT("SailboatPawn: Kunne ikke laste /Game/ModelsV2/LaserBoatCombined!"));
+		UE_LOG(LogTemp, Error, TEXT("SailboatPawn: Kunne ikke laste /Game/ModelsV2/Optimist3735!"));
 	}
 
 	// SternShield fjernet: bakdelen dekkes nå av båt-meshet fra Blender (ror, rorkult, skrog).
