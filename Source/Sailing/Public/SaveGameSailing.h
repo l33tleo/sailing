@@ -27,9 +27,17 @@ struct FIslandData
 	UPROPERTY(BlueprintReadWrite, Category = "Island")
 	FDateTime DiscoveredTime;
 
+	/** When set, this island is a fjord island; GetUniqueKey() returns "Fjord_" + FjordIslandId. */
+	UPROPERTY(BlueprintReadWrite, Category = "Island")
+	FString FjordIslandId;
+
 	// Unique key for map storage
 	FString GetUniqueKey() const
 	{
+		if (!FjordIslandId.IsEmpty())
+		{
+			return FString(TEXT("Fjord_")) + FjordIslandId;
+		}
 		return FString::Printf(TEXT("%d_%d_%d"), ChunkCoord.X, ChunkCoord.Y, IslandIndex);
 	}
 };
@@ -55,6 +63,11 @@ public:
 	bool IsIslandDiscovered(FIntPoint ChunkCoord, int32 IslandIndex) const;
 	void MarkIslandDiscovered(const FIslandData& IslandData);
 	FIslandData* GetIslandData(FIntPoint ChunkCoord, int32 IslandIndex);
+
+	/** True if the fjord island with the given name is in the save. */
+	bool IsFjordIslandDiscovered(const FString& IslandName) const;
+	/** Save discovery of a fjord island (uses FjordIslandId in Data as key). */
+	void MarkFjordIslandDiscovered(const FIslandData& IslandData);
 
 	static const FString SaveSlotName;
 };

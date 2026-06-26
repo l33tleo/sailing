@@ -12,17 +12,42 @@
 
 ASailingPlayerController::ASailingPlayerController()
 {
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bTickEvenWhenPaused = true;
 }
 
 void ASailingPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
-	InputComponent->BindKey(EKeys::Escape, EInputEvent::IE_Pressed, this, &ASailingPlayerController::TogglePauseMenu);
-	InputComponent->BindKey(EKeys::LeftMouseButton, EInputEvent::IE_Pressed, this, &ASailingPlayerController::OnPauseMenuClick);
+
+	// Escape og M må fungere under pause (kart-modus pauser spillet)
+	FInputKeyBinding& EscBind = InputComponent->BindKey(EKeys::Escape, EInputEvent::IE_Pressed, this, &ASailingPlayerController::TogglePauseMenu);
+	EscBind.bExecuteWhenPaused = true;
+
+	FInputKeyBinding& MousePressBind = InputComponent->BindKey(EKeys::LeftMouseButton, EInputEvent::IE_Pressed, this, &ASailingPlayerController::OnMapMousePressed);
+	MousePressBind.bExecuteWhenPaused = true;
+
+	FInputKeyBinding& MouseReleaseBind = InputComponent->BindKey(EKeys::LeftMouseButton, EInputEvent::IE_Released, this, &ASailingPlayerController::OnMapMouseReleased);
+	MouseReleaseBind.bExecuteWhenPaused = true;
+
+	FInputKeyBinding& MBind = InputComponent->BindKey(EKeys::M, EInputEvent::IE_Pressed, this, &ASailingPlayerController::ToggleMapView);
+	MBind.bExecuteWhenPaused = true;
+
+	FInputKeyBinding& ScrollUpBind = InputComponent->BindKey(EKeys::MouseScrollUp, EInputEvent::IE_Pressed, this, &ASailingPlayerController::OnMapScrollUp);
+	ScrollUpBind.bExecuteWhenPaused = true;
+
+	FInputKeyBinding& ScrollDownBind = InputComponent->BindKey(EKeys::MouseScrollDown, EInputEvent::IE_Pressed, this, &ASailingPlayerController::OnMapScrollDown);
+	ScrollDownBind.bExecuteWhenPaused = true;
 }
 
 void ASailingPlayerController::TogglePauseMenu()
 {
+	// Escape lukker kartet først
+	if (bShowMapView)
+	{
+		CloseMapView();
+		return;
+	}
 	bShowPauseMenu = !bShowPauseMenu;
 	SetShowMouseCursor(bShowPauseMenu);
 	if (bShowPauseMenu)
@@ -47,15 +72,116 @@ void ASailingPlayerController::ClosePauseMenu()
 	}
 }
 
-void ASailingPlayerController::OnPauseMenuClick()
+void ASailingPlayerController::ToggleMapView()
 {
-	if (!bShowPauseMenu) return;
-	float MouseX, MouseY;
-	if (GetMousePosition(MouseX, MouseY) && GetHUD())
+	if (bShowPauseMenu) return; // Ikke åpne kart under pause-meny
+
+	bShowMapView = !bShowMapView;
+	SetShowMouseCursor(bShowMapView);
+	if (bShowMapView)
 	{
+		FInputModeGameAndUI Mode;
+		Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		SetInputMode(Mode);
 		if (ASailingHUD* HUD = Cast<ASailingHUD>(GetHUD()))
 		{
-			HUD->OnPauseMenuClick(MouseX, MouseY);
+			HUD->SetFullMapVisible(true);
+		}
+	}
+	else
+	{
+		SetInputMode(FInputModeGameOnly());
+		if (ASailingHUD* HUD = Cast<ASailingHUD>(GetHUD()))
+		{
+			HUD->SetFullMapVisible(false);
+		}
+	}
+}
+
+void ASailingPlayerController::CloseMapView()
+{
+	if (!bShowMapView) return;
+	bShowMapView = false;
+	bMapMouseDown = false;
+	SetShowMouseCursor(false);
+	SetInputMode(FInputModeGameOnly());
+	if (ASailingHUD* HUD = Cast<ASailingHUD>(GetHUD()))
+	{
+		HUD->SetFullMapVisible(false);
+	}
+}
+
+void ASailingPlayerController::OnMapScrollUp()
+{
+	if (!bShowMapView) return;
+	if (ASailingHUD* HUD = Cast<ASailingHUD>(GetHUD()))
+	{
+		HUD->OnFullMapScroll(1.0f);
+	}
+}
+
+void ASailingPlayerController::OnMapScrollDown()
+{
+	if (!bShowMapView) return;
+	if (ASailingHUD* HUD = Cast<ASailingHUD>(GetHUD()))
+	{
+		HUD->OnFullMapScroll(-1.0f);
+	}
+}
+
+void ASailingPlayerController::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+
+	if (!bShowMapView || !bMapMouseDown) return;
+
+	float DeltaX, DeltaY;
+	GetInputMouseDelta(DeltaX, DeltaY);
+	if (ASailingHUD* HUD = Cast<ASailingHUD>(GetHUD()))
+	{
+		HUD->OnFullMapDragDelta(DeltaX, DeltaY);
+	}
+}
+
+void ASailingPlayerController::OnMapMousePressed()
+{
+	// Pause-meny klikk
+	if (bShowPauseMenu)
+	{
+		float MouseX, MouseY;
+		if (GetMousePosition(MouseX, MouseY) && GetHUD())
+		{
+			if (ASailingHUD* HUD = Cast<ASailingHUD>(GetHUD()))
+			{
+				HUD->OnPauseMenuClick(MouseX, MouseY);
+			}
+		}
+		return;
+	}
+
+	// Kart-modus: start drag
+	if (bShowMapView)
+	{
+		bMapMouseDown = true;
+		float MouseX, MouseY;
+		if (GetMousePosition(MouseX, MouseY))
+		{
+			if (ASailingHUD* HUD = Cast<ASailingHUD>(GetHUD()))
+			{
+				HUD->OnFullMapClick(MouseX, MouseY);
+			}
+		}
+	}
+}
+
+void ASailingPlayerController::OnMapMouseReleased()
+{
+	if (bMapMouseDown)
+	{
+		bMapMouseDown = false;
+		if (ASailingHUD* HUD = Cast<ASailingHUD>(GetHUD()))
+		{
+			HUD->OnFullMapRelease();
 		}
 	}
 }

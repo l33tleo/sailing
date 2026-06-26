@@ -22,14 +22,28 @@ public:
 	/** Lukk pause-meny (kalles fra HUD ved Fortsett). */
 	void ClosePauseMenu();
 
+	/** Om fullskjerm-kartet vises (M-tast). */
+	bool IsMapViewShown() const { return bShowMapView; }
+	/** Lukk fullskjerm-kartet. */
+	void CloseMapView();
+
+	virtual void Tick(float DeltaTime) override;
+
 protected:
 	virtual void BeginPlay() override;
 
 private:
 	void TogglePauseMenu();
+	void ToggleMapView();
 	void OnPauseMenuClick();
+	void OnMapMousePressed();
+	void OnMapMouseReleased();
+	void OnMapScrollUp();
+	void OnMapScrollDown();
+	bool bMapMouseDown = false;
 
 	bool bShowPauseMenu = false;
+	bool bShowMapView = false;
 	UPROPERTY()
 	TObjectPtr<UInputMappingContext> SailingMappingContext;
 

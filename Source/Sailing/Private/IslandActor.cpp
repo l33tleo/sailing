@@ -89,6 +89,18 @@ void AIslandActor::InitializeIsland(FIntPoint InChunkCoord, int32 InIslandIndex,
 	}
 }
 
+void AIslandActor::InitializeFjordIsland(const FString& InName, int32 InIndex, bool bWasDiscovered)
+{
+	IslandName = InName;
+	ChunkCoord = FIntPoint(-1, -1);
+	IslandIndex = InIndex;
+
+	if (bWasDiscovered)
+	{
+		SetDiscovered(true);
+	}
+}
+
 void AIslandActor::SetDiscovered(bool bFromSaveGame)
 {
 	if (bDiscovered)
