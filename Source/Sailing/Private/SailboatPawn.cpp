@@ -23,7 +23,7 @@ ASailboatPawn::ASailboatPawn()
 	CapsuleComp->SetCollisionProfileName(TEXT("Pawn"));
 	CapsuleComp->SetupAttachment(RootScene);
 
-	// Kombinert Laser-båt (alle deler i ett mesh fra Blender V3)
+	// Kombinert Optimist-båt (alle deler i ett mesh fra Blender)
 	BoatMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BoatMesh"));
 	BoatMesh->SetupAttachment(RootScene);
 	BoatMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);

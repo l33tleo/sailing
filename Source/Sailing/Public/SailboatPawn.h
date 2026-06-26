@@ -31,7 +31,7 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UCapsuleComponent> CapsuleComp;
 
-	/** Kombinert Laser-båt mesh (skrog, mast, seil, ror osv. i ett). */
+	/** Kombinert Optimist-båt mesh (skrog, mast, seil, ror osv. i ett). */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> BoatMesh;
 
