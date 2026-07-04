@@ -47,7 +47,8 @@ def run_query(query: str, endpoint: str = DEFAULT_ENDPOINT) -> dict[str, Any]:
         endpoint,
         params={"data": q},
         timeout=TIMEOUT,
-        headers={"Accept": "application/json"},
+        # Overpass returns 406 without a proper User-Agent.
+        headers={"Accept": "application/json", "User-Agent": "sailing-game/1.0 (overpass client)"},
     )
     resp.raise_for_status()
     return resp.json()

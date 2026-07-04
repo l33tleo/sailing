@@ -11,6 +11,18 @@ class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
 class AWindActor;
+class UInstancedStaticMeshComponent;
+
+/** Én skum-/spray-partikkel (verdensrom). Simuleres på CPU, tegnes via instanced mesh. */
+struct FSprayParticle
+{
+	FVector Position = FVector::ZeroVector;
+	FVector Velocity = FVector::ZeroVector;
+	float Life = 0.0f;     // gjenstående levetid (s); <= 0 = inaktiv
+	float MaxLife = 1.0f;
+	float Size = 1.0f;     // grunnskala
+	float Yaw = 0.0f;
+};
 
 UCLASS()
 class SAILING_API ASailboatPawn : public APawn
@@ -48,6 +60,35 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UCameraComponent> Camera;
+
+	/** Instanced mesh-pool for skum/spray (baug-skum + vinddrift i kast). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UInstancedStaticMeshComponent> SprayMesh;
+
+	// Spray-tuning. Av som standard: skum-kulene (Engine-sfærer) så urealistiske ut og
+	// flimret (hundrevis som popper inn/ut). Kan slås på igjen i editoren om ønskelig.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Spray")
+	bool bEnableSpray = false;
+
+	/** Antall partikler i poolen (forhåndsallokert). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Spray", meta = (ClampMin = "8", ClampMax = "256"))
+	int32 SprayPoolSize = 96;
+
+	/** Fart (enheter/s) der baug-skum begynner å danne seg. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Spray", meta = (ClampMin = "0"))
+	float SpraySpeedThreshold = 280.0f;
+
+	/** Levetid per partikkel (s). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Spray", meta = (ClampMin = "0.1"))
+	float SprayParticleLife = 0.9f;
+
+	/** Grunnstørrelse (skala på kule-mesh, 1 ≈ 100 enheter diameter). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Spray", meta = (ClampMin = "0.02"))
+	float SprayParticleSize = 0.18f;
+
+	/** «Tyngdekraft» som trekker spray ned igjen (enheter/s²). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Spray", meta = (ClampMin = "0"))
+	float SprayGravity = 900.0f;
 
 	// Tuning
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Tuning")
@@ -127,4 +168,13 @@ private:
 	TWeakObjectPtr<AWindActor> CachedWind;
 
 	AWindActor* FindWind() const;
+
+	// Spray-state
+	TArray<FSprayParticle> SprayParticles;
+	float SprayEmitAccumulator = 0.0f;
+	bool bSprayInitialized = false;
+
+	void InitSpray();
+	void UpdateSpray(float DeltaTime, const FVector& Forward, float Time);
+	void EmitSprayParticle(const FVector& Pos, const FVector& Vel, float SizeScale);
 };

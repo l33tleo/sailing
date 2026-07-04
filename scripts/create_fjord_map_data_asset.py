@@ -60,25 +60,34 @@ def main():
             return False
         print("Created asset:", full_path)
 
-    # CoastlinePoints: array of Vector2D
-    coast = []
-    for p in data_json.get("CoastlinePoints", []):
-        coast.append(unreal.Vector2D(float(p["X"]), float(p["Y"])))
-    data.set_editor_property("coastline_points", coast)
+    def to_v2d_array(points):
+        return [unreal.Vector2D(float(p["X"]), float(p["Y"])) for p in points]
 
-    # Islands: TArray<FFjordIslandDef>
-    islands_raw = data_json.get("Islands", [])
-    # In Unreal Python we build the array; struct type may be FjordIslandDef (no F prefix)
-    islands_array = data.get_editor_property("islands")
-    islands_array.clear()
-    for i in islands_raw:
-        # Append new struct element and set fields (API may vary by UE version)
-        islands_array.append(unreal.FjordIslandDef())
-        entry = islands_array[-1]
+    # NOTE: Unreal Python returns struct array elements by *value*. Mutating
+    # array[-1].set_editor_property(...) is lost. Build each struct fully, collect
+    # into a plain Python list, then assign the whole array at once.
+
+    # Legacy CoastlinePoints (kept for back-compat; pipeline no longer fills it)
+    data.set_editor_property("coastline_points", to_v2d_array(data_json.get("CoastlinePoints", [])))
+
+    # Landmasses: TArray<FFjordRing>, each with a `points` Vector2D array
+    land_list = []
+    for ring in data_json.get("Landmasses", []):
+        r = unreal.FjordRing()
+        r.set_editor_property("points", to_v2d_array(ring))
+        land_list.append(r)
+    data.set_editor_property("landmasses", land_list)
+
+    # Islands: TArray<FFjordIslandDef> with name, position, scale, outline
+    isl_list = []
+    for i in data_json.get("Islands", []):
+        entry = unreal.FjordIslandDef()
         entry.set_editor_property("name", i["Name"])
         entry.set_editor_property("position", unreal.Vector2D(float(i["Position"]["X"]), float(i["Position"]["Y"])))
         entry.set_editor_property("scale", float(i["Scale"]))
-    data.set_editor_property("islands", islands_array)
+        entry.set_editor_property("outline", to_v2d_array(i.get("Outline", [])))
+        isl_list.append(entry)
+    data.set_editor_property("islands", isl_list)
 
     # WorldOrigin, MetersPerUnit
     wo = data_json.get("WorldOrigin", {})

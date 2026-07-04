@@ -1,4 +1,5 @@
 #include "OceanPlaneActor.h"
+#include "WindActor.h"
 #include "ProceduralMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/Material.h"
@@ -95,9 +96,10 @@ void AOceanPlaneActor::GenerateOceanLayers()
 	BaseVertices.Empty();
 	Vertices.Empty();
 	Normals.Empty();
+	SurfaceColors.Empty();
 	TArray<int32> Triangles;
 	TArray<FVector2D> UVs;
-	TArray<FLinearColor> VertexColors;
+	TArray<FLinearColor>& VertexColors = SurfaceColors;
 
 	const int32 NumVerts = GridResolution + 1;
 	const float CellSize = OceanSize / GridResolution;
@@ -144,29 +146,79 @@ void AOceanPlaneActor::UpdateSurfaceWaves(float Time)
 {
 	FVector ActorLoc = GetActorLocation();
 
+	// Oppdater fargene (cat's paws) sjeldnere enn geometrien for å spare CPU.
+	AWindActor* Wind = FindWind();
+	bool bUpdateColors = Wind && (FrameCounter % FMath::Max(1, ColorUpdateInterval) == 0);
+	++FrameCounter;
+
 	for (int32 i = 0; i < Vertices.Num(); ++i)
 	{
 		float X = BaseVertices[i].X + ActorLoc.X;
 		float Y = BaseVertices[i].Y + ActorLoc.Y;
 
+		// Lokalt kast forsterker bølgene (choppete vann) og mørkner overflaten.
+		float Gust = 0.0f;
+		if (Wind)
+		{
+			Gust = Wind->GetGustFactorAt(FVector(X, Y, WaterLevel));
+		}
+		float Amp = WaveAmplitude * (1.0f + Gust * GustChopBoost);
+
 		float Z = 0.0f;
-		Z += FMath::Sin(X * 0.002f + Time * WaveSpeed) * WaveAmplitude;
-		Z += FMath::Sin(Y * 0.003f + Time * WaveSpeed * 0.7f) * WaveAmplitude * 0.6f;
-		Z += FMath::Sin((X + Y) * 0.001f + Time * WaveSpeed * 1.3f) * WaveAmplitude * 0.3f;
-		Z += FMath::Sin(X * 0.005f - Time * WaveSpeed * 0.5f) * WaveAmplitude * 0.2f;
+		Z += FMath::Sin(X * 0.002f + Time * WaveSpeed) * Amp;
+		Z += FMath::Sin(Y * 0.003f + Time * WaveSpeed * 0.7f) * Amp * 0.6f;
+		Z += FMath::Sin((X + Y) * 0.001f + Time * WaveSpeed * 1.3f) * Amp * 0.3f;
+		Z += FMath::Sin(X * 0.005f - Time * WaveSpeed * 0.5f) * Amp * 0.2f;
 
 		Vertices[i].Z = WaterLevel + Z;
 
-		float dZdX = 0.002f * FMath::Cos(X * 0.002f + Time * WaveSpeed) * WaveAmplitude
-			+ 0.001f * FMath::Cos((X + Y) * 0.001f + Time * WaveSpeed * 1.3f) * WaveAmplitude * 0.3f;
-		float dZdY = 0.003f * FMath::Cos(Y * 0.003f + Time * WaveSpeed * 0.7f) * WaveAmplitude * 0.6f
-			+ 0.001f * FMath::Cos((X + Y) * 0.001f + Time * WaveSpeed * 1.3f) * WaveAmplitude * 0.3f;
+		float dZdX = 0.002f * FMath::Cos(X * 0.002f + Time * WaveSpeed) * Amp
+			+ 0.001f * FMath::Cos((X + Y) * 0.001f + Time * WaveSpeed * 1.3f) * Amp * 0.3f;
+		float dZdY = 0.003f * FMath::Cos(Y * 0.003f + Time * WaveSpeed * 0.7f) * Amp * 0.6f
+			+ 0.001f * FMath::Cos((X + Y) * 0.001f + Time * WaveSpeed * 1.3f) * Amp * 0.3f;
 
 		Normals[i] = FVector(-dZdX, -dZdY, 1.0f).GetSafeNormal();
+
+		if (bUpdateColors)
+		{
+			// Cat's paw: mørkere og litt mer opak der kastet tar tak i vannet.
+			float Darken = 1.0f - Gust * GustDarkening;
+			FLinearColor C = SurfaceColor;
+			C.R *= Darken;
+			C.G *= Darken;
+			C.B *= Darken;
+			C.A = FMath::Min(1.0f, SurfaceColor.A + Gust * 0.3f);
+			SurfaceColors[i] = C;
+		}
 	}
 
-	SurfaceMesh->UpdateMeshSection_LinearColor(0, Vertices, Normals, TArray<FVector2D>(),
-		TArray<FLinearColor>(), TArray<FProcMeshTangent>());
+	if (bUpdateColors)
+	{
+		SurfaceMesh->UpdateMeshSection_LinearColor(0, Vertices, Normals, TArray<FVector2D>(),
+			SurfaceColors, TArray<FProcMeshTangent>());
+	}
+	else
+	{
+		SurfaceMesh->UpdateMeshSection_LinearColor(0, Vertices, Normals, TArray<FVector2D>(),
+			TArray<FLinearColor>(), TArray<FProcMeshTangent>());
+	}
+}
+
+AWindActor* AOceanPlaneActor::FindWind()
+{
+	if (CachedWind.IsValid())
+	{
+		return CachedWind.Get();
+	}
+
+	TArray<AActor*> Found;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AWindActor::StaticClass(), Found);
+	if (Found.Num() > 0)
+	{
+		CachedWind = Cast<AWindActor>(Found[0]);
+		return CachedWind.Get();
+	}
+	return nullptr;
 }
 
 void AOceanPlaneActor::BeginPlay()
