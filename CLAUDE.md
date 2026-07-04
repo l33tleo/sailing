@@ -4,19 +4,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Sailing is a single-player sailing exploration game built in Unreal Engine 5.7 (macOS only). The player navigates a sailboat through procedurally generated ocean with discoverable Nordic-named islands. Written in C++ with Norwegian documentation.
+Sailing is a single-player sailing exploration game built in Unreal Engine 5.8 (macOS only). The player navigates a sailboat through procedurally generated ocean with discoverable Nordic-named islands. Written in C++ with Norwegian documentation.
 
 ## Build Commands
 
 Build the project (editor target, Development config):
 ```bash
-"/Users/Shared/Epic Games/UE_5.7/Engine/Build/BatchFiles/Mac/Build.sh" SailingEditor Mac Development -Project="/Users/leovonschwind/sailing/Sailing.uproject" -WaitMutex
+"/Users/Shared/Epic Games/UE_5.8/Engine/Build/BatchFiles/Mac/Build.sh" SailingEditor Mac Development -Project="/Users/leovonschwind/sailing/Sailing.uproject" -WaitMutex
 ```
 Append `2>&1 | tail -10` for abbreviated output.
 
 Generate Xcode project files:
 ```bash
-"/Users/Shared/Epic Games/UE_5.7/Engine/Build/BatchFiles/Mac/GenerateProjectFiles.sh" -project="/Users/leovonschwind/sailing/Sailing.uproject" -game -engine
+"/Users/Shared/Epic Games/UE_5.8/Engine/Build/BatchFiles/Mac/GenerateProjectFiles.sh" -project="/Users/leovonschwind/sailing/Sailing.uproject" -game -engine
 ```
 
 ## Architecture
@@ -38,7 +38,7 @@ Single module "Sailing" depending on: Core, CoreUObject, Engine, InputCore, Enha
 
 **AIslandActor** — Individual island with discovery trigger (USphereComponent). Broadcasts discovery event, changes material from M_Island to M_IslandDiscovered. Identified by ChunkCoord + IslandIndex.
 
-**AOceanPlaneActor** — Procedural ocean mesh (128x128 grid, 200k unit extent). Animated waves via vertex displacement. Has warmup system (bHideDuringWarmup) to avoid shader compilation artifacts.
+**AOceanPlaneActor** — Procedural ocean mesh (128x128 grid, 200k unit extent). Four stacked layers (Deep/Mid/Shallow/Surface) using the opaque M_OceanVC material; the surface layer animates via vertex displacement.
 
 **ASailingHUD** — Renders compass with wind indicator, speed info, discovery popup (4s duration), and discovery counter.
 

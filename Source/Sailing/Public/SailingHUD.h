@@ -1,11 +1,13 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Templates/Function.h"
 #include "GameFramework/HUD.h"
 #include "SailingHUD.generated.h"
 
 class AIslandActor;
 class UTexture2D;
+class UFjordMapData;
 
 UCLASS()
 class SAILING_API ASailingHUD : public AHUD
@@ -76,6 +78,10 @@ private:
 	float DiscoveryPopupDuration = 4.0f;
 	bool bShowingDiscoveryPopup = false;
 
+	// Vind-feedback (trend + kast-blink). -1 = ikke initialisert.
+	float SmoothedWindMs = -1.0f;
+	float GustFlashPhase = 0.0f;
+
 	// Bind to island discoveries
 	void BindToIslandDiscoveries();
 
@@ -110,6 +116,19 @@ private:
 
 	/** Øyer vi allerede har bunden OnDiscovered til (unngår dobbelt AddDynamic). */
 	TSet<TWeakObjectPtr<AIslandActor>> BoundIslandDiscoveries;
+
+	/** Cachet øyliste for kart-tegning (unngår GetAllActorsOfClass hver frame). */
+	TArray<TWeakObjectPtr<AIslandActor>> CachedIslands;
+
+	/** Fjord-kartdata (kystlinjer). Lastes i BeginPlay i fjordmodus. */
+	UPROPERTY()
+	TObjectPtr<UFjordMapData> FjordMapData;
+
+	/** DistanceScale fra FjordMapManager (meter → Unreal units) for kystlinjer. */
+	float FjordDistanceScale = 100.0f;
+
+	/** Tegn kystlinjer (fastland) på kartet med gitt world→skjerm-projeksjon. */
+	void DrawLandmassOutlines(const TFunctionRef<bool(float, float, float&, float&)>& Project, float LineThickness);
 
 	void DrawPauseMenu();
 	bool PauseMenuButtonHit(float X, float Y, float Bx, float By, float Bw, float Bh) const;

@@ -3,41 +3,150 @@
 
 AWindActor::AWindActor()
 {
+	// Tick driver segment-systemet (hovedretning som dreier sakte mot nye mål).
 	PrimaryActorTick.bCanEverTick = true;
 }
 
-FVector AWindActor::GetWindDirection() const
+void AWindActor::BeginPlay()
 {
-	FVector Dir = WindDirection.GetSafeNormal();
-	if (DirectionOscillationAngle > 0.0f && GetWorld())
-	{
-		float T = GetWorld()->GetTimeSeconds();
-		float YawDeg = DirectionOscillationAngle * FMath::Sin(2.0f * UE_PI * DirectionOscillationFrequency * T);
-		FRotator OscRot(0.0f, YawDeg, 0.0f);
-		Dir = OscRot.RotateVector(Dir);
-	}
-	return Dir.GetSafeNormal();
+	Super::BeginPlay();
+
+	RandStream.Initialize(WindSeed);
+
+	// Start på den konfigurerte retningen, så velg første segment.
+	CurrentBaseYaw = WindDirection.GetSafeNormal().Rotation().Yaw;
+	TargetBaseYaw = CurrentBaseYaw;
+	StartNewSegment();
 }
 
-float AWindActor::GetWindStrength() const
+void AWindActor::StartNewSegment()
 {
-	float S = BaseWindStrength;
-	if (GustStrength > 0.0f && GetWorld())
+	// Tilfeldig: blir dette segmentet ustabilt?
+	bool bUnstable = RandStream.FRand() < UnstableChance;
+	CurrentInstability = bUnstable
+		? RandStream.FRandRange(0.5f, 1.0f)
+		: RandStream.FRandRange(0.0f, 0.2f);
+
+	// Ny målretning: et tilfeldig hopp til venstre eller høyre.
+	float Magnitude = RandStream.FRandRange(DirectionChangeMinDeg, DirectionChangeMaxDeg);
+	float Sign = (RandStream.FRand() < 0.5f) ? -1.0f : 1.0f;
+	TargetBaseYaw = FMath::UnwindDegrees(CurrentBaseYaw + Sign * Magnitude);
+
+	// Varighet: kortere når ustabilt → skifter oftere.
+	float Interval = RandStream.FRandRange(MeanChangeIntervalMin, MeanChangeIntervalMax);
+	if (bUnstable)
 	{
-		float T = GetWorld()->GetTimeSeconds();
-		S += GustStrength * FMath::Sin(2.0f * UE_PI * GustFrequency * T);
+		Interval *= UnstableIntervalScale;
 	}
-	return FMath::Max(0.0f, S);
+	SegmentTimeRemaining = Interval;
 }
 
 void AWindActor::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	if (WindRotationRate != 0.0f)
+	// Tell ned mot neste hovedskifte.
+	SegmentTimeRemaining -= DeltaTime;
+	if (SegmentTimeRemaining <= 0.0f)
 	{
-		FRotator Rot = WindDirection.Rotation();
-		Rot.Yaw += WindRotationRate * DeltaTime;
-		WindDirection = Rot.Vector();
+		StartNewSegment();
 	}
+
+	// Drei hovedretningen sakte mot målet (korteste vei).
+	float Delta = FMath::FindDeltaAngleDegrees(CurrentBaseYaw, TargetBaseYaw);
+	float Step = TransitionSpeedDeg * DeltaTime;
+	if (FMath::Abs(Delta) <= Step)
+	{
+		CurrentBaseYaw = TargetBaseYaw;
+	}
+	else
+	{
+		CurrentBaseYaw = FMath::UnwindDegrees(CurrentBaseYaw + FMath::Sign(Delta) * Step);
+	}
+}
+
+float AWindActor::SeedOffset(float Channel) const
+{
+	return WindSeed * 13.137f + Channel * 101.7f;
+}
+
+float AWindActor::GetWindShiftDeg() const
+{
+	float T = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0f;
+	float Deg = 0.0f;
+
+	// Ustabilitet forsterker vuggingen.
+	float Boost = 1.0f + CurrentInstability * UnstableOscillationBoost;
+
+	if (ShiftAmplitudeDeg > 0.0f)
+	{
+		Deg += ShiftAmplitudeDeg * Boost * FMath::PerlinNoise1D(T * ShiftTimeScale + SeedOffset(1.0f));
+	}
+	if (JitterAmplitudeDeg > 0.0f)
+	{
+		Deg += JitterAmplitudeDeg * Boost * FMath::PerlinNoise1D(T * JitterTimeScale + SeedOffset(2.0f));
+	}
+
+	return Deg;
+}
+
+FVector AWindActor::GetMeanWindDirection() const
+{
+	return FRotator(0.0f, CurrentBaseYaw, 0.0f).Vector();
+}
+
+FVector AWindActor::GetWindDirection() const
+{
+	float Yaw = CurrentBaseYaw + GetWindShiftDeg();
+	return FRotator(0.0f, Yaw, 0.0f).Vector();
+}
+
+float AWindActor::GetWindStrength() const
+{
+	float S = BaseWindStrength;
+
+	if (StrengthNoiseAmplitude > 0.0f && GetWorld())
+	{
+		float T = GetWorld()->GetTimeSeconds();
+		float N = FMath::PerlinNoise1D(T * StrengthNoiseTimeScale + SeedOffset(3.0f)); // [-1,1]
+		S += StrengthNoiseAmplitude * N;
+	}
+
+	return FMath::Max(0.0f, S);
+}
+
+float AWindActor::GetGustFactorAt(const FVector& WorldPos) const
+{
+	if (GustAmplitude <= 0.0f || !GetWorld())
+	{
+		return 0.0f;
+	}
+
+	float T = GetWorld()->GetTimeSeconds();
+
+	// Flekkene driver nedvinds (fra vindkilden og forbi spilleren). WindDir peker mot kilden,
+	// så +WindDir*tid lar et fast mønster-trekk forflytte seg i flytretningen over tid.
+	FVector WindDir = GetWindDirection();
+	FVector Advected = WorldPos + WindDir * (GustTravelSpeed * T);
+
+	// 3D-støy: to romlige akser + tid (feltet former/oppløser seg sakte).
+	FVector Coord(
+		Advected.X * GustSpatialScale + SeedOffset(4.0f),
+		Advected.Y * GustSpatialScale + SeedOffset(5.0f),
+		T * GustTimeScale + SeedOffset(6.0f));
+
+	float N = FMath::PerlinNoise3D(Coord); // ~[-1,1]
+
+	// Bare topper over terskel teller som kast → diskrete flekker i stedet for konstant variasjon.
+	float G = (N - GustThreshold) / FMath::Max(0.05f, 1.0f - GustThreshold);
+	return FMath::Clamp(G, 0.0f, 1.0f);
+}
+
+FVector AWindActor::GetWindVelocityAt(const FVector& WorldPos) const
+{
+	FVector Dir = GetWindDirection();
+	float Strength = GetWindStrength();
+	float Gust = GetGustFactorAt(WorldPos);
+	Strength *= (1.0f + GustAmplitude * Gust);
+	return Dir * Strength;
 }

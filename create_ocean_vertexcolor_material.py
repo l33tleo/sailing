@@ -13,7 +13,6 @@ mat_ocean.set_editor_property("two_sided", True)
 # Create VertexColor node
 vc_node = unreal.MaterialEditingLibrary.create_material_expression(mat_ocean, unreal.MaterialExpressionVertexColor, -300, 0)
 
-# Create roughness constant
 roughness_const = unreal.MaterialEditingLibrary.create_material_expression(mat_ocean, unreal.MaterialExpressionConstant, -300, 200)
 roughness_const.set_editor_property("r", 0.15)
 

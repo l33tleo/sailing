@@ -5,6 +5,8 @@
 #include "SailingGameMode.h"
 #include "SailingPlayerController.h"
 #include "SaveGameSailing.h"
+#include "FjordMapData.h"
+#include "FjordMapManager.h"
 #include "Engine/Canvas.h"
 #include "Engine/Font.h"
 #include "Engine/Texture2D.h"
@@ -41,6 +43,17 @@ void ASailingHUD::BeginPlay()
 				{
 					UE_LOG(LogTemp, Log, TEXT("SailingHUD: Loaded chart texture OslofjordChart for overview map."));
 				}
+
+				// Fjord map data (coastline outlines for the map)
+				FjordMapData = LoadObject<UFjordMapData>(nullptr, TEXT("/Game/Fjord/OslofjordMapData"));
+				if (AFjordMapManager* FM = Cast<AFjordMapManager>(UGameplayStatics::GetActorOfClass(GetWorld(), AFjordMapManager::StaticClass())))
+				{
+					FjordDistanceScale = FM->DistanceScale;
+					if (!FjordMapData && FM->FjordMapData)
+					{
+						FjordMapData = FM->FjordMapData;
+					}
+				}
 			}
 		}
 	}
@@ -55,10 +68,12 @@ void ASailingHUD::BindToIslandDiscoveries()
 	TArray<AActor*> Islands;
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AIslandActor::StaticClass(), Islands);
 
+	CachedIslands.Reset();
 	for (AActor* Actor : Islands)
 	{
 		if (AIslandActor* Island = Cast<AIslandActor>(Actor))
 		{
+			CachedIslands.Add(Island);
 			if (!BoundIslandDiscoveries.Contains(Island))
 			{
 				Island->OnDiscovered.AddDynamic(this, &ASailingHUD::OnIslandDiscovered);
@@ -272,6 +287,15 @@ void ASailingHUD::DrawCompass()
 				CenterX + FMath::Cos(A2) * R, CenterY + FMath::Sin(A2) * R,
 				WindColor, 2.0f);
 		}
+
+		// Svak referansemarkør for MIDDEL-vindretningen. Gapet til den gule pila = vrien.
+		FVector MeanDir = Wind->GetMeanWindDirection();
+		float MeanAngle = FMath::Atan2(MeanDir.Y, MeanDir.X) - FMath::Atan2(BoatFwd.Y, BoatFwd.X) - PI * 0.5f;
+		float MCos = FMath::Cos(MeanAngle);
+		float MSin = FMath::Sin(MeanAngle);
+		DrawLine(CenterX + MCos * (Radius - 14.0f), CenterY + MSin * (Radius - 14.0f),
+			CenterX + MCos * (Radius - 2.0f), CenterY + MSin * (Radius - 2.0f),
+			FLinearColor(1.0f, 1.0f, 1.0f, 0.45f), 2.0f);
 	}
 }
 
@@ -290,9 +314,9 @@ void ASailingHUD::DrawWindAndSpeed()
 
 	// Info panel below compass (bottom-left)
 	float PanelX = 90.0f - 100.0f;
-	float PanelY = Canvas->ClipY - 95.0f;
+	float PanelY = Canvas->ClipY - 118.0f;
 	float PanelW = 200.0f;
-	float PanelH = 85.0f;
+	float PanelH = 108.0f;
 
 	// Dark background
 	DrawRect(FLinearColor(0.0f, 0.05f, 0.15f, 0.7f), PanelX, PanelY, PanelW, PanelH);
@@ -301,10 +325,26 @@ void ASailingHUD::DrawWindAndSpeed()
 	const ASailboatPawn* Boat = Cast<ASailboatPawn>(Pawn);
 	if (Wind)
 	{
-		float WindMs = Wind->GetWindStrength() * WindStrengthToMs;
+		// Lokal vind ved båten (inkl. kast) – det spilleren faktisk seiler i.
+		FVector BoatLoc = Pawn->GetActorLocation();
+		float WindMs = Wind->GetWindVelocityAt(BoatLoc).Size() * WindStrengthToMs;
+
+		// Glatt et snitt for trend-pil (bygger ↑ / avtar ↓).
+		float DeltaTime = GetWorld()->GetDeltaSeconds();
+		if (SmoothedWindMs < 0.0f) SmoothedWindMs = WindMs;
+		float TrendDelta = WindMs - SmoothedWindMs;
+		float Alpha = FMath::Clamp(DeltaTime * 1.5f, 0.0f, 1.0f);
+		SmoothedWindMs = FMath::Lerp(SmoothedWindMs, WindMs, Alpha);
+
+		const TCHAR* TrendArrow = TEXT(" ");
+		FLinearColor TrendColor(0.6f, 0.6f, 0.6f, 1.0f);
+		if (TrendDelta > 0.05f) { TrendArrow = TEXT("↑"); TrendColor = FLinearColor(0.4f, 1.0f, 0.4f, 1.0f); }
+		else if (TrendDelta < -0.05f) { TrendArrow = TEXT("↓"); TrendColor = FLinearColor(1.0f, 0.5f, 0.4f, 1.0f); }
+
 		FString WindText = FString::Printf(TEXT("VIND: %.1f m/s"), WindMs);
 		DrawText(WindText, FLinearColor(0.5f, 0.9f, 1.0f, 1.0f),
-			PanelX + 15.0f, PanelY + 8.0f, nullptr, 1.3f);
+			PanelX + 15.0f, PanelY + 6.0f, nullptr, 1.3f);
+		DrawText(TrendArrow, TrendColor, PanelX + 168.0f, PanelY + 6.0f, nullptr, 1.4f);
 
 		// Point of sail label
 		if (Boat)
@@ -349,7 +389,39 @@ void ASailingHUD::DrawWindAndSpeed()
 			}
 
 			DrawText(PointOfSail, PointColor,
-				PanelX + 15.0f, PanelY + 32.0f, nullptr, 1.3f);
+				PanelX + 15.0f, PanelY + 30.0f, nullptr, 1.3f);
+		}
+
+		// Vri-indikator: nåværende retning relativt til middel (+ høyre / - venstre).
+		float ShiftDeg = Wind->GetWindShiftDeg();
+		FString ShiftText = FString::Printf(TEXT("VRI: %+.0f%c %s"), ShiftDeg, (TCHAR)0x00B0,
+			ShiftDeg > 1.0f ? TEXT("H") : (ShiftDeg < -1.0f ? TEXT("V") : TEXT("-")));
+		DrawText(ShiftText, FLinearColor(0.7f, 0.85f, 1.0f, 1.0f),
+			PanelX + 15.0f, PanelY + 54.0f, nullptr, 1.1f);
+
+		// Kast-varsel: blinkende «KAST!» når et kast treffer båten, ellers «KAST KOMMER»
+		// når et kast er på vei inn fra oppvinds (vindkilde-siden).
+		FVector WindDir = Wind->GetWindDirection();
+		float GustHere = Wind->GetGustFactorAt(BoatLoc);
+		float GustAhead = Wind->GetGustFactorAt(BoatLoc + WindDir * 8000.0f);
+		GustFlashPhase += DeltaTime * 6.0f;
+		float Flash = 0.5f + 0.5f * FMath::Sin(GustFlashPhase);
+
+		if (GustHere > 0.15f)
+		{
+			FString GustText = FString::Printf(TEXT("KAST! +%.0f%%"), GustHere * Wind->GustAmplitude * 100.0f);
+			DrawText(GustText, FLinearColor(1.0f, 0.4f * Flash + 0.2f, 0.1f, 1.0f),
+				PanelX + 105.0f, PanelY + 54.0f, nullptr, 1.1f);
+		}
+		else if (GustAhead > 0.15f)
+		{
+			DrawText(TEXT("KAST KOMMER"), FLinearColor(1.0f, 0.85f, 0.3f, 0.6f + 0.4f * Flash),
+				PanelX + 95.0f, PanelY + 54.0f, nullptr, 1.0f);
+		}
+		else if (Wind->GetInstability() > 0.4f)
+		{
+			DrawText(TEXT("USTABIL"), FLinearColor(1.0f, 0.6f, 0.2f, 0.7f + 0.3f * Flash),
+				PanelX + 120.0f, PanelY + 54.0f, nullptr, 1.0f);
 		}
 	}
 
@@ -367,7 +439,7 @@ void ASailingHUD::DrawWindAndSpeed()
 
 		FString SpeedText = FString::Printf(TEXT("FART: %.1f kn"), SpeedKn);
 		DrawText(SpeedText, SpeedColor,
-			PanelX + 15.0f, PanelY + 56.0f, nullptr, 1.3f);
+			PanelX + 15.0f, PanelY + 80.0f, nullptr, 1.3f);
 	}
 }
 
@@ -484,12 +556,10 @@ void ASailingHUD::DrawRadarMinimap()
 		}
 	}
 
-	// 2. Øyer (klippet til sirkel)
-	TArray<AActor*> AllIslands;
-	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AIslandActor::StaticClass(), AllIslands);
-	for (AActor* Actor : AllIslands)
+	// 2. Øyer (klippet til sirkel) — bruk cachet liste, ikke GetAllActorsOfClass per frame
+	for (const TWeakObjectPtr<AIslandActor>& IslandPtr : CachedIslands)
 	{
-		AIslandActor* Island = Cast<AIslandActor>(Actor);
+		AIslandActor* Island = IslandPtr.Get();
 		if (!Island) continue;
 		FVector Loc = Island->GetActorLocation();
 		float Dx = Loc.X - PlayerX;
@@ -643,12 +713,22 @@ void ASailingHUD::DrawFullMap()
 	float BestHoverDistSq = HoverThresholdSq;
 	float HoveredPx = 0.0f, HoveredPy = 0.0f;
 
-	// 3. Øyer
-	TArray<AActor*> AllIslands;
-	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AIslandActor::StaticClass(), AllIslands);
-	for (AActor* Actor : AllIslands)
+	// Projeksjon world→skjerm for kartet, med klipp til kartområdet.
+	auto ProjectFull = [&](float wx, float wy, float& outPx, float& outPy) -> bool
 	{
-		AIslandActor* Island = Cast<AIslandActor>(Actor);
+		outPx = MapScreenCX + (wx - CenterWorldX) * Scale;
+		outPy = MapScreenCY - (wy - CenterWorldY) * Scale;
+		return outPx >= MapLeft && outPx <= MapLeft + MapSize
+			&& outPy >= MapTop && outPy <= MapTop + MapSize;
+	};
+
+	// Fastland (kystlinjer) tegnes under øyene.
+	DrawLandmassOutlines(ProjectFull, 1.5f);
+
+	// 3. Øyer — bruk cachet liste, ikke GetAllActorsOfClass per frame
+	for (const TWeakObjectPtr<AIslandActor>& IslandPtr : CachedIslands)
+	{
+		AIslandActor* Island = IslandPtr.Get();
 		if (!Island) continue;
 		FVector Loc = Island->GetActorLocation();
 		float Dx = Loc.X - CenterWorldX;
@@ -671,14 +751,35 @@ void ASailingHUD::DrawFullMap()
 			}
 		}
 
-		const float DotSize = 7.0f;
-		FLinearColor Color = Island->bDiscovered ? MapIslandColor : MapUndiscoveredIslandColor;
-		DrawRect(Color, Px - DotSize * 0.5f, Py - DotSize * 0.5f, DotSize, DotSize);
+		const FLinearColor Color = Island->bDiscovered ? MapIslandColor : MapUndiscoveredIslandColor;
+		if (Island->LocalOutline.Num() >= 3)
+		{
+			// Ekte omriss fra polygonet (actor-lokalt = verden - actor-origo)
+			const float LineW = Island->bDiscovered ? 2.0f : 1.0f;
+			const int32 N = Island->LocalOutline.Num();
+			float Ax, Ay, Bx, By;
+			for (int32 i = 0; i < N; ++i)
+			{
+				const FVector2D& P0 = Island->LocalOutline[i];
+				const FVector2D& P1 = Island->LocalOutline[(i + 1) % N];
+				const bool In0 = ProjectFull(Loc.X + P0.X, Loc.Y + P0.Y, Ax, Ay);
+				const bool In1 = ProjectFull(Loc.X + P1.X, Loc.Y + P1.Y, Bx, By);
+				if (In0 && In1)
+				{
+					DrawLine(Ax, Ay, Bx, By, Color, LineW);
+				}
+			}
+		}
+		else
+		{
+			const float DotSize = 7.0f;
+			DrawRect(Color, Px - DotSize * 0.5f, Py - DotSize * 0.5f, DotSize, DotSize);
+		}
 
 		// Vis navn på oppdagede øyer (med lesbar bakgrunn)
 		if (Island->bDiscovered)
 		{
-			const float TextX = Px + DotSize;
+			const float TextX = Px + 8.0f;
 			const float TextY = Py - 6.0f;
 			const float EstCharW = 9.0f;
 			const float LabelW = FMath::Max(40.0f, Island->IslandName.Len() * EstCharW + 8.0f);
@@ -740,6 +841,30 @@ void ASailingHUD::DrawFullMap()
 	FString ZoomText = FString::Printf(TEXT("Zoom: %.1fx"), FullMapZoom);
 	DrawText(ZoomText, FLinearColor(0.7f, 0.8f, 0.9f, 0.7f),
 		MapLeft + 8.0f, MapTop + 8.0f, nullptr, 1.1f);
+}
+
+void ASailingHUD::DrawLandmassOutlines(const TFunctionRef<bool(float, float, float&, float&)>& Project, float LineThickness)
+{
+	if (!FjordMapData) return;
+
+	const FLinearColor CoastColor(0.35f, 0.6f, 0.4f, 0.9f);
+	for (const FFjordRing& Ring : FjordMapData->Landmasses)
+	{
+		const int32 N = Ring.Points.Num();
+		if (N < 2) continue;
+		float Ax, Ay, Bx, By;
+		for (int32 i = 0; i < N; ++i)
+		{
+			const FVector2D W0 = Ring.Points[i] * FjordDistanceScale;
+			const FVector2D W1 = Ring.Points[(i + 1) % N] * FjordDistanceScale;
+			const bool In0 = Project(W0.X, W0.Y, Ax, Ay);
+			const bool In1 = Project(W1.X, W1.Y, Bx, By);
+			if (In0 && In1)
+			{
+				DrawLine(Ax, Ay, Bx, By, CoastColor, LineThickness);
+			}
+		}
+	}
 }
 
 bool ASailingHUD::PauseMenuButtonHit(float X, float Y, float Bx, float By, float Bw, float Bh) const

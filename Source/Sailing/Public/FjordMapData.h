@@ -4,7 +4,18 @@
 #include "Engine/DataAsset.h"
 #include "FjordMapData.generated.h"
 
-/** Definition of a single island in the fjord map (real name and position). */
+/** A single closed polygon ring (world X,Y in Unreal units). Wrapper needed because
+ *  UPROPERTY does not support TArray<TArray<>> (e.g. a list of landmass rings). */
+USTRUCT(BlueprintType)
+struct FFjordRing
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fjord")
+	TArray<FVector2D> Points;
+};
+
+/** Definition of a single island in the fjord map (real name, position and outline). */
 USTRUCT(BlueprintType)
 struct FFjordIslandDef
 {
@@ -13,11 +24,18 @@ struct FFjordIslandDef
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fjord")
 	FString Name;
 
+	/** Centroid (world X,Y). Used for the map label and as spawn origin. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fjord")
 	FVector2D Position = FVector2D::ZeroVector;
 
+	/** Fallback uniform scale, used only when Outline is empty. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fjord", meta = (ClampMin = "0.1"))
 	float Scale = 3.0f;
+
+	/** Closed outline polygon (world X,Y). When non-empty, the island is built as a
+	 *  filled polygon mesh from this ring instead of the uniform static mesh. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fjord")
+	TArray<FVector2D> Outline;
 };
 
 /** Data asset for Oslofjord map: coastline polygon(s) and island definitions. */
@@ -27,11 +45,16 @@ class SAILING_API UFjordMapData : public UDataAsset
 	GENERATED_BODY()
 
 public:
-	/** Coastline as closed polygon (world X,Y in Unreal units). */
+	/** Legacy coastline polygon (world X,Y). Superseded by Landmasses; kept for
+	 *  backward compatibility and no longer populated by the pipeline. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fjord")
 	TArray<FVector2D> CoastlinePoints;
 
-	/** Islands with real names and positions (world X,Y). */
+	/** Mainland as filled polygons (one ring per landmass: west/east shore, Nesodden, ...). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fjord")
+	TArray<FFjordRing> Landmasses;
+
+	/** Islands with real names, positions and outlines (world X,Y). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fjord")
 	TArray<FFjordIslandDef> Islands;
 

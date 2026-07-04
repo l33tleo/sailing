@@ -13,7 +13,8 @@ public class Sailing : ModuleRules
 			"ProceduralMeshComponent",
 			"UMG",
 			"Slate",
-			"SlateCore"
+			"SlateCore",
+			"Json"
 		});
 	}
 }

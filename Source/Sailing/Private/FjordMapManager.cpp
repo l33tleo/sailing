@@ -1,5 +1,6 @@
 #include "FjordMapManager.h"
 #include "FjordMapData.h"
+#include "FjordGeometry.h"
 #include "IslandActor.h"
 #include "SailboatPawn.h"
 #include "SaveGameSailing.h"
@@ -9,6 +10,8 @@ AFjordMapManager::AFjordMapManager()
 {
 	PrimaryActorTick.bCanEverTick = false;
 	IslandClass = AIslandActor::StaticClass();
+	// Default to the generated Oslofjord asset; falls back to built-in data if absent.
+	FjordMapDataPath = FSoftObjectPath(TEXT("/Game/Fjord/OslofjordMapData.OslofjordMapData"));
 }
 
 void AFjordMapManager::SetSaveGame(USaveGameSailing* InSaveGame)
@@ -24,6 +27,11 @@ void AFjordMapManager::BeginPlay()
 	if (!Data && !FjordMapDataPath.IsNull())
 	{
 		Data = Cast<UFjordMapData>(FjordMapDataPath.TryLoad());
+		if (Data)
+		{
+			FjordMapData = Data; // so coastline/HUD lookups can reuse it
+			UE_LOG(LogTemp, Log, TEXT("FjordMapManager: Loaded FjordMapData asset (%d islands)."), Data->Islands.Num());
+		}
 	}
 	if (!Data)
 	{
@@ -65,6 +73,9 @@ void AFjordMapManager::BeginPlay()
 		UE_LOG(LogTemp, Log, TEXT("FjordMapManager: Using built-in Oslofjord data (%d islands)."), TestData->Islands.Num());
 	}
 
+	// Real elevation for island/mainland relief (optional; flat polygons if absent).
+	HeightGrid = FjordGeometry::FHeightGrid::Load();
+
 	const TArray<FFjordIslandDef>& Islands = Data->Islands;
 	for (int32 i = 0; i < Islands.Num(); ++i)
 	{
@@ -78,10 +89,26 @@ void AFjordMapManager::BeginPlay()
 			IslandClass, SpawnLoc, FRotator::ZeroRotator, Params);
 		if (Island)
 		{
-			Island->SetActorScale3D(FVector(Def.Scale, Def.Scale, Def.Scale * 0.5f));
+			const bool bWasDiscovered = SaveGame ? SaveGame->IsFjordIslandDiscovered(Def.Name) : false;
 
-			bool bWasDiscovered = SaveGame ? SaveGame->IsFjordIslandDiscovered(Def.Name) : false;
-			Island->InitializeFjordIsland(Def.Name, i, bWasDiscovered);
+			if (Def.Outline.Num() >= 3)
+			{
+				// Build a filled polygon in actor-local space (real units × DistanceScale).
+				TArray<FVector2D> LocalOutline;
+				LocalOutline.Reserve(Def.Outline.Num());
+				for (const FVector2D& P : Def.Outline)
+				{
+					LocalOutline.Add((P - Def.Position) * DistanceScale);
+				}
+				Island->SetTerrainSource(HeightGrid, HeightExaggeration, DistanceScale);
+				Island->InitializeFjordIslandPolygon(Def.Name, i, bWasDiscovered, LocalOutline);
+			}
+			else
+			{
+				// Fallback: uniform static mesh scaled at a point.
+				Island->SetActorScale3D(FVector(Def.Scale, Def.Scale, Def.Scale * 0.5f));
+				Island->InitializeFjordIsland(Def.Name, i, bWasDiscovered);
+			}
 
 			Island->OnDiscovered.AddDynamic(this, &AFjordMapManager::OnIslandDiscovered);
 		}
