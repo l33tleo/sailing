@@ -847,6 +847,13 @@ void ASailingHUD::DrawLandmassOutlines(const TFunctionRef<bool(float, float, flo
 {
 	if (!FjordMapData) return;
 
+	// Kystlinje-ringene i fjord_data.json lukkes kunstig langs Overpass-bbox-kanten
+	// (se close_to_bbox() i scripts/fetch_oslofjord_islands_osm.py) der OSM-kystlinjen
+	// går ut av det hentede området. Den syntetiske lukkekanten er en rett strek som kan
+	// bli titusenvis av meter lang, mens ekte kystlinjesegmenter (etter 8m Douglas-Peucker-
+	// forenkling) aldri kommer i nærheten av det — filtrer den bort her fremfor å tegne den.
+	constexpr float MaxCoastlineSegmentMeters = 1500.0f;
+
 	const FLinearColor CoastColor(0.35f, 0.6f, 0.4f, 0.9f);
 	for (const FFjordRing& Ring : FjordMapData->Landmasses)
 	{
@@ -855,8 +862,12 @@ void ASailingHUD::DrawLandmassOutlines(const TFunctionRef<bool(float, float, flo
 		float Ax, Ay, Bx, By;
 		for (int32 i = 0; i < N; ++i)
 		{
-			const FVector2D W0 = Ring.Points[i] * FjordDistanceScale;
-			const FVector2D W1 = Ring.Points[(i + 1) % N] * FjordDistanceScale;
+			const FVector2D& P0 = Ring.Points[i];
+			const FVector2D& P1 = Ring.Points[(i + 1) % N];
+			if (FVector2D::Distance(P0, P1) > MaxCoastlineSegmentMeters) continue;
+
+			const FVector2D W0 = P0 * FjordDistanceScale;
+			const FVector2D W1 = P1 * FjordDistanceScale;
 			const bool In0 = Project(W0.X, W0.Y, Ax, Ay);
 			const bool In1 = Project(W1.X, W1.Y, Bx, By);
 			if (In0 && In1)

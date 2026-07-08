@@ -12,29 +12,30 @@
 #include "Camera/CameraComponent.h"
 #include "EnhancedInputComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "ProceduralMeshComponent.h"
+#include "Engine/Engine.h"   // DEBUG (midlertidig): GEngine->AddOnScreenDebugMessage
 
 ASailboatPawn::ASailboatPawn()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	// Felles rot slik at kapsel, båt og kamera flyttes sammen
-	RootScene = CreateDefaultSubobject<USceneComponent>(TEXT("RootScene"));
-	RootComponent = RootScene;
-
+	// Kapselen er rot: den sveiper mot land (grunnstøting), og båt/kamera flyttes med den.
+	// Radius ~70 gir en tettere passform rundt Optimist-skroget (~1,13 m bredt) og
+	// mindre «klebing» i kyst-hjørner enn en bredere sirkel.
 	CapsuleComp = CreateDefaultSubobject<UCapsuleComponent>(TEXT("Capsule"));
-	CapsuleComp->InitCapsuleSize(100.0f, 50.0f);
+	CapsuleComp->InitCapsuleSize(70.0f, 50.0f);
 	CapsuleComp->SetCollisionProfileName(TEXT("Pawn"));
-	CapsuleComp->SetupAttachment(RootScene);
+	RootComponent = CapsuleComp;
 
 	// Kombinert Optimist-båt (alle deler i ett mesh fra Blender)
 	BoatMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BoatMesh"));
-	BoatMesh->SetupAttachment(RootScene);
+	BoatMesh->SetupAttachment(CapsuleComp);
 	BoatMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	BoatMesh->SetCastShadow(true);
 
 	// Plan bak i båten (stern) – ugjennomtrengelig, så man ikke ser «inn» bakfra
 	SternShield = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("SternShield"));
-	SternShield->SetupAttachment(RootScene);
+	SternShield->SetupAttachment(CapsuleComp);
 	SternShield->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	SternShield->SetCastShadow(true);
 	// Posisjon og skala settes i BeginPlay ut fra båt-mesh bounds (måling)
@@ -42,7 +43,7 @@ ASailboatPawn::ASailboatPawn()
 
 	// Målpunkt over båten: kamera ser mot dette punktet, så båten havner lavere i bildet
 	CameraTarget = CreateDefaultSubobject<USceneComponent>(TEXT("CameraTarget"));
-	CameraTarget->SetupAttachment(RootScene);
+	CameraTarget->SetupAttachment(CapsuleComp);
 	CameraTarget->SetRelativeLocation(FVector(0.0f, 0.0f, 120.0f));
 
 	// Spring arm for tredjepersonskamera (arm og pitch slik at hele masten er synlig som standard)
@@ -59,7 +60,7 @@ ASailboatPawn::ASailboatPawn()
 
 	// Skum/spray-pool (instanced mesh). Mesh/materiale settes i InitSpray ved BeginPlay.
 	SprayMesh = CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("SprayMesh"));
-	SprayMesh->SetupAttachment(RootScene);
+	SprayMesh->SetupAttachment(CapsuleComp);
 	SprayMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	SprayMesh->SetCastShadow(false);
 	SprayMesh->SetMobility(EComponentMobility::Movable);
@@ -205,14 +206,121 @@ void ASailboatPawn::Tick(float DeltaTime)
 	float Acceleration = CurrentSailForce - Drag;
 	float NewSpeed = FMath::Clamp(CurrentSpeed + Acceleration * DeltaTime, 0.0f, MaxBoatSpeed);
 	FVector Movement = Forward * NewSpeed * DeltaTime;
-	AddActorWorldOffset(Movement, false);
+
+	// Sveip fremdriften mot land (kapselen er rot). Enkel, robust respons som ALDRI
+	// låser båten fast: skyv ut av evt. penetrasjon, skli langs kysten med resten av
+	// trekket, og reduser fart etter hvor frontalt treffet var (aldri helt til 0, så
+	// spilleren alltid kan manøvrere seg løs).
+	FHitResult Hit;
+	AddActorWorldOffset(Movement, /*bSweep=*/true, &Hit);
 	CurrentSpeed = NewSpeed;
+
+	if (Hit.bBlockingHit)
+	{
+		const float Frontalness = FMath::Clamp(FVector::DotProduct(Forward, -Hit.ImpactNormal), 0.0f, 1.0f);
+
+		// Skyv ut hvis kapselen har havnet delvis inne i land (uten å drepe farten).
+		if (Hit.bStartPenetrating)
+		{
+			AddActorWorldOffset(Hit.Normal * (Hit.PenetrationDepth + 2.0f), /*bSweep=*/false);
+		}
+
+		// Skli resten av trekket langs kystflaten.
+		const FVector Slide = FVector::VectorPlaneProject(Movement * (1.0f - Hit.Time), Hit.ImpactNormal);
+		if (!Slide.IsNearlyZero())
+		{
+			AddActorWorldOffset(Slide, /*bSweep=*/true);
+		}
+
+		// Frontal grunnstøting bremser mye; skrå streif nesten ingenting.
+		CurrentSpeed = NewSpeed * FMath::Lerp(1.0f, GroundingSpeedRetain, Frontalness);
+
+		// === DEBUG (midlertidig) ===
+		const FVector BLoc = GetActorLocation();
+		const FString HitName = Hit.GetActor() ? Hit.GetActor()->GetName() : TEXT("<ukjent>");
+		UE_LOG(LogTemp, Warning,
+			TEXT("[GRUNNSTOT] traff=%s pos=(%.0f,%.0f,%.0f)  normal=(%.2f,%.2f,%.2f)  startPen=%d  frontal=%.2f  fart %.0f->%.0f"),
+			*HitName, BLoc.X, BLoc.Y, BLoc.Z, Hit.Normal.X, Hit.Normal.Y, Hit.Normal.Z,
+			Hit.bStartPenetrating ? 1 : 0, Frontalness, NewSpeed, CurrentSpeed);
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(101, 2.0f, FColor::Red,
+				FString::Printf(TEXT("GRUNNSTOT: %s  startPen=%d  frontal=%.2f  fart=%.0f"),
+					*HitName, Hit.bStartPenetrating ? 1 : 0, Frontalness, CurrentSpeed));
+		}
+	}
 
 	// 4. Lås til vannoverflate med enkel sinus-heave
 	FVector Loc = GetActorLocation();
 	float Time = GetWorld()->GetTimeSeconds();
 	Loc.Z = WaterZ + FMath::Sin(Time * WaveFrequency * 2.0f * PI) * WaveAmplitude;
 	SetActorLocation(Loc, false);
+
+	// 4c. Sikkerhetsnett mot å være inne i en landmasse. Landmassene er hule skall
+	// (kollisjon kun langs ytterkysten), så havner båten først på innsiden — via en
+	// lagret posisjon, eller en sjelden gjennomkryping — kan den seile fritt i det tomme
+	// interiøret. Her fanges det: er båten over land, settes den tilbake til siste trygge
+	// vann-posisjon (eller flyttes ut til nærmeste vann ved lasting inne i land).
+	if (IsOverLand(GetActorLocation()))
+	{
+		// Bruk siste trygge posisjon bare hvis den faktisk er vann (den kan være ugyldig
+		// hvis den ble satt før landkollisjonen var bygd på første frame).
+		if (bHasSafeLoc && !IsOverLand(LastSafeLoc))
+		{
+			SetActorLocation(LastSafeLoc, /*bSweep=*/false);
+			CurrentSpeed = 0.0f;
+		}
+		else
+		{
+			// Ingen gyldig trygg posisjon (typisk: lastet inne i land fra en gammel lagret
+			// posisjon). Søk utover i ringer etter nærmeste åpne vann og flytt båten dit.
+			const FVector Base = GetActorLocation();
+			for (float R = 3000.0f; R <= 300000.0f; R += 3000.0f)
+			{
+				bool bRescued = false;
+				for (int32 A = 0; A < 24; ++A)
+				{
+					const float Ang = A * (2.0f * PI / 24.0f);
+					FVector Test(Base.X + FMath::Cos(Ang) * R, Base.Y + FMath::Sin(Ang) * R, WaterZ);
+					if (!IsOverLand(Test))
+					{
+						SetActorLocation(Test, /*bSweep=*/false);
+						LastSafeLoc = Test;
+						bHasSafeLoc = true;
+						CurrentSpeed = 0.0f;
+						bRescued = true;
+						UE_LOG(LogTemp, Warning, TEXT("[REDNING] Båt inne i land ved (%.0f,%.0f) — flyttet til vann (%.0f,%.0f)."),
+							Base.X, Base.Y, Test.X, Test.Y);
+						break;
+					}
+				}
+				if (bRescued)
+				{
+					break;
+				}
+			}
+		}
+	}
+	else
+	{
+		LastSafeLoc = GetActorLocation();
+		bHasSafeLoc = true;
+	}
+
+	// === DEBUG (midlertidig) — fast avlesning av fart og posisjon hver frame ===
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(100, 0.0f, FColor::Cyan,
+			FString::Printf(TEXT("fart=%.0f  pos=(%.0f, %.0f, %.0f)"),
+				CurrentSpeed, Loc.X, Loc.Y, Loc.Z));
+	}
+	// Strupet bane-logg (~4/sek) for å spore hele ruten, også der ingen grunnstøt skjer.
+	if (Time - LastDebugLogTime > 0.25f)
+	{
+		LastDebugLogTime = Time;
+		UE_LOG(LogTemp, Log, TEXT("[BAATPOS] pos=(%.0f,%.0f,%.0f)  fart=%.0f"),
+			GetActorLocation().X, GetActorLocation().Y, GetActorLocation().Z, CurrentSpeed);
+	}
 
 	// 4b. Skum/spray
 	if (bEnableSpray)
@@ -230,6 +338,30 @@ void ASailboatPawn::Tick(float DeltaTime)
 	}
 	CameraYawInput = 0.0f;
 	CameraPitchInput = 0.0f;
+}
+
+bool ASailboatPawn::IsOverLand(const FVector& Loc) const
+{
+	// Land (øyer/fastland) er WorldStatic med kollisjon; havet har ingen kollisjon.
+	// En loddrett stråle gjennom båtens XY treffer land kun der båten er innenfor en
+	// landmasse-fotavtrykk — da er den ved vannlinjen «under» det hule skallet.
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return false;
+	}
+	const FVector Start(Loc.X, Loc.Y, 100000.0f);
+	const FVector End(Loc.X, Loc.Y, -100000.0f);
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(BoatOverLand), /*bTraceComplex=*/true, this);
+	FHitResult Hit;
+	if (!World->LineTraceSingleByChannel(Hit, Start, End, ECC_WorldStatic, Params))
+	{
+		return false;
+	}
+	// Bare fjord-landmassene (øyer/kystlinje) er ProceduralMeshComponent. Nivåets
+	// Landscape-backdrop er en heightfield-komponent og skal IKKE telle som «land»
+	// her, ellers tror båten den er inne i land overalt og blir stående fast.
+	return Hit.GetComponent() && Hit.GetComponent()->IsA(UProceduralMeshComponent::StaticClass());
 }
 
 AWindActor* ASailboatPawn::FindWind() const

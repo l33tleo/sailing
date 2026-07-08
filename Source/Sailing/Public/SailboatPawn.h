@@ -36,10 +36,7 @@ public:
 	virtual void Tick(float DeltaTime) override;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
-	// Components – RootScene er rot slik at kapsel, båt og kamera flyttes sammen
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	TObjectPtr<USceneComponent> RootScene;
-
+	// Components – kapselen er rot slik at den sveiper mot land, og båt/kamera flyttes med den
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UCapsuleComponent> CapsuleComp;
 
@@ -96,6 +93,10 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Tuning")
 	float MaxBoatSpeed = 800.0f;
+
+	/** Andel av farten som beholdes ved frontal grunnstøting (0 = full stopp, 1 = ingen brems). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Tuning", meta = (ClampMin = "0", ClampMax = "1"))
+	float GroundingSpeedRetain = 0.1f;
 
 	/** Hullmotstand: drag = DragCoefficient * Speed^2 (enheter: 1/lengde). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Tuning", meta = (ClampMin = "0"))
@@ -164,10 +165,20 @@ private:
 	float CameraYawInput = 0.0f;
 	float CameraPitchInput = 0.0f;
 
+	// DEBUG (midlertidig): strupe posisjonslogg til ~4 ganger i sekundet
+	float LastDebugLogTime = 0.0f;
+
 	UPROPERTY()
 	TWeakObjectPtr<AWindActor> CachedWind;
 
 	AWindActor* FindWind() const;
+
+	/** Sant hvis punktet ligger over/inne i en landmasse (nedstråle treffer land). */
+	bool IsOverLand(const FVector& Loc) const;
+
+	/** Siste posisjon som var i åpent vann — sikkerhetsnett mot å havne inne i land. */
+	FVector LastSafeLoc = FVector::ZeroVector;
+	bool bHasSafeLoc = false;
 
 	// Spray-state
 	TArray<FSprayParticle> SprayParticles;
