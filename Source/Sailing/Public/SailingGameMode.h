@@ -26,7 +26,7 @@ public:
 
 	/** Start position for new game in fjord mode (e.g. near Oslo). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fjord")
-	FVector FjordStartPosition = FVector(-139600.0f, -150000.0f, 100.0f);
+	FVector FjordStartPosition = FVector(-148350.0f, -134845.0f, 100.0f);
 
 	// Get the current save game
 	UFUNCTION(BlueprintCallable, Category = "Save")
