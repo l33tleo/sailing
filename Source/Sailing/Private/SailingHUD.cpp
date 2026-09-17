@@ -11,6 +11,8 @@
 #include "Engine/Font.h"
 #include "Engine/Texture2D.h"
 #include "Kismet/GameplayStatics.h"
+#include "Kismet/KismetSystemLibrary.h"
+#include "Misc/PackageName.h"
 
 namespace
 {
@@ -904,7 +906,8 @@ void ASailingHUD::DrawPauseMenu()
 	DrawRect(BtnColor, Bx, PauseSaveY, PauseButtonW, PauseButtonH);
 	DrawText(TEXT("Lagre"), FLinearColor::White, Bx + 20.0f, PauseSaveY + 10.0f, nullptr, 1.4f);
 	DrawRect(BtnColor, Bx, PauseQuitY, PauseButtonW, PauseButtonH);
-	DrawText(TEXT("Avslutt til meny"), FLinearColor::White, Bx + 20.0f, PauseQuitY + 10.0f, nullptr, 1.4f);
+	const bool bHasMenuMap = FPackageName::DoesPackageExist(TEXT("/Game/Maps/MainMenu"));
+	DrawText(bHasMenuMap ? TEXT("Avslutt til meny") : TEXT("Lagre og avslutt"), FLinearColor::White, Bx + 20.0f, PauseQuitY + 10.0f, nullptr, 1.4f);
 }
 
 void ASailingHUD::OnPauseMenuClick(float X, float Y)
@@ -930,6 +933,16 @@ void ASailingHUD::OnPauseMenuClick(float X, float Y)
 	if (PauseMenuButtonHit(X, Y, Bx, PauseQuitY, PauseButtonW, PauseButtonH))
 	{
 		PC->ClosePauseMenu();
-		UGameplayStatics::OpenLevel(this, FName(TEXT("MainMenu")));
+		// MainMenu-kartet finnes ikke (ennå). OpenLevel mot et manglende kart gir InvalidURL ->
+		// motoren faller tilbake til GameDefaultMap (MainOcean?closed), dvs. hele nivået lastes på
+		// nytt og båten «respawner» på lagret posisjon. Avslutt spillet i stedet (lagres i EndPlay).
+		if (FPackageName::DoesPackageExist(TEXT("/Game/Maps/MainMenu")))
+		{
+			UGameplayStatics::OpenLevel(this, FName(TEXT("MainMenu")));
+		}
+		else
+		{
+			UKismetSystemLibrary::QuitGame(this, PC, EQuitPreference::Quit, /*bIgnorePlatformRestrictions=*/false);
+		}
 	}
 }
