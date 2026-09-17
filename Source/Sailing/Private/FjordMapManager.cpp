@@ -101,6 +101,7 @@ void AFjordMapManager::BeginPlay()
 					LocalOutline.Add((P - Def.Position) * DistanceScale);
 				}
 				Island->SetTerrainSource(HeightGrid, HeightExaggeration, DistanceScale);
+				Island->SetBakedMesh(Def.BakedMesh.LoadSynchronous());
 				Island->InitializeFjordIslandPolygon(Def.Name, i, bWasDiscovered, LocalOutline);
 			}
 			else

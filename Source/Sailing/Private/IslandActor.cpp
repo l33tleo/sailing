@@ -2,6 +2,7 @@
 #include "SailboatPawn.h"
 #include "IslandNameGenerator.h"
 #include "FjordGeometry.h"
+#include "Sailing.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SphereComponent.h"
 #include "ProceduralMeshComponent.h"
@@ -46,7 +47,7 @@ AIslandActor::AIslandActor()
 	// Filled polygon land mesh (used for fjord islands with a real outline).
 	LandMesh = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("LandMesh"));
 	LandMesh->SetupAttachment(RootComponent);
-	LandMesh->SetCollisionProfileName(TEXT("BlockAll"));
+	LandMesh->SetCollisionProfileName(TEXT("FjordLand"));
 
 	DiscoverySphere = CreateDefaultSubobject<USphereComponent>(TEXT("DiscoverySphere"));
 	DiscoverySphere->SetupAttachment(RootComponent);
@@ -130,10 +131,21 @@ void AIslandActor::InitializeFjordIslandPolygon(const FString& InName, int32 InI
 	if (LocalOutline.Num() >= 3)
 	{
 		bUsingPolygon = true;
-		BuildPolygonMesh();
+		if (BakedMesh && IslandMesh)
+		{
+			// Bakt terreng: z=0 i meshen er middelvannstand, og aktøren står på WaterZ.
+			IslandMesh->SetStaticMesh(BakedMesh);
+			IslandMesh->SetCollisionProfileName(TEXT("FjordLand"));
+			ApplyLandMaterial(IslandMesh);
+			UE_LOG(LogTemp, Log, TEXT("Island %s: bakt terreng %s"), *IslandName, *BakedMesh->GetName());
+		}
+		else
+		{
+			BuildPolygonMesh();
+		}
 
 		// Hide the fallback static mesh; the polygon provides shape and collision.
-		if (IslandMesh)
+		if (IslandMesh && !BakedMesh)
 		{
 			IslandMesh->SetVisibility(false);
 			IslandMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -190,6 +202,11 @@ void AIslandActor::BuildPolygonMesh()
 		bBuilt = FjordGeometry::BuildFilledPolygon(LandMesh, LocalOutline, IslandTopZLocal, IslandSkirtDepth, 0, LandColor);
 	}
 
+	ApplyLandMaterial(LandMesh);
+}
+
+void AIslandActor::ApplyLandMaterial(UMeshComponent* Target)
+{
 	// Prefer the aerial M_Land material (as a dynamic instance so discovery can highlight
 	// without replacing the photo). Fall back to the flat green materials if it is absent.
 	UMaterialInterface* LandBase = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Fjord/M_Land.M_Land"));
@@ -197,7 +214,7 @@ void AIslandActor::BuildPolygonMesh()
 	{
 		LandMID = UMaterialInstanceDynamic::Create(LandBase, this);
 		LandMID->SetScalarParameterValue(TEXT("Discovered"), bDiscovered ? 1.0f : 0.0f);
-		LandMesh->SetMaterial(0, LandMID);
+		Target->SetMaterial(0, LandMID);
 	}
 	else
 	{
@@ -205,7 +222,7 @@ void AIslandActor::BuildPolygonMesh()
 			nullptr, bDiscovered ? TEXT("/Game/Materials/M_IslandDiscovered") : TEXT("/Game/Materials/M_Island"));
 		if (Mat)
 		{
-			LandMesh->SetMaterial(0, Mat);
+			Target->SetMaterial(0, Mat);
 		}
 	}
 }
@@ -244,7 +261,7 @@ void AIslandActor::ApplyDiscoveredMaterial()
 		return;
 	}
 
-	if (bUsingPolygon && LandMesh)
+	if (bUsingPolygon && LandMesh && !BakedMesh)
 	{
 		LandMesh->SetMaterial(0, DiscoveredMat);
 		return;

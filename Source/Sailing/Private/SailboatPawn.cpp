@@ -1,4 +1,5 @@
 #include "SailboatPawn.h"
+#include "Sailing.h"
 #include "SailingPlayerController.h"
 #include "WindActor.h"
 #include "Components/SceneComponent.h"
@@ -392,9 +393,9 @@ void ASailboatPawn::Tick(float DeltaTime)
 void ASailboatPawn::HandleCapsuleHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp,
 	FVector NormalImpulse, const FHitResult& Hit)
 {
-	// Bare fjord-landmassene (øyer/kystlinje) er ProceduralMeshComponent — samme filter som
-	// IsOverLand() bruker, slik at vannkollisjon/andre aktører ikke trigger grunnstøtingsrespons.
-	if (!OtherComp || !OtherComp->IsA(UProceduralMeshComponent::StaticClass()))
+	// Bare fjordens land (øyer/kystlinje, bakt eller prosedural) ligger på FjordLand-kanalen — samme
+	// filter som IsOverLand() bruker, slik at vannkollisjon/andre aktører ikke trigger grunnstøtingsrespons.
+	if (!OtherComp || OtherComp->GetCollisionObjectType() != ECC_FjordLand)
 	{
 		return;
 	}
@@ -427,14 +428,16 @@ bool ASailboatPawn::IsOverLand(const FVector& Loc) const
 	const FVector End(Loc.X, Loc.Y, -100000.0f);
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(BoatOverLand), /*bTraceComplex=*/true, this);
 	FHitResult Hit;
-	if (!World->LineTraceSingleByChannel(Hit, Start, End, ECC_WorldStatic, Params))
+	// Kun FjordLand-objekter: nivåets Landscape-backdrop (WorldStatic) skal IKKE telle som «land»
+	// her, ellers tror båten den er inne i land overalt og blir stående fast.
+	if (!World->LineTraceSingleByObjectType(Hit, Start, End, FCollisionObjectQueryParams(ECC_FjordLand), Params))
 	{
 		return false;
 	}
-	// Bare fjord-landmassene (øyer/kystlinje) er ProceduralMeshComponent. Nivåets
-	// Landscape-backdrop er en heightfield-komponent og skal IKKE telle som «land»
-	// her, ellers tror båten den er inne i land overalt og blir stående fast.
-	return Hit.GetComponent() && Hit.GetComponent()->IsA(UProceduralMeshComponent::StaticClass());
+	// Bakt terreng fortsetter som sjøbunn under vannflaten; bare terreng som stikker tydelig opp
+	// over vannet (over bølgetoppene, ~0,7 m) er «land». De hule prosedurale skallene har toppen
+	// på z≥190 og passerer også.
+	return Hit.ImpactPoint.Z > OverLandMinZ;
 }
 
 AWindActor* ASailboatPawn::FindWind() const

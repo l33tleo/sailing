@@ -19,10 +19,8 @@ import argparse
 import io
 import json
 import math
-import re
 import sys
 import time
-import unicodedata
 from pathlib import Path
 
 import numpy as np
@@ -34,6 +32,7 @@ sys.path.insert(0, str(SCRIPTS / "mcp-kartverket"))
 
 from fjord_data_from_geojson import ORIGIN_LAT, ORIGIN_LON  # noqa: E402
 import wcs  # noqa: E402
+from fjord_slug import slugify  # noqa: E402
 
 FJORD_JSON = SCRIPTS / "fjord_data.json"
 OUT_DIR = SCRIPTS / "cache" / "dtm"
@@ -41,13 +40,6 @@ TILE_PX = 2000
 MARGIN_M = 200.0          # dekker undervannsbeltet baken legger rundt øya
 M_PER_DEG_LAT = 111320.0
 M_PER_DEG_LON = 111320.0 * math.cos(math.radians(ORIGIN_LAT))
-
-
-def slugify(name: str) -> str:
-    """«Håøya» → «haaoya»: stabile ASCII-filnavn/asset-navn."""
-    s = name.lower().replace("å", "aa").replace("ø", "o").replace("æ", "ae")
-    s = unicodedata.normalize("NFKD", s).encode("ascii", "ignore").decode()
-    return re.sub(r"[^a-z0-9]+", "_", s).strip("_")
 
 
 def m_to_lonlat(x_m: float, y_m: float) -> tuple[float, float]:

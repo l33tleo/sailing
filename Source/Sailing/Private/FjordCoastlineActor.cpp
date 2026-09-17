@@ -15,7 +15,7 @@ AFjordCoastlineActor::AFjordCoastlineActor()
 
 	CoastlineMesh = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("CoastlineMesh"));
 	CoastlineMesh->SetupAttachment(RootComponent);
-	CoastlineMesh->SetCollisionProfileName(TEXT("BlockAll"));
+	CoastlineMesh->SetCollisionProfileName(TEXT("FjordLand"));
 
 	// Default to the generated Oslofjord asset; falls back to old behaviour if absent.
 	FjordMapDataPath = FSoftObjectPath(TEXT("/Game/Fjord/OslofjordMapData.OslofjordMapData"));

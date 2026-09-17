@@ -4,6 +4,8 @@
 #include "Engine/DataAsset.h"
 #include "FjordMapData.generated.h"
 
+class UStaticMesh;
+
 /** A single closed polygon ring (world X,Y in Unreal units). Wrapper needed because
  *  UPROPERTY does not support TArray<TArray<>> (e.g. a list of landmass rings). */
 USTRUCT(BlueprintType)
@@ -36,6 +38,11 @@ struct FFjordIslandDef
 	 *  filled polygon mesh from this ring instead of the uniform static mesh. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fjord")
 	TArray<FVector2D> Outline;
+
+	/** Offline-bakt terreng (Nanite) fra scripts/bake; pivot = Position, z=0 = middelvannstand.
+	 *  Settes av scripts/bake/import_baked_land.py. Tom → prosedural polygon som før. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fjord")
+	TSoftObjectPtr<UStaticMesh> BakedMesh;
 };
 
 /** Data asset for Oslofjord map: coastline polygon(s) and island definitions. */

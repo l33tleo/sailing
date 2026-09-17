@@ -34,3 +34,6 @@ skills-lock.json
 
 # Bake-/datacache (regenereres av scripts/bake og henteskriptene)
 scripts/cache/
+
+# Bakt øy-terreng (~300 MB Nanite-mesher): regenereres med scripts/bake/rebuild_land.sh
+Content/Fjord/Land/

@@ -100,6 +100,11 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Tuning", meta = (ClampMin = "0", ClampMax = "1"))
 	float GroundingSpeedRetain = 0.1f;
 
+	/** Verdens-Z terrenget må stikke over for å regnes som «land» i IsOverLand (vannflaten er
+	 *  z=100, bølgetopper ~169). Bakt terreng fortsetter som sjøbunn under dette nivået. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Grounding")
+	float OverLandMinZ = 170.0f;
+
 	/** Hullmotstand: drag = DragCoefficient * Speed^2 (enheter: 1/lengde). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Tuning", meta = (ClampMin = "0"))
 	float DragCoefficient = 0.0012f;
