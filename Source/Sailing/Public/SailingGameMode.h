@@ -58,5 +58,8 @@ private:
 	UPROPERTY()
 	TObjectPtr<USaveGameSailing> SaveGame;
 
+	/** Satt når -FjordShots/-FjordBench kjører; blokkerer lagring. */
+	bool bBenchmarkRun = false;
+
 	void LoadOrCreateSaveGame();
 };

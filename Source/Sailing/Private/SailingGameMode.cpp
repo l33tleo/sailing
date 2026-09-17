@@ -12,6 +12,7 @@
 #include "OceanWaterSetupActor.h"
 #include "LightingSetupActor.h"
 #include "SaveGameSailing.h"
+#include "FjordBenchmarkComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
 
@@ -114,6 +115,14 @@ void ASailingGameMode::BeginPlay()
 		});
 	}
 
+	// Måleverktøy (-FjordShots / -FjordBench): faste kamerastasjoner, avslutter spillet selv.
+	if (bUseFjordMap && UFjordBenchmarkComponent::IsRequestedOnCommandLine())
+	{
+		bBenchmarkRun = true;
+		UFjordBenchmarkComponent* Bench = NewObject<UFjordBenchmarkComponent>(this, TEXT("FjordBenchmark"));
+		Bench->RegisterComponent();
+	}
+
 	UE_LOG(LogTemp, Log, TEXT("SailingGameMode: Spill lastet. Øyer oppdaget: %d"),
 		SaveGame ? SaveGame->TotalIslandsDiscovered : 0);
 }
@@ -149,7 +158,8 @@ AChunkManager* ASailingGameMode::GetChunkManager() const
 
 void ASailingGameMode::SaveGame_()
 {
-	if (SaveGame)
+	// En målekjøring skal aldri overskrive spillerens lagrede posisjon/oppdagelser.
+	if (SaveGame && !bBenchmarkRun)
 	{
 		// Update player location
 		if (APlayerController* PC = GetWorld()->GetFirstPlayerController())

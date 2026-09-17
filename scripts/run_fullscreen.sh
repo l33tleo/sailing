@@ -13,6 +13,9 @@
 #   scripts/run_fullscreen.sh --hitches    logg hakk >60 ms til Saved/Logs/Fullscreen.log
 #   scripts/run_fullscreen.sh --quality 2  grafikkvalitet 0–3 (lav/medium/høy/epic; standard er 3)
 #   scripts/run_fullscreen.sh --fps 30     lås bildefrekvensen (jevnere enn ulåst ~25–35 fps)
+#   scripts/run_fullscreen.sh --shots     faste skjermbilder ved referanseøyer → renders/landscape/<label>/
+#   scripts/run_fullscreen.sh --bench     fps per stasjon som [FPSBENCH]-linjer (skrives ut til slutt)
+#   scripts/run_fullscreen.sh --label fase2   merkelapp for --shots/--bench (standard «baseline»)
 #   scripts/run_fullscreen.sh --force      start selv om editoren er åpen (frarådes, se under)
 # Avslutt spillet med Cmd+Q.
 
@@ -27,6 +30,8 @@ BUILD=1
 FORCE=0
 RES=""
 EXEC_CMDS=""
+MEASURE_ARGS=()
+LABEL=""
 
 add_cmd() { EXEC_CMDS="${EXEC_CMDS:+$EXEC_CMDS,}$1"; }
 
@@ -47,8 +52,13 @@ while [[ $# -gt 0 ]]; do
 			FPS="${2:-}"; shift
 			[[ "$FPS" =~ ^[0-9]+$ ]] || { echo "--fps må være et heltall" >&2; exit 2; }
 			add_cmd "t.MaxFPS $FPS" ;;
+		--shots)    MEASURE_ARGS+=(-FjordShots) ;;
+		--bench)    MEASURE_ARGS+=(-FjordBench) ;;
+		--label)
+			LABEL="${2:-}"; shift
+			[[ "$LABEL" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "--label: kun bokstaver, tall, _ og -" >&2; exit 2; } ;;
 		--res)      RES="${2:-}"; shift ;;
-		-h|--help)  sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+		-h|--help)  sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
 		*) echo "Ukjent valg: $1 (se --help)" >&2; exit 2 ;;
 	esac
 	shift
@@ -86,6 +96,16 @@ if [[ -n "$RES" ]]; then
 fi
 if [[ -n "$EXEC_CMDS" ]]; then
 	ARGS+=(-ExecCmds="$EXEC_CMDS")
+fi
+
+if [[ ${#MEASURE_ARGS[@]} -gt 0 ]]; then
+	# Målekjøring: spillet avslutter seg selv etter siste stasjon; vis resultatene etterpå.
+	ARGS+=("${MEASURE_ARGS[@]}")
+	[[ -n "$LABEL" ]] && ARGS+=(-FjordLabel="$LABEL")
+	echo "Starter målekjøring (logg: $LOG). Spillet avslutter seg selv."
+	"$EDITOR_BIN" "${ARGS[@]}" || true
+	grep -a "\[FPSBENCH\]" "$LOG" | sed 's/^.*\[FPSBENCH\]/[FPSBENCH]/'
+	exit 0
 fi
 
 echo "Starter Sailing i fullskjerm (logg: $LOG). Avslutt med Cmd+Q."
