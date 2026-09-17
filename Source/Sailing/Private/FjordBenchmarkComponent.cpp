@@ -9,6 +9,10 @@
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
+#include "Engine/StaticMesh.h"
+#include "Engine/StaticMeshActor.h"
+#include "Components/StaticMeshComponent.h"
+#include "RenderUtils.h"
 
 UFjordBenchmarkComponent::UFjordBenchmarkComponent()
 {
@@ -54,6 +58,30 @@ void UFjordBenchmarkComponent::BeginPlay()
 		Camera->GetCameraComponent()->bConstrainAspectRatio = false;
 		// Smalere enn spillkameraet: øyene fyller mer av bildet, så før/etter blir lettere å lese.
 		Camera->GetCameraComponent()->SetFieldOfView(60.0f);
+	}
+
+	// Nanite-status for denne maskinen/RHI-en (fase 0-spike; nyttig i hver målelogg).
+	UE_LOG(LogTemp, Log, TEXT("[FPSBENCH] nanite plattformstotte=%d ibruk=%d"),
+		DoesPlatformSupportNanite(GMaxRHIShaderPlatform) ? 1 : 0,
+		UseNanite(GMaxRHIShaderPlatform) ? 1 : 0);
+
+	// -FjordSpikeMesh=/Game/...: plasser en testmesh rett foran første stasjon (Nanite-/ytelsesspike).
+	FString SpikePath;
+	if (FParse::Value(FCommandLine::Get(), TEXT("FjordSpikeMesh="), SpikePath))
+	{
+		if (UStaticMesh* SpikeMesh = LoadObject<UStaticMesh>(nullptr, *SpikePath))
+		{
+			const FVector Loc = Stations[0].CameraLocation + FVector(40000.0, 0.0, -250.0);
+			AStaticMeshActor* A = GetWorld()->SpawnActor<AStaticMeshActor>(Loc, FRotator::ZeroRotator);
+			A->SetMobility(EComponentMobility::Movable);
+			A->GetStaticMeshComponent()->SetStaticMesh(SpikeMesh);
+			UE_LOG(LogTemp, Log, TEXT("[FPSBENCH] spikemesh=%s nanitedata=%d"), *SpikePath,
+				SpikeMesh->HasValidNaniteData() ? 1 : 0);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[FPSBENCH] fant ikke spikemesh %s"), *SpikePath);
+		}
 	}
 
 	UE_LOG(LogTemp, Log, TEXT("[FPSBENCH] start label=%s bilder=%d benk=%d stasjoner=%d"),

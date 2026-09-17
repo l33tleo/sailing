@@ -31,3 +31,6 @@ __pycache__/
 .claude/
 .agents/
 skills-lock.json
+
+# Bake-/datacache (regenereres av scripts/bake og henteskriptene)
+scripts/cache/

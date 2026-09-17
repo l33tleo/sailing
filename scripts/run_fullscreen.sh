@@ -16,6 +16,7 @@
 #   scripts/run_fullscreen.sh --shots     faste skjermbilder ved referanseøyer → renders/landscape/<label>/
 #   scripts/run_fullscreen.sh --bench     fps per stasjon som [FPSBENCH]-linjer (skrives ut til slutt)
 #   scripts/run_fullscreen.sh --label fase2   merkelapp for --shots/--bench (standard «baseline»)
+#   scripts/run_fullscreen.sh --spike-mesh /Game/Sti/Mesh   testmesh foran første stasjon (med --shots/--bench)
 #   scripts/run_fullscreen.sh --force      start selv om editoren er åpen (frarådes, se under)
 # Avslutt spillet med Cmd+Q.
 
@@ -31,6 +32,7 @@ FORCE=0
 RES=""
 EXEC_CMDS=""
 MEASURE_ARGS=()
+MEASURE_EXTRA=()
 LABEL=""
 
 add_cmd() { EXEC_CMDS="${EXEC_CMDS:+$EXEC_CMDS,}$1"; }
@@ -54,11 +56,12 @@ while [[ $# -gt 0 ]]; do
 			add_cmd "t.MaxFPS $FPS" ;;
 		--shots)    MEASURE_ARGS+=(-FjordShots) ;;
 		--bench)    MEASURE_ARGS+=(-FjordBench) ;;
+		--spike-mesh) MEASURE_EXTRA+=(-FjordSpikeMesh="${2:-}"); shift ;;
 		--label)
 			LABEL="${2:-}"; shift
 			[[ "$LABEL" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "--label: kun bokstaver, tall, _ og -" >&2; exit 2; } ;;
 		--res)      RES="${2:-}"; shift ;;
-		-h|--help)  sed -n '2,21p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+		-h|--help)  sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
 		*) echo "Ukjent valg: $1 (se --help)" >&2; exit 2 ;;
 	esac
 	shift
@@ -101,6 +104,7 @@ fi
 if [[ ${#MEASURE_ARGS[@]} -gt 0 ]]; then
 	# Målekjøring: spillet avslutter seg selv etter siste stasjon; vis resultatene etterpå.
 	ARGS+=("${MEASURE_ARGS[@]}")
+	[[ ${#MEASURE_EXTRA[@]} -gt 0 ]] && ARGS+=("${MEASURE_EXTRA[@]}")
 	[[ -n "$LABEL" ]] && ARGS+=(-FjordLabel="$LABEL")
 	echo "Starter målekjøring (logg: $LOG). Spillet avslutter seg selv."
 	"$EDITOR_BIN" "${ARGS[@]}" || true
