@@ -14,6 +14,12 @@ Build the project (editor target, Development config):
 ```
 Append `2>&1 | tail -10` for abbreviated output.
 
+Kjør spillet frittstående i fullskjerm (bygger først; krever at editoren er lukket):
+```bash
+scripts/run_fullscreen.sh            # --no-build | --res 1920x1080 | --hitches | --force
+```
+Bruk dette for å vurdere spillfølelse: på macOS 27 + UE 5.8 gir vindusmodus/PIE periodiske ~1 s-stopp (Metal `nextDrawable`-timeout i motoren, ikke prosjektkode) som ikke opptrer i fullskjerm. Kjør aldri to Unreal-instanser samtidig (memory pressure).
+
 Generate Xcode project files:
 ```bash
 "/Users/Shared/Epic Games/UE_5.8/Engine/Build/BatchFiles/Mac/GenerateProjectFiles.sh" -project="/Users/leovonschwind/sailing/Sailing.uproject" -game -engine
@@ -22,23 +28,29 @@ Generate Xcode project files:
 ## Architecture
 
 ### Module & Dependencies
-Single module "Sailing" depending on: Core, CoreUObject, Engine, InputCore, EnhancedInput, ProceduralMeshComponent.
+Single module "Sailing" depending on: Core, CoreUObject, Engine, InputCore, EnhancedInput, ProceduralMeshComponent, UMG, Slate, SlateCore, Json, Water.
 
 ### Key Classes and Data Flow
 
-**ASailingGameMode** — Central coordinator. Spawns AWindActor, AChunkManager, and AOceanPlaneActor on BeginPlay. Manages save/load via USaveGameSailing. Sets default pawn (ASailboatPawn), controller, and HUD classes.
+**ASailingGameMode** — Central coordinator. Spawns AWindActor, ALightingSetupActor, and either (fjordmodus, default) AFjordMapManager+AFjordCoastlineActor+AOceanWaterSetupActor or (legacy prosedyremodus) AChunkManager+AOceanPlaneActor on BeginPlay. Manages save/load via USaveGameSailing. Sets default pawn (ASailboatPawn), controller, and HUD classes.
 
-**ASailboatPawn** — Player-controlled sailboat with capsule collision, static mesh visual, spring arm + camera. Calculates sail force from wind direction (cosine-based). Simulates wave bobbing. Uses Enhanced Input for turning and camera control.
+**ASailboatPawn** — Player-controlled sailboat. CapsuleComp (root) is fully physics-simulated (SetSimulatePhysics). Oppdrift/krengning bruker EGEN fjær/demper-pongtongmodell (ApplyPontoonBuoyancy, kalt hver Tick) som sampler Water System sin bølgehøyde direkte via `UWaterBodyComponent::TryQueryWaterInfoClosestToWorldLocation` med `IncludeWaves` (NB: bekvemmelighetsfunksjonen `GetWaterSurfaceInfoAtLocation` setter ALDRI IncludeWaves og returnerer det flate vannplanet) — IKKE UBuoyancyComponent. Pongtong-dempingen begrenses per pongtong til `0.6 * m_eff / dt` (m_eff = effektiv masse sett fra punktet): kreftene påføres eksplisitt én gang per frame, og ubegrenset demping (900 mot m_eff≈7 kg ved baug/akter) var numerisk ustabil og pisket opp ±25° stamping, verre ved lav fps. Fortegn: positiv Pitch/Roll i UE er rotasjon om −Right/−Forward. Årsak (verifisert i PIE, se `scripts/` for research-notater): Chaos-simulerte kropper genererer ikke pålitelige overlap-events mot Water-pluginets QUERY_ONLY-havkollisjon, så UBuoyancyComponents interne "er jeg i vann"-sporing (CurrentWaterBodyComponents, populert via AWaterBody::NotifyActorBeginOverlap) forble tom uansett kollisjonsoppsett. Pongtong-fjærkraften er klampet (±2x båtvekt per pongtong) for å unngå at et ubegrenset dempingsledd kan gi en eksplosiv "trampoline"-effekt ved høy inngangsfart. Seilkraft fra en polar-kurve-vindmodell påføres som massefri AddForce (fremdrift) + separat AddTorque (krengning); sving styres via direkte vinkelhastighet. Grunnstøting håndteres via OnComponentHit (filtrert på UProceduralMeshComponent-land) i stedet for manuell sweep. Uses Enhanced Input for turning and camera control.
 
 **ASailingPlayerController** — Creates and binds Enhanced Input actions and mapping context programmatically.
 
-**AWindActor** — Global wind with direction, strength, and slow rotation rate. Feeds into sailboat sail force calculation.
+**AWindActor** — Global vindmodell (Perlin-basert retning/styrke/kast). Feeds sailboat sail force calculation AND (fjordmodus) AOceanWaterSetupActors bølgeretning/-styrke.
 
-**AChunkManager** — Chunk-based procedural island streaming. Loads islands within 3 chunks, unloads beyond 5. Max 3 islands per chunk. Deterministic placement via seeded generation. Integrates with save system to restore discovery state.
+**AOceanWaterSetupActor** (fjordmodus) — Setter opp UE5 Water System for havet: spawner AWaterZone + en AFjordOceanBodyActor (se under) dekkende hele Oslofjordens kjente utstrekning, konstruerer en Gerstner-bølgegenerator (UGerstnerWaterWaveGeneratorSimple) og synker bølgeretning/-styrke mot AWindActor. Bruker Water-pluginets ferdige Water_Material_Ocean-material; fargen settes på komponentens WaterMID (`WaterAbsorption`/`WaterScattering` — Absorption er en DISTANSE per kanal, høyere = klarere; default gir tropisk turkis). Water-pluginets editor-only bekvemmelighetsfunksjoner (SetOceanExtent, FillWaterZoneWithOcean) er ikke tilgjengelige i spillkode — havets VISUELLE utstrekning settes via `UFjordOceanBodyComponent::SetRuntimeOceanExtents` (= ZoneExtent) og kollisjonsboksen via `SetRuntimeCollisionExtents` (se AFjordOceanBodyActor). Aktørskalering virker IKKE (motoren deler OceanExtents på komponentskalaen for å holde verdensstørrelsen fast). NB: hav-splinen beskriver en ØY — vannet genereres UTENFOR splinen ut til OceanExtents. Splinen er derfor en bitteliten (2x2 m) pliktøy i sonens hjørne; en spline rundt hele sonen gir et hav uten vann (båten «svever» — verifisert i PIE).
+
+**AFjordOceanBodyActor / UFjordOceanBodyComponent** (`FjordOceanBodyActor.h/.cpp`) — Underklasser av AWaterBodyOcean/UWaterBodyOceanComponent, nødvendig fordi `CollisionExtents` (den faktiske, ALLTID verdensromsstore havkollisjonsboksen — uavhengig av spline/aktørskalering) og `OceanExtents` (visuell utstrekning) er `protected` med en C++ `friend`-erklæring som kun gjelder AWaterBodyOcean selv, og settefunksjonen er editor-only. Protected-arv via en komponent-underklasse omgår dette. `UFjordOceanBodyComponent`s konstruktør setter også `bAffectsLandscape=false` (MÅ skje i konstruktøren, ikke post-spawn — WaterEditor-modulens `OnLevelActorAdded`-lytter kjører synkront under selve SpawnActor()-kallet og kan ellers henge en automatisert PIE-økt via en modal "Insert New Landscape Edit Layer"-dialog, siden nivået har et — irrelevant, dekorativt — Landscape).
+
+**AOceanPlaneActor** (legacy prosedyremodus, `bUseFjordMap=false`) — Procedural ocean mesh (128x128 grid, 200k unit extent) som følger spilleren. Four stacked layers (Deep/Mid/Shallow/Surface) using the opaque M_OceanVC material; the surface layer animates via vertex displacement.
+
+**ALightingSetupActor** — Spawner et globalt PostProcessVolume (eksponering/bloom/vignette/saturation) og justerer eksisterende DirectionalLight/SkyAtmosphere-aktører i MainOcean.umap for en fotorealistisk "gyllen time"-sjøfølelse. VolumetricCloud/ExponentialHeightFog sitt UTSEENDE røres bevisst ikke herfra — for scene-avhengig til å tunes blindt i kode. Unntak (ren ytelse): skyenes ray-march-samples skaleres ned (`CloudViewSampleCountScale=0.25`, `CloudShadowTracingDistanceKm=5`) — målt med `ProfileGPU` i PIE: CloudView 20 ms → 2–3 ms, 27 → ~49 fps. NB ved FPS-måling fra logg: editoren struper til ~3 fps når den ikke er i forgrunnen (`bThrottleCPUWhenNotForeground`).
+
+**AChunkManager** — Chunk-based procedural island streaming (legacy prosedyremodus). Loads islands within 3 chunks, unloads beyond 5. Max 3 islands per chunk. Deterministic placement via seeded generation. Integrates with save system to restore discovery state.
 
 **AIslandActor** — Individual island with discovery trigger (USphereComponent). Broadcasts discovery event, changes material from M_Island to M_IslandDiscovered. Identified by ChunkCoord + IslandIndex.
-
-**AOceanPlaneActor** — Procedural ocean mesh (128x128 grid, 200k unit extent). Four stacked layers (Deep/Mid/Shallow/Surface) using the opaque M_OceanVC material; the surface layer animates via vertex displacement.
 
 **ASailingHUD** — Renders compass with wind indicator, speed info, discovery popup (4s duration), and discovery counter.
 
@@ -50,6 +62,8 @@ Single module "Sailing" depending on: Core, CoreUObject, Engine, InputCore, Enha
 Wind → Sailboat (sail force) → ChunkManager (position-based loading) → IslandActor (discovery trigger) → HUD (popup) + SaveGame (persistence)
 
 ## Materials
+
+Hav (fjordmodus): `Content/Materials/Water/` inneholder en prosjektkopi av Water-pluginets havmateriale (`M_FjordWater` ← `MI_FjordWaterInst` ← `MI_FjordOcean`) med én tilføyelse: en boksmaske på Opacity Mask (`HullMaskPos/Fwd/HalfExtent`, satt hver frame av `ASailboatPawn::UpdateHullWaterMask`) som klipper bort vannflaten innenfor skroget — Single Layer Water vet ikke at båten fortrenger vann, så uten masken ser cockpiten vannfylt ut. Grafen ble bygget med Python (Break/MakeMaterialAttributes; NB: `SetMaterialAttributes`-noden og `get_material_expression_input_names()` på Make-noden KRASJER editoren ved skripting).
 
 Five materials in Content/Materials/: M_Ocean (translucent), M_OceanVC (vertex-color opaque), M_Boat (brown), M_Island (green), M_IslandDiscovered (bright green). Python scripts at repo root create these inside Unreal's Python environment.
 

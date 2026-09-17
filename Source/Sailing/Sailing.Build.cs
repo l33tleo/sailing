@@ -14,7 +14,8 @@ public class Sailing : ModuleRules
 			"UMG",
 			"Slate",
 			"SlateCore",
-			"Json"
+			"Json",
+			"Water"
 		});
 	}
 }

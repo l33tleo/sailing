@@ -10,7 +10,7 @@ struct FIslandData
 	GENERATED_BODY()
 
 	UPROPERTY(BlueprintReadWrite, Category = "Island")
-	FIntPoint ChunkCoord;
+	FIntPoint ChunkCoord = FIntPoint::ZeroValue;
 
 	UPROPERTY(BlueprintReadWrite, Category = "Island")
 	int32 IslandIndex = 0;
