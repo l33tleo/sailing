@@ -5,6 +5,8 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
+#include "WaterBodyComponent.h"
+#include "WaterBodyOceanActor.h"
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -19,12 +21,24 @@ ASailboatPawn::ASailboatPawn()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	// Kapselen er rot: den sveiper mot land (grunnstøting), og båt/kamera flyttes med den.
-	// Radius ~70 gir en tettere passform rundt Optimist-skroget (~1,13 m bredt) og
-	// mindre «klebing» i kyst-hjørner enn en bredere sirkel.
+	// Kapselen er rot: den flyter fysikkbasert (egen pongtong-oppdrift i Tick, se
+	// ApplyPontoonBuoyancy), og båt/kamera flyttes med den. Radius ~70 gir en tettere passform
+	// rundt Optimist-skroget (~1,13 m bredt) og mindre «klebing» i kyst-hjørner enn en bredere sirkel.
 	CapsuleComp = CreateDefaultSubobject<UCapsuleComponent>(TEXT("Capsule"));
 	CapsuleComp->InitCapsuleSize(70.0f, 50.0f);
 	CapsuleComp->SetCollisionProfileName(TEXT("Pawn"));
+	CapsuleComp->SetSimulatePhysics(true);
+	CapsuleComp->SetEnableGravity(true);
+	CapsuleComp->SetNotifyRigidBodyCollision(true); // trengs for at OnComponentHit skal fyres under fysikksimulering
+	CapsuleComp->BodyInstance.bLockXRotation = false; // rull fri (krengning)
+	CapsuleComp->BodyInstance.bLockYRotation = false; // pitch fri (stamping i sjøgang)
+	// Fire uavhengige pongtong-krefter (ApplyPontoonBuoyancy) som hver reagerer på lokal hastighet
+	// kan lett sette opp en høyfrekvent rulle-/stampe-risting seg imellom uten egen fysikkdemping
+	// utover selve fjær/demper-modellen (bekreftet visuelt i PIE-skjermbilder — synlig risting).
+	// Standard motor-demping er nær null; angulær demping satt vesentlig høyere enn lineær siden
+	// det er rotasjonsristingen som er mest synlig.
+	CapsuleComp->BodyInstance.LinearDamping = 0.5f;
+	CapsuleComp->BodyInstance.AngularDamping = 4.0f;
 	RootComponent = CapsuleComp;
 
 	// Kombinert Optimist-båt (alle deler i ett mesh fra Blender)
@@ -64,6 +78,7 @@ ASailboatPawn::ASailboatPawn()
 	SprayMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	SprayMesh->SetCastShadow(false);
 	SprayMesh->SetMobility(EComponentMobility::Movable);
+
 }
 
 void ASailboatPawn::BeginPlay()
@@ -97,6 +112,12 @@ void ASailboatPawn::BeginPlay()
 		SternShield->SetVisibility(false);
 		SternShield->SetHiddenInGame(true);
 	}
+
+	// Fysikkmasse + senket tyngdepunkt (hindrer urealistisk kantring i kast).
+	CapsuleComp->SetMassOverrideInKg(NAME_None, BoatMassKg, true);
+	CapsuleComp->BodyInstance.COMNudge = FVector(0.0f, 0.0f, CenterOfMassZOffset);
+	CapsuleComp->BodyInstance.UpdateMassProperties();
+	CapsuleComp->OnComponentHit.AddDynamic(this, &ASailboatPawn::HandleCapsuleHit);
 }
 
 void ASailboatPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -138,18 +159,31 @@ void ASailboatPawn::Tick(float DeltaTime)
 		if (PC->IsMapViewShown())
 		{
 			TurnInput = 0.0f;
+			// Kapselen er fysikksimulert, så en ren `return` her slo av oppdriften mens tyngdekraften
+			// fortsatte: båten falt fritt så lenge kartet var åpent (målt i PIE: 2,6 s med kart ->
+			// z=-1968, 20 m under vann, før den spratt opp igjen). Hold oppdriften i gang og brems
+			// kun den horisontale farten, slik at båten ligger rolig mens man ser på kartet.
+			ApplyPontoonBuoyancy(DeltaTime);
+			const FVector Vel = CapsuleComp->GetPhysicsLinearVelocity();
+			CapsuleComp->AddForce(FVector(-Vel.X, -Vel.Y, 0.0f) * 3.0f, NAME_None, /*bAccelChange=*/true);
 			return;
 		}
 	}
 
-	// 1. Sving (yaw)
-	FRotator CurrentRot = GetActorRotation();
-	CurrentRot.Yaw += TurnInput * TurnSpeed * DeltaTime;
-	SetActorRotation(CurrentRot);
+	UpdateHullWaterMask();
+
+	// 1. Sving: sett Z-komponenten av vinkelhastigheten direkte. Rull/pitch (X/Y) forblir
+	//    UENDRET av dette — de styres kun av Buoyancy/bølger (naturlig krengning/stamping).
+	FVector AngVel = CapsuleComp->GetPhysicsAngularVelocityInDegrees();
+	AngVel.Z = TurnInput * TurnSpeed;
+	CapsuleComp->SetPhysicsAngularVelocityInDegrees(AngVel);
 	TurnInput = 0.0f;
 
-	// 2. Tilsynelatende vind (apparent wind) og polar-kurve
+	// 2. Tilsynelatende vind (apparent wind) og polar-kurve — uendret logikk, men CurrentSpeed
+	//    leses nå fra fysikkhastigheten i stedet for en egen integrert variabel.
 	FVector Forward = GetActorForwardVector();
+	CurrentSpeed = FVector::DotProduct(CapsuleComp->GetPhysicsLinearVelocity(), Forward);
+
 	AWindActor* Wind = FindWind();
 	if (Wind)
 	{
@@ -201,60 +235,55 @@ void ASailboatPawn::Tick(float DeltaTime)
 		CurrentSailForce = 0.0f;
 	}
 
-	// 3. Hullmotstand og integrert fart
-	float Drag = DragCoefficient * FMath::Square(CurrentSpeed);
-	float Acceleration = CurrentSailForce - Drag;
-	float NewSpeed = FMath::Clamp(CurrentSpeed + Acceleration * DeltaTime, 0.0f, MaxBoatSpeed);
-	FVector Movement = Forward * NewSpeed * DeltaTime;
+	// 3. Fremdrift som massefri akselerasjon (bAccelChange) — bevarer dagens akselerasjonsfølelse
+	//    uavhengig av BoatMassKg. Krengningsmoment er et SEPARAT, mindre bidrag (AddTorque) fra
+	//    samme seilkraft, slik at fremdrift og krengning kan tunes/verifiseres uavhengig av hverandre.
+	float Drag = DragCoefficient * FMath::Square(FMath::Max(0.0f, CurrentSpeed));
+	CapsuleComp->AddForce(Forward * (CurrentSailForce - Drag) * SailForceAccelScale, NAME_None, /*bAccelChange=*/true);
 
-	// Sveip fremdriften mot land (kapselen er rot). Enkel, robust respons som ALDRI
-	// låser båten fast: skyv ut av evt. penetrasjon, skli langs kysten med resten av
-	// trekket, og reduser fart etter hvor frontalt treffet var (aldri helt til 0, så
-	// spilleren alltid kan manøvrere seg løs).
-	FHitResult Hit;
-	AddActorWorldOffset(Movement, /*bSweep=*/true, &Hit);
-	CurrentSpeed = NewSpeed;
+	const FVector Right = FVector::CrossProduct(FVector::UpVector, Forward).GetSafeNormal();
+	const float HeelTorqueSign = (Wind ? FVector::DotProduct(Right, Wind->GetWindDirection()) : 0.0f) >= 0.0f ? 1.0f : -1.0f;
+	CapsuleComp->AddTorqueInDegrees(Forward * CurrentSailForce * HeelTorqueScale * HeelTorqueSign,
+		NAME_None, /*bAccelChange=*/false);
 
-	if (Hit.bBlockingHit)
+	// Rettende motkraft: hindrer kantring når rull-vinkelen overstiger MaxHeelAngleDeg.
+	const float HeelDeg = GetActorRotation().Roll;
+	if (FMath::Abs(HeelDeg) > MaxHeelAngleDeg)
 	{
-		const float Frontalness = FMath::Clamp(FVector::DotProduct(Forward, -Hit.ImpactNormal), 0.0f, 1.0f);
-
-		// Skyv ut hvis kapselen har havnet delvis inne i land (uten å drepe farten).
-		if (Hit.bStartPenetrating)
-		{
-			AddActorWorldOffset(Hit.Normal * (Hit.PenetrationDepth + 2.0f), /*bSweep=*/false);
-		}
-
-		// Skli resten av trekket langs kystflaten.
-		const FVector Slide = FVector::VectorPlaneProject(Movement * (1.0f - Hit.Time), Hit.ImpactNormal);
-		if (!Slide.IsNearlyZero())
-		{
-			AddActorWorldOffset(Slide, /*bSweep=*/true);
-		}
-
-		// Frontal grunnstøting bremser mye; skrå streif nesten ingenting.
-		CurrentSpeed = NewSpeed * FMath::Lerp(1.0f, GroundingSpeedRetain, Frontalness);
-
-		// === DEBUG (midlertidig) ===
-		const FVector BLoc = GetActorLocation();
-		const FString HitName = Hit.GetActor() ? Hit.GetActor()->GetName() : TEXT("<ukjent>");
-		UE_LOG(LogTemp, Warning,
-			TEXT("[GRUNNSTOT] traff=%s pos=(%.0f,%.0f,%.0f)  normal=(%.2f,%.2f,%.2f)  startPen=%d  frontal=%.2f  fart %.0f->%.0f"),
-			*HitName, BLoc.X, BLoc.Y, BLoc.Z, Hit.Normal.X, Hit.Normal.Y, Hit.Normal.Z,
-			Hit.bStartPenetrating ? 1 : 0, Frontalness, NewSpeed, CurrentSpeed);
-		if (GEngine)
-		{
-			GEngine->AddOnScreenDebugMessage(101, 2.0f, FColor::Red,
-				FString::Printf(TEXT("GRUNNSTOT: %s  startPen=%d  frontal=%.2f  fart=%.0f"),
-					*HitName, Hit.bStartPenetrating ? 1 : 0, Frontalness, CurrentSpeed));
-		}
+		const float Excess = FMath::Abs(HeelDeg) - MaxHeelAngleDeg;
+		// Fortegn: i UE er positiv Roll en rotasjon om -Forward (verifisert i PIE: 10° om +Forward
+		// gir Roll=-10), så positiv krengning rettes med moment om +Forward. Tidligere fortegn var
+		// omvendt og FORSTERKET utslaget utover grensen.
+		const float RightingSign = HeelDeg > 0.0f ? 1.0f : -1.0f;
+		CapsuleComp->AddTorqueInDegrees(Forward * Excess * RightingTorqueStrength * RightingSign,
+			NAME_None, /*bAccelChange=*/false);
 	}
 
-	// 4. Lås til vannoverflate med enkel sinus-heave
-	FVector Loc = GetActorLocation();
-	float Time = GetWorld()->GetTimeSeconds();
-	Loc.Z = WaterZ + FMath::Sin(Time * WaveFrequency * 2.0f * PI) * WaveAmplitude;
-	SetActorLocation(Loc, false);
+	// Samme rettende mekanisme for stamping (pitch) — pongtong-oppdriften er ikke perfekt
+	// symmetrisk fram/bak, og uten dette kan båten sette seg i en stor, vedvarende stampe-vinkel.
+	const float PitchDeg = GetActorRotation().Pitch;
+	if (FMath::Abs(PitchDeg) > MaxPitchAngleDeg)
+	{
+		const float PitchExcess = FMath::Abs(PitchDeg) - MaxPitchAngleDeg;
+		// Samme fortegnsregel: positiv Pitch er en rotasjon om -Right (10° om +Right gir Pitch=-10).
+		// Omvendt fortegn her var årsaken til den "vedvarende, store stampe-vinkelen": straks pitch
+		// passerte MaxPitchAngleDeg dyttet "rettingen" båten VIDERE ut (målt: -23° til +41°).
+		const float PitchRightingSign = PitchDeg > 0.0f ? 1.0f : -1.0f;
+		CapsuleComp->AddTorqueInDegrees(Right * PitchExcess * PitchRightingTorqueStrength * PitchRightingSign,
+			NAME_None, /*bAccelChange=*/false);
+	}
+
+	// Myk hastighetsgrense (physics-vennlig motkraft, ikke hard clamp).
+	if (CurrentSpeed > MaxBoatSpeed)
+	{
+		CapsuleComp->AddForce(Forward * (MaxBoatSpeed - CurrentSpeed) * 4.0f, NAME_None, /*bAccelChange=*/true);
+	}
+
+	// Oppdrift/bølge-heave/krengning: egen fjær/demper-pongtongmodell som sampler Water System sin
+	// bølgehøyde direkte (se ApplyPontoonBuoyancy). UBuoyancyComponents interne overlap-avhengige
+	// deteksjon viste seg upålitelig mot et egendefinert vann-oppsett (Chaos-simulerte kropper
+	// genererer ikke pålitelige overlap-events mot Water-pluginets QUERY_ONLY-kollisjon).
+	ApplyPontoonBuoyancy(DeltaTime);
 
 	// 4c. Sikkerhetsnett mot å være inne i en landmasse. Landmassene er hule skall
 	// (kollisjon kun langs ytterkysten), så havner båten først på innsiden — via en
@@ -267,7 +296,11 @@ void ASailboatPawn::Tick(float DeltaTime)
 		// hvis den ble satt før landkollisjonen var bygd på første frame).
 		if (bHasSafeLoc && !IsOverLand(LastSafeLoc))
 		{
+			UE_LOG(LogTemp, Warning, TEXT("[REDNING] Over land ved (%.0f,%.0f) — satt tilbake til siste trygge (%.0f,%.0f), fart nullstilt."),
+				GetActorLocation().X, GetActorLocation().Y, LastSafeLoc.X, LastSafeLoc.Y);
 			SetActorLocation(LastSafeLoc, /*bSweep=*/false);
+			CapsuleComp->SetPhysicsLinearVelocity(FVector::ZeroVector);
+			CapsuleComp->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
 			CurrentSpeed = 0.0f;
 		}
 		else
@@ -285,6 +318,8 @@ void ASailboatPawn::Tick(float DeltaTime)
 					if (!IsOverLand(Test))
 					{
 						SetActorLocation(Test, /*bSweep=*/false);
+						CapsuleComp->SetPhysicsLinearVelocity(FVector::ZeroVector);
+						CapsuleComp->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
 						LastSafeLoc = Test;
 						bHasSafeLoc = true;
 						CurrentSpeed = 0.0f;
@@ -307,19 +342,33 @@ void ASailboatPawn::Tick(float DeltaTime)
 		bHasSafeLoc = true;
 	}
 
+	const float Time = GetWorld()->GetTimeSeconds();
+
 	// === DEBUG (midlertidig) — fast avlesning av fart og posisjon hver frame ===
 	if (GEngine)
 	{
+		const FVector DebugLoc = GetActorLocation();
 		GEngine->AddOnScreenDebugMessage(100, 0.0f, FColor::Cyan,
 			FString::Printf(TEXT("fart=%.0f  pos=(%.0f, %.0f, %.0f)"),
-				CurrentSpeed, Loc.X, Loc.Y, Loc.Z));
+				CurrentSpeed, DebugLoc.X, DebugLoc.Y, DebugLoc.Z));
 	}
 	// Strupet bane-logg (~4/sek) for å spore hele ruten, også der ingen grunnstøt skjer.
 	if (Time - LastDebugLogTime > 0.25f)
 	{
 		LastDebugLogTime = Time;
-		UE_LOG(LogTemp, Log, TEXT("[BAATPOS] pos=(%.0f,%.0f,%.0f)  fart=%.0f"),
-			GetActorLocation().X, GetActorLocation().Y, GetActorLocation().Z, CurrentSpeed);
+		float SurfaceZ = WaterZ;
+		if (UWaterBodyComponent* Ocean = FindOceanBody())
+		{
+			const auto Q = Ocean->TryQueryWaterInfoClosestToWorldLocation(GetActorLocation(),
+				EWaterBodyQueryFlags::ComputeLocation | EWaterBodyQueryFlags::IncludeWaves);
+			if (Q.HasValue())
+			{
+				SurfaceZ = Q.GetValue().GetWaterSurfaceLocation().Z;
+			}
+		}
+		UE_LOG(LogTemp, Log, TEXT("[BAATPOS] pos=(%.0f,%.0f,%.0f)  fart=%.0f  pitch=%.1f rull=%.1f  neds=%.1f"),
+			GetActorLocation().X, GetActorLocation().Y, GetActorLocation().Z, CurrentSpeed,
+			GetActorRotation().Pitch, GetActorRotation().Roll, SurfaceZ - GetActorLocation().Z);
 	}
 
 	// 4b. Skum/spray
@@ -338,6 +387,30 @@ void ASailboatPawn::Tick(float DeltaTime)
 	}
 	CameraYawInput = 0.0f;
 	CameraPitchInput = 0.0f;
+}
+
+void ASailboatPawn::HandleCapsuleHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp,
+	FVector NormalImpulse, const FHitResult& Hit)
+{
+	// Bare fjord-landmassene (øyer/kystlinje) er ProceduralMeshComponent — samme filter som
+	// IsOverLand() bruker, slik at vannkollisjon/andre aktører ikke trigger grunnstøtingsrespons.
+	if (!OtherComp || !OtherComp->IsA(UProceduralMeshComponent::StaticClass()))
+	{
+		return;
+	}
+
+	const FVector Forward = GetActorForwardVector();
+	const float Frontalness = FMath::Clamp(FVector::DotProduct(Forward, -Hit.ImpactNormal), 0.0f, 1.0f);
+	const FVector Vel = CapsuleComp->GetPhysicsLinearVelocity();
+	CapsuleComp->SetPhysicsLinearVelocity(Vel * FMath::Lerp(1.0f, GroundingSpeedRetain, Frontalness));
+
+	const FString HitName = OtherActor ? OtherActor->GetName() : TEXT("<ukjent>");
+	UE_LOG(LogTemp, Warning, TEXT("[GRUNNSTOT] traff=%s frontal=%.2f"), *HitName, Frontalness);
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(101, 2.0f, FColor::Red,
+			FString::Printf(TEXT("GRUNNSTOT: %s  frontal=%.2f"), *HitName, Frontalness));
+	}
 }
 
 bool ASailboatPawn::IsOverLand(const FVector& Loc) const
@@ -379,6 +452,132 @@ AWindActor* ASailboatPawn::FindWind() const
 		return CachedWind.Get();
 	}
 	return nullptr;
+}
+
+UWaterBodyComponent* ASailboatPawn::FindOceanBody()
+{
+	if (CachedOceanBody.IsValid())
+	{
+		return CachedOceanBody.Get();
+	}
+
+	TArray<AActor*> Found;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AWaterBodyOcean::StaticClass(), Found);
+	if (Found.Num() > 0)
+	{
+		if (AWaterBodyOcean* Ocean = Cast<AWaterBodyOcean>(Found[0]))
+		{
+			CachedOceanBody = Ocean->GetWaterBodyComponent();
+			return CachedOceanBody.Get();
+		}
+	}
+	return nullptr;
+}
+
+void ASailboatPawn::UpdateHullWaterMask()
+{
+	// Se AOceanWaterSetupActor::SpawnOceanBody: havmaterialet klipper bort vannflaten i en boks
+	// rundt skroget, så cockpiten ikke ser vannfylt ut. Boksen følger båtens posisjon og kurs.
+	UWaterBodyComponent* Ocean = FindOceanBody();
+	UMaterialInstanceDynamic* WaterMID = Ocean ? Ocean->GetWaterMaterialInstance() : nullptr;
+	if (!WaterMID || !BoatMesh)
+	{
+		return;
+	}
+
+	FVector Fwd = GetActorForwardVector();
+	Fwd.Z = 0.0f;
+	Fwd = Fwd.GetSafeNormal();
+	const FVector Center = BoatMesh->GetComponentLocation() + Fwd * HullMaskCenterOffsetX;
+	WaterMID->SetVectorParameterValue(TEXT("HullMaskPos"), FLinearColor(Center.X, Center.Y, Center.Z, 0.0f));
+	WaterMID->SetVectorParameterValue(TEXT("HullMaskFwd"), FLinearColor(Fwd.X, Fwd.Y, 0.0f, 0.0f));
+	WaterMID->SetVectorParameterValue(TEXT("HullMaskHalfExtent"), FLinearColor(HullMaskHalfExtent.X, HullMaskHalfExtent.Y, 0.0f, 0.0f));
+}
+
+void ASailboatPawn::ApplyPontoonBuoyancy(float DeltaTime)
+{
+	UWaterBodyComponent* Ocean = FindOceanBody();
+	if (!Ocean)
+	{
+		return;
+	}
+
+	// Symmetrisk diamant-plassering (Optimist ~230x113 uu fotavtrykk). Forrige oppsett hadde babord/
+	// styrbord forskjøvet mot akter (X=-10 i stedet for X=0) og kun ett punkt ved baugen — denne
+	// fram/bak-asymmetrien ga en vedvarende, stor stampe-vinkel (~22-29°) i stille vann i stedet for
+	// å balansere rundt 0° (verifisert i PIE). Alle punkter krysser nå X=0/Y=0 symmetrisk.
+	static const FVector PontoonOffsets[] = {
+		FVector(115.0f, 0.0f, 0.0f),   // baug
+		FVector(-115.0f, 0.0f, 0.0f),  // akter
+		FVector(0.0f, -56.0f, 0.0f),   // babord
+		FVector(0.0f, 56.0f, 0.0f),    // styrbord
+	};
+
+	// Numerisk stabilitet: kreftene påføres én gang per frame (eksplisitt integrasjon), og et
+	// dempingsledd c er da bare stabilt når c*dt/m_eff < 2, der m_eff er den effektive massen sett
+	// fra pongtongpunktet: 1/m_eff = 1/M + x²/Iyy + y²/Ixx. For baug/akter (115 cm arm, Iyy≈1,1e5)
+	// er m_eff bare ~7 kg, så BuoyancyDamping=900 ved ~37 fps gir c*dt/m_eff≈3,4 — dempingen
+	// OVERSKYTER hver frame og pisker opp stampingen (målt i PIE: ±25° pitch, 152°/s, uavhengig av
+	// bølgehøyde, og verre jo lavere fps). Dempingen begrenses derfor per pongtong til en trygg
+	// andel av m_eff/dt.
+	const float SafeDt = FMath::Clamp(DeltaTime, 1.0f / 240.0f, 1.0f / 15.0f);
+	const FVector Inertia = CapsuleComp->GetInertiaTensor();
+	const float InvMass = 1.0f / FMath::Max(1.0f, CapsuleComp->GetMass());
+
+	const FTransform ActorTransform = GetActorTransform();
+	for (int32 PontoonIdx = 0; PontoonIdx < UE_ARRAY_COUNT(PontoonOffsets); ++PontoonIdx)
+	{
+		const FVector& LocalOffset = PontoonOffsets[PontoonIdx];
+		const FVector WorldPos = ActorTransform.TransformPosition(LocalOffset);
+
+		const float InvEffMass = InvMass
+			+ FMath::Square(LocalOffset.X) / FMath::Max(1.0f, Inertia.Y)
+			+ FMath::Square(LocalOffset.Y) / FMath::Max(1.0f, Inertia.X);
+		const float StableDamping = FMath::Min(BuoyancyDamping, 0.6f / (InvEffMass * SafeDt));
+
+		// NB: bekvemmelighetsfunksjonen GetWaterSurfaceInfoAtLocation() setter ALDRI IncludeWaves-
+		// flagget og returnerer derfor det flate vannplanet (verifisert i PIE: nøyaktig z=100 på alle
+		// pongtonger mens det visuelle havet bølget — båten hang over bølgedaler og skar gjennom
+		// topper). Spør derfor direkte med IncludeWaves, så fysikken følger de samme Gerstner-bølgene
+		// som tegnes.
+		const TValueOrError<FWaterBodyQueryResult, EWaterBodyQueryError> Query = Ocean->TryQueryWaterInfoClosestToWorldLocation(
+			WorldPos, EWaterBodyQueryFlags::ComputeLocation | EWaterBodyQueryFlags::IncludeWaves);
+		if (!Query.HasValue())
+		{
+			continue;
+		}
+		const FVector SurfaceLoc = Query.GetValue().GetWaterSurfaceLocation();
+
+		// Bølgeflatens vertikalfart slik pongtongen opplever den (endelig differanse, inkluderer at
+		// båten selv flytter seg gjennom bølgene). Dempingen virker mot RELATIV fart: demping mot
+		// absolutt fart bremset også den ønskede hiv-bevegelsen, så skroget hang etter sjøen
+		// (målt: nedsenkning 11 ± 6 cm, topper på 23 cm — nær ripa).
+		float SurfaceVelZ = 0.0f;
+		if (bPontoonSurfaceValid[PontoonIdx])
+		{
+			SurfaceVelZ = FMath::Clamp((SurfaceLoc.Z - PrevPontoonSurfaceZ[PontoonIdx]) / SafeDt, -400.0f, 400.0f);
+		}
+		PrevPontoonSurfaceZ[PontoonIdx] = SurfaceLoc.Z;
+		bPontoonSurfaceValid[PontoonIdx] = true;
+
+		// Nedsenkningsdybde: positiv når pongtong-punktet er under den (bølge-forstyrrede) vannflaten.
+		const float Submersion = FMath::Clamp(SurfaceLoc.Z - WorldPos.Z, 0.0f, PontoonRadius * 2.0f);
+		if (Submersion <= 0.0f)
+		{
+			continue;
+		}
+
+		// Fjærkraft proporsjonal med dybde, dempet mot lokal vertikal hastighet (hindrer evig humping).
+		// Dempingsleddet er ubegrenset i hastighet: treffer en pongtong vannet med høy fallfart (f.eks.
+		// etter en lengre innledende fall-transient), blir dempingskraften alene enorm og skyter båten
+		// voldsomt oppover som en trampoline (verifisert i PIE — eskalerende oscillasjon). Klampet til
+		// et par ganger båtens vekt per pongtong for å hindre dette, uten å fjerne selve dempingseffekten.
+		const float PointVelocityZ = CapsuleComp->GetPhysicsLinearVelocityAtPoint(WorldPos).Z;
+		const float RawForceZ = Submersion * BuoyancySpringStrength - (PointVelocityZ - SurfaceVelZ) * StableDamping;
+		const float MaxForceZ = BoatMassKg * 980.0f * 2.0f; // ~2x båtens vekt, per pongtong
+		const float ForceZ = FMath::Clamp(RawForceZ, -MaxForceZ, MaxForceZ);
+		CapsuleComp->AddForceAtLocation(FVector(0.0f, 0.0f, ForceZ), WorldPos);
+	}
 }
 
 void ASailboatPawn::InitSpray()
@@ -493,12 +692,20 @@ void ASailboatPawn::UpdateSpray(float DeltaTime, const FVector& Forward, float T
 	}
 
 	// --- Simulering + skriv instans-transformer ---
+	// NB ytelse: et eksplisitt SprayMesh->MarkRenderStateDirty() hver frame GJENSKAPER hele
+	// render-proxyen for instansene (målt med `stat dumphitches`: klynger av 80–135 ms hitcher i
+	// UpdatePrimitive/FlushPendingRHICommands straks spruten slo inn ved høy fart). Én
+	// BatchUpdateInstancesTransforms markerer bare instansdataene som endret. Når ingen partikler
+	// lever (og ingen levde forrige frame) hoppes oppdateringen helt over.
+	bool bAnyAlive = false;
+	SprayTransforms.SetNum(SprayParticles.Num(), EAllowShrinking::No);
 	for (int32 i = 0; i < SprayParticles.Num(); ++i)
 	{
 		FSprayParticle& P = SprayParticles[i];
 		FTransform Xform;
 		if (P.Life > 0.0f)
 		{
+			bAnyAlive = true;
 			P.Velocity.Z -= SprayGravity * DeltaTime;
 			P.Position += P.Velocity * DeltaTime;
 			P.Life -= DeltaTime;
@@ -517,7 +724,13 @@ void ASailboatPawn::UpdateSpray(float DeltaTime, const FVector& Forward, float T
 		{
 			Xform = FTransform(FRotator::ZeroRotator, FVector::ZeroVector, FVector::ZeroVector);
 		}
-		SprayMesh->UpdateInstanceTransform(i, Xform, /*bWorldSpace=*/true, /*bMarkRenderStateDirty=*/false, /*bTeleport=*/true);
+		SprayTransforms[i] = Xform;
 	}
-	SprayMesh->MarkRenderStateDirty();
+
+	if (bAnyAlive || bSprayWasAlive)
+	{
+		SprayMesh->BatchUpdateInstancesTransforms(0, SprayTransforms, /*bWorldSpace=*/true,
+			/*bMarkRenderStateDirty=*/true, /*bTeleport=*/true);
+	}
+	bSprayWasAlive = bAnyAlive;
 }

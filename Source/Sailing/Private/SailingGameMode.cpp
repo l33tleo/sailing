@@ -9,6 +9,8 @@
 #include "FjordCoastlineActor.h"
 #include "FjordMapData.h"
 #include "OceanPlaneActor.h"
+#include "OceanWaterSetupActor.h"
+#include "LightingSetupActor.h"
 #include "SaveGameSailing.h"
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
@@ -44,6 +46,10 @@ void ASailingGameMode::BeginPlay()
 	SpawnedWind = GetWorld()->SpawnActor<AWindActor>(
 		AWindActor::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Params);
 
+	// Lys/atmosfære/post-process-oppsett (gjelder begge modi)
+	GetWorld()->SpawnActor<ALightingSetupActor>(
+		ALightingSetupActor::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Params);
+
 	if (bUseFjordMap)
 	{
 		// Fjord mode: spawn fjord map manager and coastline, no chunk manager
@@ -74,9 +80,18 @@ void ASailingGameMode::BeginPlay()
 		}
 	}
 
-	// Spawn ocean plane
-	SpawnedOcean = GetWorld()->SpawnActor<AOceanPlaneActor>(
-		AOceanPlaneActor::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Params);
+	// Spawn ocean: fjordmodus bruker UE5 Water System (kjent, avgrenset fjord-utstrekning);
+	// legacy chunk-modus (i praksis uendelig verden) beholder den spiller-følgende AOceanPlaneActor.
+	if (bUseFjordMap)
+	{
+		SpawnedOcean = GetWorld()->SpawnActor<AOceanWaterSetupActor>(
+			AOceanWaterSetupActor::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Params);
+	}
+	else
+	{
+		SpawnedOcean = GetWorld()->SpawnActor<AOceanPlaneActor>(
+			AOceanPlaneActor::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, Params);
+	}
 
 	// Teleport pawn: saved position (Fortsett) or fjord start (new game in fjord mode)
 	const bool bUseSavedPosition = SaveGame && SaveGame->LastPlayerLocation != FVector::ZeroVector;
