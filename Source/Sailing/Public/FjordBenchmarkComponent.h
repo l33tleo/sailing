@@ -13,6 +13,8 @@ class ACameraActor;
  *
  *   -FjordShots            HighResShot per stasjon til renders/landscape/<label>/<stasjon>.png
  *   -FjordBench            logger «[FPSBENCH] stasjon=… snitt=… p1=…» per stasjon
+ *   -FjordGroundTest       skyver båten fra åpent vann mot Hovedøya og logger «[GROUNDTEST]»:
+ *                          verifiserer kollisjon/grunnstøting mot bakt terreng uten manuell seiling
  *   -FjordLabel=<navn>     undermappe/merkelapp (standard «baseline»)
  *
  * Vinden er allerede deterministisk (AWindActor::WindSeed), så samme stasjon gir sammenlignbare
@@ -60,6 +62,13 @@ private:
 	void EnterStation(int32 Index);
 	void AdvancePhase();
 	void FinishBench();
+	void TickGroundTest(float DeltaTime);
+
+	bool bGroundTest = false;
+	bool bGroundTestPlaced = false;
+	float GroundTestTime = 0.0f;
+	float GroundTestStillTime = 0.0f;
+	float GroundTestNextLog = 0.0f;
 
 	TArray<FStation> Stations;
 	int32 StationIndex = 0;

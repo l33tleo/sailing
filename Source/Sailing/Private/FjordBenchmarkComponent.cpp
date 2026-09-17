@@ -3,6 +3,8 @@
 #include "Camera/CameraComponent.h"
 #include "Engine/World.h"
 #include "GameFramework/HUD.h"
+#include "GameFramework/Pawn.h"
+#include "Components/PrimitiveComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "HAL/FileManager.h"
 #include "Kismet/KismetMathLibrary.h"
@@ -34,7 +36,8 @@ UFjordBenchmarkComponent::UFjordBenchmarkComponent()
 bool UFjordBenchmarkComponent::IsRequestedOnCommandLine()
 {
 	return FParse::Param(FCommandLine::Get(), TEXT("FjordShots"))
-		|| FParse::Param(FCommandLine::Get(), TEXT("FjordBench"));
+		|| FParse::Param(FCommandLine::Get(), TEXT("FjordBench"))
+		|| FParse::Param(FCommandLine::Get(), TEXT("FjordGroundTest"));
 }
 
 void UFjordBenchmarkComponent::BeginPlay()
@@ -44,6 +47,14 @@ void UFjordBenchmarkComponent::BeginPlay()
 	bShots = FParse::Param(FCommandLine::Get(), TEXT("FjordShots"));
 	bBench = FParse::Param(FCommandLine::Get(), TEXT("FjordBench"));
 	FParse::Value(FCommandLine::Get(), TEXT("FjordLabel="), Label);
+
+	bGroundTest = FParse::Param(FCommandLine::Get(), TEXT("FjordGroundTest"));
+	if (bGroundTest)
+	{
+		// Egen modus: spillerkameraet beholdes, ingen stasjoner.
+		UE_LOG(LogTemp, Log, TEXT("[GROUNDTEST] start"));
+		return;
+	}
 
 	if (!bShots && !bBench)
 	{
@@ -116,6 +127,12 @@ void UFjordBenchmarkComponent::TickComponent(float DeltaTime, ELevelTick TickTyp
 	FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+	if (bGroundTest)
+	{
+		TickGroundTest(DeltaTime);
+		return;
+	}
 
 	if (Phase == EPhase::Done || !Camera)
 	{
@@ -220,4 +237,65 @@ void UFjordBenchmarkComponent::FinishBench()
 	UE_LOG(LogTemp, Log, TEXT("[FPSBENCH] stasjon=%s snitt=%.1f p1=%.1f bilder=%d sek=%.1f label=%s"),
 		Stations[StationIndex].Name, FrameTimes.Num() / Sum,
 		P99Time > 0.0f ? 1.0f / P99Time : 0.0f, FrameTimes.Num(), Sum, *Label);
+}
+
+void UFjordBenchmarkComponent::TickGroundTest(float DeltaTime)
+{
+	APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	APawn* Pawn = PC ? PC->GetPawn() : nullptr;
+	UPrimitiveComponent* Body = Pawn ? Cast<UPrimitiveComponent>(Pawn->GetRootComponent()) : nullptr;
+	if (!Body)
+	{
+		return;
+	}
+
+	// Start i åpent vann ved Hovedøya-stasjonen; mål = øyas sentroide (inne på land).
+	const FVector Start(Stations[0].CameraLocation.X, Stations[0].CameraLocation.Y, 100.0);
+	const FVector2D Target(Stations[0].LookAt.X, Stations[0].LookAt.Y);
+
+	GroundTestTime += DeltaTime;
+	if (!bGroundTestPlaced)
+	{
+		// Vent til GameMode har flyttet båten til lagret/startposisjon, og plasser den så selv.
+		if (GroundTestTime < 3.0f)
+		{
+			return;
+		}
+		Pawn->SetActorLocationAndRotation(Start, FRotator::ZeroRotator, false, nullptr, ETeleportType::ResetPhysics);
+		bGroundTestPlaced = true;
+		GroundTestTime = 0.0f;
+		return;
+	}
+
+	const FVector Loc = Pawn->GetActorLocation();
+	const FVector2D ToTarget = Target - FVector2D(Loc.X, Loc.Y);
+	const FVector2D Dir = ToTarget.GetSafeNormal();
+
+	// Skyv med en massefri akselerasjon mot land (som seilkraften), begrenset til ~MaxBoatSpeed.
+	// Hastigheten tvinges IKKE: da overstyres oppdrift/kollisjon og båten «flyr» inn over land.
+	const FVector Before = Body->GetPhysicsLinearVelocity();
+	if (FVector2D::DotProduct(FVector2D(Before.X, Before.Y), Dir) < 800.0f)
+	{
+		Body->AddForce(FVector(Dir.X, Dir.Y, 0.0f) * 300.0f, NAME_None, /*bAccelChange=*/true);
+	}
+
+	// «Står stille» = fysikken bremset oss ned siden forrige frame selv om vi skyver.
+	const float ActualSpeed = FVector2D(Before.X, Before.Y).Size();
+	GroundTestStillTime = (GroundTestTime > 2.0f && ActualSpeed < 150.0f) ? GroundTestStillTime + DeltaTime : 0.0f;
+
+	if (GroundTestTime >= GroundTestNextLog)
+	{
+		GroundTestNextLog += 2.0f;
+		UE_LOG(LogTemp, Log, TEXT("[GROUNDTEST] t=%.0f pos=(%.0f,%.0f,%.0f) fart=%.0f til_sentroide=%.0f m"),
+			GroundTestTime, Loc.X, Loc.Y, Loc.Z, ActualSpeed, ToTarget.Size() / 100.0f);
+	}
+
+	if (GroundTestStillTime > 4.0f || GroundTestTime > 120.0f)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[GROUNDTEST] slutt t=%.0f stoppet=%d pos=(%.0f,%.0f,%.0f) til_sentroide=%.0f m"),
+			GroundTestTime, GroundTestStillTime > 4.0f ? 1 : 0, Loc.X, Loc.Y, Loc.Z, ToTarget.Size() / 100.0f);
+		bGroundTest = false;
+		SetComponentTickEnabled(false);
+		FPlatformMisc::RequestExit(false);
+	}
 }

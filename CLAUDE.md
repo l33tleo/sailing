@@ -28,7 +28,7 @@ Generate Xcode project files:
 ## Architecture
 
 ### Module & Dependencies
-Single module "Sailing" depending on: Core, CoreUObject, Engine, InputCore, EnhancedInput, ProceduralMeshComponent, UMG, Slate, SlateCore, Json, Water.
+Single module "Sailing" depending on: Core, CoreUObject, Engine, InputCore, EnhancedInput, ProceduralMeshComponent, UMG, Slate, SlateCore, Json, Water (+ private: RenderCore, RHI).
 
 ### Key Classes and Data Flow
 
@@ -50,7 +50,11 @@ Single module "Sailing" depending on: Core, CoreUObject, Engine, InputCore, Enha
 
 **AChunkManager** — Chunk-based procedural island streaming (legacy prosedyremodus). Loads islands within 3 chunks, unloads beyond 5. Max 3 islands per chunk. Deterministic placement via seeded generation. Integrates with save system to restore discovery state.
 
-**AIslandActor** — Individual island with discovery trigger (USphereComponent). Broadcasts discovery event, changes material from M_Island to M_IslandDiscovered. Identified by ChunkCoord + IslandIndex.
+**AIslandActor** — Én øy med discovery-trigger (USphereComponent). I fjordmodus bruker den **offline-bakt Nanite-terreng** (`FFjordIslandDef.BakedMesh`, satt på `IslandMesh`) når det finnes, ellers prosedural polygon (`LandMesh`, `FjordGeometry`) som fallback. Bakt mesh: pivot = øyas `Position`, z=0 = middelvannstand (aktøren står på WaterZ=100), terrenget fortsetter som sjøbunn under vann — ingen skjørt/Z-hack. Materiale: MID av `/Game/Fjord/M_Land` med `Discovered`-parameter (M_Land MÅ ha Nanite-bruksflagget, ellers «missing usage flag Nanite» + standardmateriale). Legacy chunk-modus: identifiseres med ChunkCoord + IslandIndex, M_Island → M_IslandDiscovered.
+
+**Land-kollisjon (`ECC_FjordLand`)** — Øyer og kystlinje ligger på egen objektkanal (`ECC_GameTraceChannel2`, profil `FjordLand`, definert i `Sailing.h`/`DefaultEngine.ini`). `ASailboatPawn::HandleCapsuleHit` og `IsOverLand` filtrerer på kanalen (ikke komponenttype), så nivåets dekorative Landscape (WorldStatic) aldri teller som land. `IsOverLand` krever i tillegg terreng over `OverLandMinZ` (170): bakt sjøbunn er ikke «land».
+
+**UFjordBenchmarkComponent** — Måleverktøy, kun aktivt med kommandolinjeflagg (via `scripts/run_fullscreen.sh`): `--shots` (faste kamerastasjoner → `renders/landscape/<label>/`), `--bench` (`[FPSBENCH]`-linjer, snitt + p1 per stasjon), `--ground-test` (skyver båten mot Hovedøya; forvent `[GRUNNSTOT]`, null `[REDNING]`), `--label <navn>`, `--spike-mesh <asset>`. Målekjøringer lagrer aldri spillet og avslutter seg selv. Baseline 1600x900 Epic: ~61 fps ved indre øyer, 55 i oversikt.
 
 **ASailingHUD** — Renders compass with wind indicator, speed info, discovery popup (4s duration), and discovery counter.
 
@@ -91,6 +95,14 @@ MCP servers configured in `.cursor/mcp.json`:
 
 ### Fjord map data (OSM)
 Fallback for 7 Oslofjord-øyene er hardkodet i `FjordMapManager.cpp`. For å synkronisere med OSM: kjør `scripts/fetch_oslofjord_islands_osm.py` (med `uv run --directory scripts/mcp-overpass -- python scripts/fetch_oslofjord_islands_osm.py`) og lim den utskrevne C++-blokken inn i `FjordMapManager.cpp`. Valgfritt: `scripts/fjord_data.json` inneholder samme data; `scripts/create_fjord_map_data_asset.py` kan kjøres i Unreal Editor (Python Console) for å opprette/oppdatere en UFjordMapData-asset på `/Game/Fjord/OslofjordMapData`. Sett FjordMapDataPath på FjordMapManager i nivået til den asseten for å bruke den i stedet for fallback.
+
+### Bakt øy-terreng (Nanite)
+Pipeline: `scripts/fetch_island_dtm.py` (Kartverket WCS, 1 m DTM per øy → `scripts/cache/dtm/`) → `scripts/bake/bake_land.py` (høydefelt + syntetisk sjøbunn → `.glb` render + kollisjon) → `scripts/bake/import_baked_land.py` (headless UE-import, Nanite, kompleks kollisjon, kobler `BakedMesh` i `/Game/Fjord/OslofjordMapData`). Alt i ett: `scripts/bake/rebuild_land.sh` (editoren LUKKET, ~5 min). **`Content/Fjord/Land/` (~300 MB) og `scripts/cache/` ligger utenfor git** — kjør rebuild etter fersk klone; uten assetene brukes prosedural fallback.
+- Spillets projeksjon er ekvirektangulær fra lon/lat, så WCS i EPSG:4326 gir rutenett direkte på spillets gitter (ingen reprojeksjon). Hav kommer som ~0 m, ikke nodata.
+- Kysten følger DTM-en; OSM-ringene avgjør bare hvilken øy en landcelle tilhører (nærmeste ring), så land aldri tegnes to ganger.
+- glTF-akser: spill (X,Y,Z-opp, meter) → glTF (X,Z,Y) + invertert vinding. Filnavn = asset-navn (Interchange navngir etter fil).
+- Headless Python: `UnrealEditor-Cmd Sailing.uproject -run=pythonscript -script=<abs sti> -unattended -nosplash -nullrhi`. Editor-subsystemer er `None` i commandlet — bruk `set_editor_property` direkte (f.eks. `nanite_settings`). `UnrealEditor-Cmd` uten prosjekt henger.
+- Nanite er verifisert på denne Mac-en (M3 Pro, SM6): `[FPSBENCH] nanite plattformstotte=1 ibruk=1`.
 
 ### Start Blender MCP
 Blender MCP has two parts: (1) an addon inside Blender that runs a socket server, and (2) the MCP server in Cursor (`uvx blender-mcp`). Cursor starts the MCP server automatically; you only need to make Blender listen.

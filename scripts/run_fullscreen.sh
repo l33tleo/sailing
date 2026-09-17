@@ -15,6 +15,7 @@
 #   scripts/run_fullscreen.sh --fps 30     lås bildefrekvensen (jevnere enn ulåst ~25–35 fps)
 #   scripts/run_fullscreen.sh --shots     faste skjermbilder ved referanseøyer → renders/landscape/<label>/
 #   scripts/run_fullscreen.sh --bench     fps per stasjon som [FPSBENCH]-linjer (skrives ut til slutt)
+#   scripts/run_fullscreen.sh --ground-test   skyver båten mot Hovedøya; [GROUNDTEST]/[GRUNNSTOT]/[REDNING] vises
 #   scripts/run_fullscreen.sh --label fase2   merkelapp for --shots/--bench (standard «baseline»)
 #   scripts/run_fullscreen.sh --spike-mesh /Game/Sti/Mesh   testmesh foran første stasjon (med --shots/--bench)
 #   scripts/run_fullscreen.sh --force      start selv om editoren er åpen (frarådes, se under)
@@ -56,12 +57,13 @@ while [[ $# -gt 0 ]]; do
 			add_cmd "t.MaxFPS $FPS" ;;
 		--shots)    MEASURE_ARGS+=(-FjordShots) ;;
 		--bench)    MEASURE_ARGS+=(-FjordBench) ;;
+		--ground-test) MEASURE_ARGS+=(-FjordGroundTest) ;;
 		--spike-mesh) MEASURE_EXTRA+=(-FjordSpikeMesh="${2:-}"); shift ;;
 		--label)
 			LABEL="${2:-}"; shift
 			[[ "$LABEL" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "--label: kun bokstaver, tall, _ og -" >&2; exit 2; } ;;
 		--res)      RES="${2:-}"; shift ;;
-		-h|--help)  sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+		-h|--help)  sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
 		*) echo "Ukjent valg: $1 (se --help)" >&2; exit 2 ;;
 	esac
 	shift
@@ -108,7 +110,8 @@ if [[ ${#MEASURE_ARGS[@]} -gt 0 ]]; then
 	[[ -n "$LABEL" ]] && ARGS+=(-FjordLabel="$LABEL")
 	echo "Starter målekjøring (logg: $LOG). Spillet avslutter seg selv."
 	"$EDITOR_BIN" "${ARGS[@]}" || true
-	grep -a "\[FPSBENCH\]" "$LOG" | sed 's/^.*\[FPSBENCH\]/[FPSBENCH]/'
+	grep -aE "\[(FPSBENCH|GROUNDTEST|GRUNNSTOT|REDNING)\]" "$LOG" \
+		| sed -E 's/^.*\[(FPSBENCH|GROUNDTEST|GRUNNSTOT|REDNING)\]/[\1]/'
 	exit 0
 fi
 
