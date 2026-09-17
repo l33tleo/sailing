@@ -3,6 +3,8 @@
 #include "IslandNameGenerator.h"
 #include "FjordGeometry.h"
 #include "Sailing.h"
+#include "FjordIslandBakeData.h"
+#include "Components/InstancedStaticMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SphereComponent.h"
 #include "ProceduralMeshComponent.h"
@@ -168,6 +170,55 @@ void AIslandActor::InitializeFjordIslandPolygon(const FString& InName, int32 InI
 	{
 		SetDiscovered(true);
 	}
+}
+
+void AIslandActor::BuildBakedInstances(const UFjordIslandBakeData* Data)
+{
+	// Vegetasjonen er plassert på den bakte terrengmeshen; uten den ville trærne sveve/stå i sjøen.
+	if (!Data || !BakedMesh)
+	{
+		return;
+	}
+
+	int32 Total = 0;
+	for (const FFjordInstanceSet& Set : Data->InstanceSets)
+	{
+		UStaticMesh* Mesh = Set.Mesh.LoadSynchronous();
+		const int32 Count = Set.Packed.Num() / FFjordInstanceSet::Stride;
+		if (!Mesh || Count == 0)
+		{
+			continue;
+		}
+
+		UInstancedStaticMeshComponent* ISM = NewObject<UInstancedStaticMeshComponent>(this);
+		ISM->SetStaticMesh(Mesh);
+		// Samme mobilitet som roten: en Static-komponent kan ikke festes til en ikke-statisk forelder
+		// (festingen avvises stille og komponenten blir liggende i verdens origo).
+		ISM->SetMobility(RootComponent->Mobility);
+		ISM->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		ISM->SetCastShadow(Set.bCastShadow);
+		ISM->SetCanEverAffectNavigation(false);
+		if (Set.CullDistance > 0.0f)
+		{
+			ISM->SetCullDistances(0, FMath::RoundToInt(Set.CullDistance));
+		}
+		ISM->SetupAttachment(RootComponent);
+		ISM->RegisterComponent();
+
+		TArray<FTransform> Transforms;
+		Transforms.Reserve(Count);
+		const float* P = Set.Packed.GetData();
+		for (int32 i = 0; i < Count; ++i, P += FFjordInstanceSet::Stride)
+		{
+			Transforms.Emplace(FRotator(0.0f, P[3], 0.0f), FVector(P[0], P[1], P[2]), FVector(P[4]));
+		}
+		// Ett batch-kall; ingen per-frame oppdatering (jf. MarkRenderStateDirty-hakkene på sprut-ISM-en).
+		ISM->AddInstances(Transforms, /*bShouldReturnIndices=*/false, /*bWorldSpace=*/false);
+		BakedInstanceComponents.Add(ISM);
+		Total += Count;
+
+	}
+	UE_LOG(LogTemp, Log, TEXT("Island %s: %d bakte instanser i %d sett"), *IslandName, Total, BakedInstanceComponents.Num());
 }
 
 void AIslandActor::SetTerrainSource(TSharedPtr<FjordGeometry::FHeightGrid> InGrid,

@@ -194,10 +194,13 @@ def build(tex):
         return d, n, arm
 
     grass_d, grass_n, grass_arm = flat_layer("Grass", "GrassTileUU", 350.0)
-    # Kildeteksturen er tørt, gult gress; norsk kystgress/lyng er grønnere og mørkere.
+    # Svak grønntoning: kildeteksturen er høstlig, og «gyllen time»-lyset trekker alt mot gult.
     grass_d = g.mul(grass_d, g.node(unreal.MaterialExpressionVectorParameter, parameter_name="GrassTint",
-                                    default_value=unreal.LinearColor(0.55, 0.85, 0.40, 1.0)))
+                                    default_value=unreal.LinearColor(0.80, 0.95, 0.65, 1.0)))
     forest_d, forest_n, _ = flat_layer("Forest", "ForestTileUU", 500.0, with_arm=False)
+    # Kildeteksturen er høstløv i rødbrunt; under barskog er bunnen mørkere og grønnere (mose, lyng).
+    forest_d = g.mul(forest_d, g.node(unreal.MaterialExpressionVectorParameter, parameter_name="ForestTint",
+                                      default_value=unreal.LinearColor(0.50, 0.62, 0.38, 1.0)))
     shore_d, shore_n, shore_arm = flat_layer("Shore", "ShoreTileUU", 600.0)
 
     # Klippe: triplanar over XZ/YZ, vektet av |N.x| mot |N.y| (toppflaten er aldri klippe).
@@ -208,12 +211,12 @@ def build(tex):
     cliff_d = g.lerp(g.sample(tex[("Cliff", "D")], uv_xz, "D"), g.sample(tex[("Cliff", "D")], uv_yz, "D"), w_yz)
     cliff_n = g.lerp(g.sample(tex[("Cliff", "N")], uv_xz, "N"), g.sample(tex[("Cliff", "N")], uv_yz, "N"), w_yz)
     cliff_arm = g.sample(tex[("Cliff", "ARM")], uv_xz, "ARM")
-    # Oslofeltets kalkstein/skifer er grå, ikke beige som kildeteksturen.
+    # Oslofeltets kalkstein/skifer er grå: demp fargen litt og la lavet i teksturen stå igjen.
     desat = g.node(unreal.MaterialExpressionDesaturation)
     g.link(cliff_d, desat, "")
-    g.link(g.param("CliffDesaturate", 0.75), desat, "Fraction")
+    g.link(g.param("CliffDesaturate", 0.25), desat, "Fraction")
     cliff_d = g.mul(desat, g.node(unreal.MaterialExpressionVectorParameter, parameter_name="CliffTint",
-                                  default_value=unreal.LinearColor(0.62, 0.62, 0.64, 1.0)))
+                                  default_value=unreal.LinearColor(0.85, 0.85, 0.86, 1.0)))
 
     def stack(veg_a, veg_b, shore_v, cliff_v):
         return g.lerp(g.lerp(g.lerp(veg_a, veg_b, forest), shore_v, shore), cliff_v, cliff)
@@ -224,8 +227,8 @@ def build(tex):
     arm = stack(grass_arm, forest_arm, shore_arm, cliff_arm)
 
     # --- Farge: fototonet detalj nært, foto på avstand (klipper beholder steinteksturen) ---
-    tinted = g.mul(g.mul(detail, ortho_rgb), g.param("OrthoTintGain", 3.0))
-    tint_w = g.mul(ortho_ok, g.param("OrthoTintAmount", 0.35))
+    tinted = g.mul(g.mul(detail, ortho_rgb), g.param("OrthoTintGain", 1.8))
+    tint_w = g.mul(ortho_ok, g.param("OrthoTintAmount", 0.25))
     near = g.lerp(detail, tinted, tint_w)
     color = g.lerp(near, ortho_rgb, g.mul(far, ortho_ok))
     # Våtbånd: mørkere og blankere fra sjøbunn til litt over vannlinjen.

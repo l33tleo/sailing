@@ -31,6 +31,12 @@ echo "== Baker terreng =="
 uv run --with numpy --with scipy --with pillow --with trimesh --with fast-simplification \
 	python scripts/bake/bake_land.py
 
+echo "== Genererer trær og baker vegetasjonsplassering =="
+uv run --with numpy --with scipy --with pillow --with trimesh --with fast-simplification \
+	python scripts/bake/make_trees.py
+uv run --with numpy --with scipy --with pillow --with trimesh --with fast-simplification \
+	python scripts/bake/bake_vegetation.py
+
 echo "== Bygger landmateriale M_LandV2 (headless) =="
 MATLOG="$ROOT/Saved/Logs/LandMat.log"
 "$UE_CMD" "$ROOT/Sailing.uproject" -run=pythonscript \
@@ -44,3 +50,11 @@ echo "== Importerer til Unreal (headless, ~4 min) =="
 	-unattended -nosplash -nullrhi -abslog="$LOG" >/dev/null 2>&1 || true
 grep -a "BAKEIMPORT\|LogPython: Error" "$LOG" | grep -v "Display" | sed 's/^.*\[BAKEIMPORT\]/[BAKEIMPORT]/' | tail -5
 grep -aq "koblet .* øyer til bakt mesh" "$LOG" || { echo "Importen feilet — se $LOG" >&2; exit 1; }
+
+echo "== Importerer trær og vegetasjonsdata (headless) =="
+VEGLOG="$ROOT/Saved/Logs/VegImport.log"
+"$UE_CMD" "$ROOT/Sailing.uproject" -run=pythonscript \
+	-script="$ROOT/scripts/bake/import_vegetation.py" \
+	-unattended -nosplash -nullrhi -abslog="$VEGLOG" >/dev/null 2>&1 || true
+grep -a "\[VEGIMPORT\] ferdig" "$VEGLOG" | sed 's/^.*\[VEGIMPORT\]/[VEGIMPORT]/' \
+	|| { echo "Vegetasjonsimport feilet — se $VEGLOG" >&2; exit 1; }

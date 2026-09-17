@@ -17,10 +17,10 @@ UA = {"User-Agent": "sailing-game/1.0 (texture fetch)"}
 
 # lag → kandidater i prioritert rekkefølge (første som finnes brukes)
 LAYERS = {
-    "Cliff": ["rock_face_03", "rock_05"],                  # bratte flater, triplanar
-    "Shore": ["coast_sand_rocks_02", "gray_rocks"],        # svaberg/rullestein i strandsonen
-    "Grass": ["sparse_grass", "leafy_grass", "aerial_grass_rock"],
-    "Forest": ["forest_ground_04", "forest_leaves_02"],    # skogbunn
+    "Cliff": ["mossy_rock", "rock_05"],                    # grått berg med lav; bratte flater, triplanar
+    "Shore": ["rock_boulder_dry", "gray_rocks"],           # lyse, glatte svaberg i strandsonen
+    "Grass": ["forrest_ground_01", "leafy_grass"],         # gress/mose på åpne flater
+    "Forest": ["forest_leaves_02", "brown_mud_leaves_01"], # mørk, mosegrodd skogbunn
 }
 MAPS = {"Diffuse": "D", "nor_dx": "N", "arm": "ARM"}
 
@@ -36,6 +36,8 @@ def main():
     args = ap.parse_args()
     OUT.mkdir(parents=True, exist_ok=True)
     chosen = {}
+    src_p = OUT / "sources.json"
+    previous = json.loads(src_p.read_text(encoding="utf-8")) if src_p.exists() else {}
 
     for layer, candidates in LAYERS.items():
         for slug in candidates:
@@ -47,7 +49,8 @@ def main():
                 continue
             for m, suffix in MAPS.items():
                 dst = OUT / f"T_Land_{layer}_{suffix}.jpg"
-                if dst.exists():
+                # Hopp over bare hvis cachen kommer fra SAMME kilde (lagene kan få ny tekstur).
+                if dst.exists() and previous.get(layer) == slug:
                     continue
                 url = files[m][args.res]["jpg"]["url"]
                 print(f"{layer}: {slug} {m} …", flush=True)

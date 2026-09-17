@@ -53,7 +53,7 @@ COLLISION_STEP_M = 4.0
 COLLISION_KEEP = 0.25
 
 
-def rasterize(ring_m, meta, shape) -> np.ndarray:
+def rasterize(ring_m, meta, shape) -> np.ndarray:  # også brukt av bake_vegetation.py
     """Fyll en ring (spillmeter) inn i DTM-rutenettet. Rad 0 = nord."""
     res = meta["res_m"]
     pts = [((x - meta["min_x_m"]) / res, (meta["max_y_m"] - y) / res) for x, y in ring_m]
@@ -166,6 +166,9 @@ def bake_island(isl: dict, all_rings: list, exaggeration: float) -> dict | None:
 
     # Seed fra navnet → samme detalj ved hver bake (determinisme).
     height = add_cliff_detail(height, land, res, int(hashlib.sha1(slug.encode()).hexdigest()[:8], 16))
+
+    # Feltene gjenbrukes av bake_vegetation.py (samme høyder som meshen → trærne står på bakken).
+    np.savez_compressed(OUT_DIR / f"{slug}_fields.npz", height=height.astype(np.float32), land=land)
 
     region = d_land <= SEABED_BELT_M
     pivot = (isl["Position"]["X"], isl["Position"]["Y"])

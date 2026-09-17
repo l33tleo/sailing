@@ -10,6 +10,8 @@ class UProceduralMeshComponent;
 class UMaterialInstanceDynamic;
 class UMeshComponent;
 class UStaticMesh;
+class UFjordIslandBakeData;
+class UInstancedStaticMeshComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnIslandDiscovered, AIslandActor*, Island, const FString&, IslandName);
 
@@ -72,6 +74,9 @@ public:
 	 *  Kall før InitializeFjordIslandPolygon. */
 	void SetBakedMesh(UStaticMesh* InMesh) { BakedMesh = InMesh; }
 
+	/** Bygg instansiert vegetasjon fra bakte data. Kall etter InitializeFjordIslandPolygon. */
+	void BuildBakedInstances(const UFjordIslandBakeData* Data);
+
 	// Mark island as discovered (called from save system or overlap)
 	void SetDiscovered(bool bFromSaveGame = false);
 
@@ -97,6 +102,9 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UStaticMesh> BakedMesh;
+
+	UPROPERTY()
+	TArray<TObjectPtr<UInstancedStaticMeshComponent>> BakedInstanceComponents;
 
 	void ApplyLandMaterial(UMeshComponent* Target);
 
