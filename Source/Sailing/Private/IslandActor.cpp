@@ -209,7 +209,12 @@ void AIslandActor::ApplyLandMaterial(UMeshComponent* Target)
 {
 	// Prefer the aerial M_Land material (as a dynamic instance so discovery can highlight
 	// without replacing the photo). Fall back to the flat green materials if it is absent.
-	UMaterialInterface* LandBase = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Fjord/M_Land.M_Land"));
+	// M_LandV2 = lagdelt PBR (scripts/create_land_material_v2.py); M_Land = kun flyfoto.
+	UMaterialInterface* LandBase = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Fjord/M_LandV2.M_LandV2"));
+	if (!LandBase)
+	{
+		LandBase = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Fjord/M_Land.M_Land"));
+	}
 	if (LandBase)
 	{
 		LandMID = UMaterialInstanceDynamic::Create(LandBase, this);

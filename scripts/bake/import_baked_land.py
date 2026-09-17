@@ -64,7 +64,8 @@ def import_glb(asset_name):
 
 def main():
     manifest = json.load(open(os.path.join(BAKE_DIR, "manifest.json"), encoding="utf-8"))
-    land_mat = unreal.load_asset(LAND_MATERIAL)
+    # Lagdelt M_LandV2 hvis den er bygget (scripts/create_land_material_v2.py), ellers flyfoto-M_Land.
+    land_mat = unreal.load_asset(LAND_MATERIAL + "V2") or unreal.load_asset(LAND_MATERIAL)
     if land_mat:
         # Uten dette flagget faller Nanite-mesher tilbake til standardmaterialet i spillet
         # («missing usage flag Nanite»).

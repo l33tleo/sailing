@@ -26,6 +26,8 @@ UFjordBenchmarkComponent::UFjordBenchmarkComponent()
 	const float EyeZ = 350.0f;
 	Stations = {
 		{ TEXT("hovedoya"),    FVector(-189800.0, -156900.0, EyeZ),  FVector(-102570.0, -156873.0, 1500.0) },
+		// Nærbilde ~60 m fra Hovedøyas vestside: for å vurdere materiale, strandsone og vegetasjon.
+		{ TEXT("hovedoya_naer"), FVector(-156000.0, -160100.0, EyeZ),  FVector(-140000.0, -157000.0, 1200.0) },
 		{ TEXT("gressholmen"), FVector(-134400.0, -229300.0, EyeZ),  FVector(-177868.0, -304643.0, 1000.0) },
 		{ TEXT("lindoya"),     FVector(-270900.0, -291700.0, EyeZ),  FVector(-205019.0, -225800.0, 1000.0) },
 		{ TEXT("haaoya"),      FVector(-834300.0, -2650900.0, EyeZ), FVector(-1011285.0, -2344466.0, 8000.0) },

@@ -47,6 +47,8 @@ SEABED_BELT_M = 150.0    # hvor langt ut sjøbunnen følger med
 SEABED_SLOPE = 0.10      # meter dybde per meter fra land
 SEABED_MAX_M = 15.0
 RENDER_TRIS_PER_M2 = 0.35   # mål etter desimering (land + sjøbunn)
+STEEP_START, STEEP_END = 0.6, 1.4   # tan(helning): ~31° … ~54°
+ROCK_DETAIL_M = 0.9                 # amplitude på fraktal bergdetalj i bratt terreng
 COLLISION_STEP_M = 4.0
 COLLISION_KEEP = 0.25
 
@@ -58,6 +60,29 @@ def rasterize(ring_m, meta, shape) -> np.ndarray:
     img = Image.new("1", (shape[1], shape[0]), 0)
     ImageDraw.Draw(img).polygon(pts, fill=1)
     return np.asarray(img, dtype=bool)
+
+
+def rock_noise(shape, res: float, seed: int) -> np.ndarray:
+    """Fraktal «ridged» støy (≈ −1..1) med bølgelengder 16/8/4/2 m — sprekker og hyller i berg."""
+    rng = np.random.default_rng(seed)
+    out = np.zeros(shape, dtype=np.float32)
+    for wavelength, amp in ((16.0, 1.0), (8.0, 0.55), (4.0, 0.3), (2.0, 0.15)):
+        n = ndimage.gaussian_filter(rng.standard_normal(shape).astype(np.float32), wavelength / (2.5 * res))
+        n /= n.std() + 1e-9
+        out += amp * (1.0 - 2.0 * np.abs(np.tanh(n)))
+    return out / 2.0
+
+
+def add_cliff_detail(height: np.ndarray, land: np.ndarray, res: float, seed: int) -> np.ndarray:
+    """Lidar treffer sjelden bakken i stup, så DTM-en interpolerer bratte flater som store plane
+    trekanter (5–20 m) som ser lavpoly ut på nært hold. Glatt ut kantene mellom dem og legg på
+    fraktal bergdetalj, vektet av helningen slik at slakt terreng er urørt."""
+    gy, gx = np.gradient(height, res)
+    steep = np.clip((np.hypot(gx, gy) - STEEP_START) / (STEEP_END - STEEP_START), 0.0, 1.0) * land
+    steep = ndimage.gaussian_filter(steep.astype(np.float32), 2.0 / res)
+    smooth = ndimage.gaussian_filter(height, 2.5 / res)
+    out = height * (1.0 - steep) + smooth * steep
+    return out + rock_noise(height.shape, res, seed) * steep * ROCK_DETAIL_M
 
 
 def grid_mesh(height: np.ndarray, mask: np.ndarray, step: int):
@@ -88,8 +113,10 @@ def export_glb(path: Path, verts_local: np.ndarray, faces: np.ndarray, uv=None):
     if uv is not None:
         mesh.visual = trimesh.visual.TextureVisuals(uv=uv)
     mesh.invert()
+    # Eksplisitte, arealvektede verteksnormaler → myk shading (uten dem lar vi importøren gjette).
+    _ = mesh.vertex_normals
     path.parent.mkdir(parents=True, exist_ok=True)
-    mesh.export(path)
+    mesh.export(path, include_normals=True)
 
 
 def bake_island(isl: dict, all_rings: list, exaggeration: float) -> dict | None:
@@ -136,6 +163,9 @@ def bake_island(isl: dict, all_rings: list, exaggeration: float) -> dict | None:
     smooth = ndimage.gaussian_filter(height, sigma=1.5 / res)
     shore = np.clip(1.0 - np.abs(height) / 1.0, 0.0, 1.0)
     height = height * (1 - shore) + smooth * shore
+
+    # Seed fra navnet → samme detalj ved hver bake (determinisme).
+    height = add_cliff_detail(height, land, res, int(hashlib.sha1(slug.encode()).hexdigest()[:8], 16))
 
     region = d_land <= SEABED_BELT_M
     pivot = (isl["Position"]["X"], isl["Position"]["Y"])
