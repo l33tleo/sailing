@@ -26,6 +26,11 @@ static TAutoConsoleVariable<float> CVarRudderTestDeg(
 	TEXT("sailing.RudderTestDeg"), -999.0f,
 	TEXT("Tvinger rorvinkelen (grader, + = styrbordsving). -999 = av."));
 
+// Testkrok: låser kameraets orbit-yaw (grader rundt båten, 0 = bakfra) for skjermbilder fra siden.
+static TAutoConsoleVariable<float> CVarCamYawTest(
+	TEXT("sailing.CamYawTest"), -999.0f,
+	TEXT("Låser kameraets yaw rundt båten (grader). -999 = av."));
+
 ASailboatPawn::ASailboatPawn()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -540,6 +545,11 @@ void ASailboatPawn::Tick(float DeltaTime)
 		FRotator ArmRot = SpringArm->GetRelativeRotation();
 		ArmRot.Yaw += CameraYawInput * 2.0f;
 		ArmRot.Pitch = FMath::Clamp(ArmRot.Pitch + CameraPitchInput * 2.0f, -50.0f, 15.0f);
+		const float CamYawTest = CVarCamYawTest.GetValueOnGameThread();
+		if (CamYawTest > -998.0f)
+		{
+			ArmRot.Yaw = CamYawTest;
+		}
 		SpringArm->SetRelativeRotation(ArmRot);
 	}
 	CameraYawInput = 0.0f;
