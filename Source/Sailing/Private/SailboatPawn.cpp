@@ -1,6 +1,5 @@
 #include "SailboatPawn.h"
 #include "Sailing.h"
-#include "StaticMeshResources.h"
 #include "SailingPlayerController.h"
 #include "WindActor.h"
 #include "Components/SceneComponent.h"
@@ -47,7 +46,7 @@ ASailboatPawn::ASailboatPawn()
 	BoatMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BoatMesh"));
 	BoatMesh->SetupAttachment(CapsuleComp);
 	BoatMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	BoatMesh->SetCastShadow(true);
+	BoatMesh->SetCastShadow(false);   // se BeginPlay
 
 	// Plan bak i båten (stern) – ugjennomtrengelig, så man ikke ser «inn» bakfra
 	SternShield = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("SternShield"));
@@ -102,27 +101,13 @@ void ASailboatPawn::BeginPlay()
 		BoatMesh->SetRelativeScale3D(FVector(1.0f, 1.0f, 1.0f));
 		// FBX-materialer fra Blender brukes direkte (M_Hull, M_Sail, M_Wood, M_Board)
 
-		// Seilet kaster ikke skygge. Sola står lavt («gyllen time»), så det 3,5 m høye seilet kaster
-		// en ~30 m lang skygge på vannet — og i Single Layer Water blir en skygge ikke bare mørkere:
-		// uten sol-spredning gjenstår bare speilingen av den gulbrune himmelen, og stripen ser ut som
-		// mudder bak båten. Skrogets skygge (2–3 m) beholdes. Per-seksjons-flagget finnes bare på
-		// asseten/renderdataene (ikke på komponenten), så det settes her i minnet — asseten røres ikke.
-		if (FStaticMeshRenderData* RenderData = BoatCombinedMesh->GetRenderData())
-		{
-			const TArray<FStaticMaterial>& Mats = BoatCombinedMesh->GetStaticMaterials();
-			for (FStaticMeshLODResources& LOD : RenderData->LODResources)
-			{
-				for (FStaticMeshSection& Section : LOD.Sections)
-				{
-					if (Mats.IsValidIndex(Section.MaterialIndex)
-						&& Mats[Section.MaterialIndex].MaterialSlotName.ToString().StartsWith(TEXT("M_Sail")))
-					{
-						Section.bCastShadow = false;
-					}
-				}
-			}
-			BoatMesh->MarkRenderStateDirty();
-		}
+		// Båten kaster ikke skygge på vannet. I Single Layer Water blir en skygge ikke bare mørkere:
+		// der sola ikke treffer forsvinner sol-spredningen, og det som gjenstår er speilingen av den
+		// gulbrune «gyllen time»-himmelen — seilets ~30 m lange skygge så ut som en mudderstripe, og
+		// skrogets 2–3 m skygge som om man så bunnen rett under båten. Verifisert med --boat-shot og
+		// ShowFlag.DynamicShadows 0. Sol og himmel skygger fortsatt skroget selv (self-shadow er av
+		// samme flagg, men det tapet er knapt synlig på en hvit Optimist).
+		BoatMesh->SetCastShadow(false);
 	}
 	else
 	{
