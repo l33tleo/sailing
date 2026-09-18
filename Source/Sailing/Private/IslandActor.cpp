@@ -4,6 +4,7 @@
 #include "FjordGeometry.h"
 #include "Sailing.h"
 #include "FjordIslandBakeData.h"
+#include "Misc/CommandLine.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SphereComponent.h"
@@ -196,7 +197,11 @@ void AIslandActor::BuildBakedInstances(const UFjordIslandBakeData* Data)
 		// (festingen avvises stille og komponenten blir liggende i verdens origo).
 		ISM->SetMobility(RootComponent->Mobility);
 		ISM->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		ISM->SetCastShadow(Set.bCastShadow);
+		// -FjordTreeShadow=0 slår av skyggekasting for A/B-måling (scripts/run_fullscreen.sh --exec virker
+		// ikke her: dette er en komponentegenskap, ikke en konsollvariabel).
+		int32 TreeShadow = 1;
+		FParse::Value(FCommandLine::Get(), TEXT("FjordTreeShadow="), TreeShadow);
+		ISM->SetCastShadow(Set.bCastShadow && TreeShadow != 0);
 		ISM->SetCanEverAffectNavigation(false);
 		if (Set.CullDistance > 0.0f)
 		{

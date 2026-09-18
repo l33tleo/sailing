@@ -18,6 +18,7 @@
 #   scripts/run_fullscreen.sh --ground-test   skyver båten mot Hovedøya; [GROUNDTEST]/[GRUNNSTOT]/[REDNING] vises
 #   scripts/run_fullscreen.sh --label fase2   merkelapp for --shots/--bench (standard «baseline»)
 #   scripts/run_fullscreen.sh --spike-mesh /Game/Sti/Mesh   testmesh foran første stasjon (med --shots/--bench)
+#   scripts/run_fullscreen.sh --arg -FjordTreeShadow=0   vilkårlig kommandolinjeflagg til spillet (A/B)
 #   scripts/run_fullscreen.sh --exec "r.Shadow.Virtual.Enable 1"   vilkårlig konsollkommando (A/B-måling)
 #   scripts/run_fullscreen.sh --force      start selv om editoren er åpen (frarådes, se under)
 # Avslutt spillet med Cmd+Q.
@@ -59,13 +60,14 @@ while [[ $# -gt 0 ]]; do
 		--shots)    MEASURE_ARGS+=(-FjordShots) ;;
 		--bench)    MEASURE_ARGS+=(-FjordBench) ;;
 		--ground-test) MEASURE_ARGS+=(-FjordGroundTest) ;;
+		--arg)      MEASURE_EXTRA+=("${2:-}"); shift ;;
 		--spike-mesh) MEASURE_EXTRA+=(-FjordSpikeMesh="${2:-}"); shift ;;
 		--label)
 			LABEL="${2:-}"; shift
 			[[ "$LABEL" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "--label: kun bokstaver, tall, _ og -" >&2; exit 2; } ;;
 		--exec)     add_cmd "${2:-}"; shift ;;
 		--res)      RES="${2:-}"; shift ;;
-		-h|--help)  sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+		-h|--help)  sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
 		*) echo "Ukjent valg: $1 (se --help)" >&2; exit 2 ;;
 	esac
 	shift
