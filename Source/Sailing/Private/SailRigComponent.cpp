@@ -104,7 +104,7 @@ void USailRigComponent::UpdateRig(float ApparentWindAngleDeg, float ApparentWind
 void USailRigComponent::ApplyToMesh()
 {
 	// Bommen peker -X. Yaw +θ tar -X mot -Y (babord), så positiv bomvinkel (styrbord) er negativ yaw.
-	// Fortegnet verifiseres med --boat-shot når riggen er et eget mesh (fase 2).
+	// Verifisert med --boat-shot --exec "sailing.BoomTestDeg 50": bommen står ut til styrbord.
 	SetRelativeRotation(FRotator(0.0f, -BoomAngleDeg, 0.0f));
 
 	if (SailMID)

@@ -316,6 +316,7 @@ void ASailboatPawn::Tick(float DeltaTime)
 		TurnInput = 0.0f;
 		// Positiv rorvinkel = styrbordsving: bladet (akter for pivot) skal til styrbord, kulten til
 		// babord — negativ yaw gir det (samme utledning som bommen i USailRigComponent::ApplyToMesh).
+		// Verifisert med --boat-shot --exec "sailing.RudderTestDeg 30".
 		RudderMesh->SetRelativeRotation(FRotator(0.0f, -RudderAngleDeg, 0.0f));
 	}
 
