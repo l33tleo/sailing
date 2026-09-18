@@ -134,10 +134,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Wake", meta = (ClampMin = "1"))
 	float HullFoamFullSpeed = 300.0f;
 
-	// Spray-tuning. Av som standard: skum-kulene (Engine-sfærer) så urealistiske ut og
-	// flimret (hundrevis som popper inn/ut). Kan slås på igjen i editoren om ønskelig.
+	// Spray-tuning. Kameravendte skum-quads med M_SprayQuad (se InitSpray); de gamle Engine-kulene
+	// så urealistiske ut og var derfor avslått.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Spray")
-	bool bEnableSpray = false;
+	bool bEnableSpray = true;
 
 	/** Antall partikler i poolen (forhåndsallokert). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Spray", meta = (ClampMin = "8", ClampMax = "256"))
@@ -363,6 +363,7 @@ private:
 	TArray<FSprayParticle> SprayParticles;
 	float SprayEmitAccumulator = 0.0f;
 	bool bSprayInitialized = false;
+	bool bSprayQuads = false;   // M_SprayQuad + plan (ellers kule-fallback)
 
 	void InitSpray();
 	void UpdateSpray(float DeltaTime, const FVector& Forward, float Time);

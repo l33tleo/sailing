@@ -32,6 +32,11 @@ static TAutoConsoleVariable<int32> CVarWake(
 	TEXT("sailing.Wake"), 1,
 	TEXT("1 = kjølvann og skrogskum på (standard), 0 = av."));
 
+// Testkrok: tvinger baugsprut uansett fart (--exec "sailing.SprayTest 1").
+static TAutoConsoleVariable<int32> CVarSprayTest(
+	TEXT("sailing.SprayTest"), 0,
+	TEXT("1 = tving baugsprut uansett fart."));
+
 // Testkrok: låser kameraets orbit-yaw (grader rundt båten, 0 = bakfra) for skjermbilder fra siden.
 static TAutoConsoleVariable<float> CVarCamYawTest(
 	TEXT("sailing.CamYawTest"), -999.0f,
@@ -804,17 +809,26 @@ void ASailboatPawn::InitSpray()
 	}
 	bSprayInitialized = true;
 
-	// Små kuler i stedet for flate plan (unngår «papirlapp»-utseendet). Ingen egne assets nødvendig.
-	UStaticMesh* DropMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+	// Kameravendte skum-quads (Engine-plan, 100×100 uu i XY) med M_SprayQuad
+	// (scripts/create_spray_material.py): rund, støyet dråpe som fader med levetiden. Levetiden
+	// legges i instansens Z-skala og leses i materialet — planet er flatt, så skalaen er usynlig.
+	// Fallback uten materialet: hvite Engine-kuler som før (så urealistiske ut, derfor quads).
+	UMaterialInterface* QuadMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Materials/Water/M_SprayQuad.M_SprayQuad"));
+	UStaticMesh* DropMesh = LoadObject<UStaticMesh>(nullptr,
+		QuadMat ? TEXT("/Engine/BasicShapes/Plane.Plane") : TEXT("/Engine/BasicShapes/Sphere.Sphere"));
 	if (DropMesh)
 	{
 		SprayMesh->SetStaticMesh(DropMesh);
 	}
-	UMaterialInterface* BaseMat = LoadObject<UMaterialInterface>(nullptr,
-		TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
-	if (BaseMat)
+	bSprayQuads = QuadMat != nullptr;
+	if (QuadMat)
 	{
-		// Dynamisk instans for å tinte skummet hvitt (param-navn ignoreres hvis det ikke finnes).
+		SprayMesh->SetMaterial(0, QuadMat);
+	}
+	else if (UMaterialInterface* BaseMat = LoadObject<UMaterialInterface>(nullptr,
+		TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial")))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[SPRUT] /Game/Materials/Water/M_SprayQuad mangler (scripts/create_spray_material.py) — bruker kuler"));
 		UMaterialInstanceDynamic* FoamMID = UMaterialInstanceDynamic::Create(BaseMat, this);
 		if (FoamMID)
 		{
@@ -832,6 +846,7 @@ void ASailboatPawn::InitSpray()
 	// Forhåndsallokér hele poolen som usynlige (null-skala) instanser.
 	SprayParticles.SetNum(FMath::Max(8, SprayPoolSize));
 	SprayMesh->ClearInstances();
+	SprayMesh->SetNumCustomDataFloats(1);   // [0] = levetidsfraksjon
 	FTransform Hidden(FRotator::ZeroRotator, FVector::ZeroVector, FVector::ZeroVector);
 	for (int32 i = 0; i < SprayParticles.Num(); ++i)
 	{
@@ -869,13 +884,18 @@ void ASailboatPawn::UpdateSpray(float DeltaTime, const FVector& Forward, float T
 	AWindActor* Wind = FindWind();
 
 	// --- Emisjon: baug-skum når farten er høy ---
-	if (CurrentSpeed > SpraySpeedThreshold)
+	const bool bSprayTest = CVarSprayTest.GetValueOnGameThread() != 0;
+	if (CurrentSpeed > SpraySpeedThreshold || bSprayTest)
 	{
-		float SpeedFrac = (CurrentSpeed - SpraySpeedThreshold) / FMath::Max(1.0f, MaxBoatSpeed - SpraySpeedThreshold);
+		float SpeedFrac = bSprayTest ? 0.8f
+			: (CurrentSpeed - SpraySpeedThreshold) / FMath::Max(1.0f, MaxBoatSpeed - SpraySpeedThreshold);
 		float Rate = 45.0f * FMath::Clamp(SpeedFrac, 0.0f, 1.0f); // partikler/sekund
 		SprayEmitAccumulator += Rate * DeltaTime;
 
-		FVector Bow = BoatLoc + Forward * 130.0f;
+		// Spawn ved vannlinjen: kapselsenteret ligger ~11 uu UNDER vannflaten, og en partikkel som
+		// starter under WaterZ resirkuleres umiddelbart («landet på vannet»).
+		FVector Bow = BoatLoc + Forward * 120.0f;
+		Bow.Z = FMath::Max(BoatLoc.Z, WaterZ) + 12.0f;
 		FVector Right = FVector::CrossProduct(FVector::UpVector, Forward).GetSafeNormal();
 
 		while (SprayEmitAccumulator >= 1.0f)
@@ -885,8 +905,8 @@ void ASailboatPawn::UpdateSpray(float DeltaTime, const FVector& Forward, float T
 			FVector SpawnPos = Bow + Right * (Side * 70.0f);
 			// Sprut: bakover + utover til siden + opp, skalert med fart.
 			FVector V = -Forward * (CurrentSpeed * 0.35f)
-				+ Right * (Side * CurrentSpeed * 0.25f)
-				+ FVector(0.0f, 0.0f, FMath::FRandRange(180.0f, 320.0f) * (0.5f + SpeedFrac));
+				+ Right * (Side * CurrentSpeed * 0.3f)
+				+ FVector(0.0f, 0.0f, FMath::FRandRange(120.0f, 220.0f) * (0.5f + SpeedFrac));
 			EmitSprayParticle(SpawnPos, V, 0.8f + SpeedFrac * 0.6f);
 		}
 	}
@@ -915,6 +935,7 @@ void ASailboatPawn::UpdateSpray(float DeltaTime, const FVector& Forward, float T
 	// lever (og ingen levde forrige frame) hoppes oppdateringen helt over.
 	bool bAnyAlive = false;
 	SprayTransforms.SetNum(SprayParticles.Num(), EAllowShrinking::No);
+	const FVector CamPos = Camera ? Camera->GetComponentLocation() : BoatLoc + FVector(0, 0, 500);
 	for (int32 i = 0; i < SprayParticles.Num(); ++i)
 	{
 		FSprayParticle& P = SprayParticles[i];
@@ -926,15 +947,28 @@ void ASailboatPawn::UpdateSpray(float DeltaTime, const FVector& Forward, float T
 			P.Position += P.Velocity * DeltaTime;
 			P.Life -= DeltaTime;
 
-			// Krymp mot slutten av levetiden som «fade».
 			float LifeFrac = FMath::Clamp(P.Life / FMath::Max(0.01f, P.MaxLife), 0.0f, 1.0f);
-			float Scale = P.Size * FMath::Sin(LifeFrac * PI); // opp og ned: dukker opp og forsvinner
 
 			if (P.Position.Z < WaterZ)
 			{
 				P.Life = 0.0f; // landet på vannet → resirkuler
 			}
-			Xform = FTransform(FRotator(0.0f, P.Yaw, 0.0f), P.Position, FVector(Scale));
+			if (bSprayQuads)
+			{
+				// Planet vendes mot kameraet (normal +Z mot kameraet, rullet med partikkelens yaw).
+				// Levetidsfraksjonen går som custom data 0 til M_SprayQuad (fader i shaderen);
+				// bMarkRenderStateDirty=false her — batch-oppdateringen under laster opp alt.
+				const FVector ToCam = (CamPos - P.Position).GetSafeNormal();
+				const FRotator Facing = FRotationMatrix::MakeFromZX(ToCam, FRotator(0.0f, P.Yaw, 0.0f).Vector()).Rotator();
+				Xform = FTransform(Facing, P.Position, FVector(P.Size));
+				SprayMesh->SetCustomDataValue(i, 0, LifeFrac, /*bMarkRenderStateDirty=*/false);
+			}
+			else
+			{
+				// Kuler: krymp mot slutten av levetiden som «fade».
+				float Scale = P.Size * FMath::Sin(LifeFrac * PI);
+				Xform = FTransform(FRotator(0.0f, P.Yaw, 0.0f), P.Position, FVector(Scale));
+			}
 		}
 		else
 		{
