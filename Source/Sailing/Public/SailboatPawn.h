@@ -50,6 +50,19 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> SternShield;
 
+	/** Gulvplater i cockpiten. Skrogmodellen er åpne skall uten gulv, og havmaterialet klipper bort
+	 *  vannet inne i skroget — uten gulv ser man rett ned på sjøbunnen gjennom cockpiten. Tre plater
+	 *  fordi skroget smalner mot baugen (halvbredde 48 cm midtskips, 31 i baugen); målt fra meshen. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TArray<TObjectPtr<UStaticMeshComponent>> CockpitFloorPlates;
+
+	/** Plater i BoatMesh-lokale cm: X = (xmin, xmax), Y = halvbredde. Skrogbunnen ligger på z −10..−5. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Visual")
+	TArray<FVector> CockpitFloorPlateSpecs = { FVector(-108.0f, 45.0f, 39.0f), FVector(45.0f, 85.0f, 34.0f), FVector(85.0f, 105.0f, 29.0f) };
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Visual")
+	float CockpitFloorZ = -3.0f;
+
 	/** Målpunkt for kamera (over båten) slik at båten havner lavere i bildet. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<USceneComponent> CameraTarget;

@@ -1,5 +1,6 @@
 #include "SailboatPawn.h"
 #include "Sailing.h"
+#include "UObject/ConstructorHelpers.h"
 #include "SailingPlayerController.h"
 #include "WindActor.h"
 #include "Components/SceneComponent.h"
@@ -47,6 +48,23 @@ ASailboatPawn::ASailboatPawn()
 	BoatMesh->SetupAttachment(CapsuleComp);
 	BoatMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	BoatMesh->SetCastShadow(false);   // se BeginPlay
+
+	// Gulv i cockpiten (se header). Kuber fra motoren, skalert i BeginPlay.
+	{
+		static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(TEXT("/Engine/BasicShapes/Cube"));
+		for (int32 i = 0; i < 3; ++i)
+		{
+			UStaticMeshComponent* Plate = CreateDefaultSubobject<UStaticMeshComponent>(*FString::Printf(TEXT("CockpitFloor%d"), i));
+			Plate->SetupAttachment(BoatMesh);
+			Plate->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			Plate->SetCastShadow(false);
+			if (Cube.Succeeded())
+			{
+				Plate->SetStaticMesh(Cube.Object);
+			}
+			CockpitFloorPlates.Add(Plate);
+		}
+	}
 
 	// Plan bak i båten (stern) – ugjennomtrengelig, så man ikke ser «inn» bakfra
 	SternShield = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("SternShield"));
@@ -108,6 +126,25 @@ void ASailboatPawn::BeginPlay()
 		// ShowFlag.DynamicShadows 0. Sol og himmel skygger fortsatt skroget selv (self-shadow er av
 		// samme flagg, men det tapet er knapt synlig på en hvit Optimist).
 		BoatMesh->SetCastShadow(false);
+
+		// Gulvplater: kuben er 100 cm; skaler til platens plan og 2 cm tykkelse. Skrogets materiale
+		// (hvit), så de leses som innsiden av båten.
+		UMaterialInterface* FloorMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ModelsV2/M_Cockpit.M_Cockpit"));
+		if (!FloorMat)
+		{
+			FloorMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ModelsV2/M_Hull.M_Hull"));
+		}
+		for (int32 i = 0; i < CockpitFloorPlates.Num() && i < CockpitFloorPlateSpecs.Num(); ++i)
+		{
+			const FVector& Spec = CockpitFloorPlateSpecs[i];
+			UStaticMeshComponent* Plate = CockpitFloorPlates[i];
+			Plate->SetRelativeLocation(FVector((Spec.X + Spec.Y) * 0.5f, 0.0f, CockpitFloorZ));
+			Plate->SetRelativeScale3D(FVector((Spec.Y - Spec.X) / 100.0f, Spec.Z / 50.0f, 0.02f));
+			if (FloorMat)
+			{
+				Plate->SetMaterial(0, FloorMat);
+			}
+		}
 	}
 	else
 	{
