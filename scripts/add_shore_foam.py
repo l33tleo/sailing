@@ -11,6 +11,9 @@ mot skumfarge/-ruhet, styrt av:
   bånd    = 1 − saturate(avstand_til_kyst / FoamWidth), fra T_ShoreDistance (verdens-XY)
   bølging = 0,5 + 0,5·sin(Time·FoamSpeed − avstand·FoamPhase)   (skummet «trekker» inn mot land)
   struktur = panorerende, sømløs støytekstur
+pluss SKROGSKUM: et bånd (HullFoamWidth, andel av boksens halvmål) rett utenfor skrogmasken
+(HullMaskPos/Fwd/HalfExtent), sterkest ved baugen og strømmende akterover, skalert med
+HullFoamStrength som ASailboatPawn::UpdateHullWaterMask setter ∝ fart hver frame.
 Alle noder som legges inn får desc «SHOREFOAM», så en ny kjøring fjerner de gamle først.
 
 NB: get_material_expression_input_names() på Make-noden krasjet editoren interaktivt (CLAUDE.md),
@@ -154,6 +157,45 @@ def main():
     # NB: DepthFade (kontaktlinje i snittet vann/terreng) FORSØKT og forkastet: i Single Layer Water
     # leser den 0 overalt (scenedybden bak vannet er ikke tilgjengelig i dette passet), og hele
     # havflaten ble skum.
+
+    # --- Skrogskum: et smalt bånd rett utenfor skrogmasken (HullMaskPos/Fwd/HalfExtent settes hver
+    # frame av ASailboatPawn::UpdateHullWaterMask, sammen med HullFoamStrength ∝ fart). Sterkest
+    # ved baugen, strømmer akterover. Samme-navns parameternoder deler verdi med maskens.
+    hull_pos = g.node(unreal.MaterialExpressionVectorParameter, parameter_name="HullMaskPos",
+                      default_value=unreal.LinearColor(0.0, 0.0, 0.0, 0.0))
+    hull_fwd = g.node(unreal.MaterialExpressionVectorParameter, parameter_name="HullMaskFwd",
+                      default_value=unreal.LinearColor(1.0, 0.0, 0.0, 0.0))
+    hull_ext = g.node(unreal.MaterialExpressionVectorParameter, parameter_name="HullMaskHalfExtent",
+                      default_value=unreal.LinearColor(109.0, 50.0, 0.0, 0.0))
+    rel = g.binop(unreal.MaterialExpressionSubtract, g.mask(wp, r=True, g=True), g.mask(hull_pos, r=True, g=True))
+    fwd_xy = g.mask(hull_fwd, r=True, g=True)
+    right_xy = g.node(unreal.MaterialExpressionAppendVector)
+    g.link(g.binop(unreal.MaterialExpressionMultiply, g.mask(hull_fwd, g=True), -1.0), right_xy, "A")
+    g.link(g.mask(hull_fwd, r=True), right_xy, "B")
+    dx = g.node(unreal.MaterialExpressionDotProduct); g.link(rel, dx, "A"); g.link(fwd_xy, dx, "B")
+    dy = g.node(unreal.MaterialExpressionDotProduct); g.link(rel, dy, "A"); g.link(right_xy, dy, "B")
+    ext_x, ext_y = g.mask(hull_ext, r=True), g.mask(hull_ext, g=True)
+    nx = g.binop(unreal.MaterialExpressionDivide, g.link(dx, g.node(unreal.MaterialExpressionAbs), ""), ext_x)
+    ny = g.binop(unreal.MaterialExpressionDivide, g.link(dy, g.node(unreal.MaterialExpressionAbs), ""), ext_y)
+    dbox = g.node(unreal.MaterialExpressionMax); g.link(nx, dbox, "A"); g.link(ny, dbox, "B")   # 1 på maskekanten
+    # Maskeboksen (109×50) ligger INNENFOR skrogets fotavtrykk (115×56,5), så båndet må begynne et
+    # stykke utenfor kanten (HullFoamInner) for å synes: 1,1 → 55 cm tvers, 120 cm langs.
+    hband = g.binop(unreal.MaterialExpressionDivide,
+                    g.binop(unreal.MaterialExpressionSubtract, dbox, g.param("HullFoamInner", 1.1)),
+                    g.param("HullFoamWidth", 0.5))
+    hband = g.link(g.link(hband, g.node(unreal.MaterialExpressionOneMinus), ""), g.node(unreal.MaterialExpressionSaturate), "")
+    bow_w = g.binop(unreal.MaterialExpressionAdd, 0.5, g.binop(unreal.MaterialExpressionMultiply, 0.5,
+                    g.link(g.binop(unreal.MaterialExpressionDivide, dx, ext_x), g.node(unreal.MaterialExpressionSaturate), "")))
+    huv = g.node(unreal.MaterialExpressionAppendVector)
+    g.link(g.binop(unreal.MaterialExpressionAdd, dx, g.binop(unreal.MaterialExpressionMultiply, time, g.param("HullFoamFlow", 120.0))), huv, "A")
+    g.link(dy, huv, "B")
+    hnoise = g.node(unreal.MaterialExpressionTextureSample, texture=noise_tex,
+                    sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_LINEAR_GRAYSCALE)
+    g.link(g.binop(unreal.MaterialExpressionDivide, huv, g.param("HullFoamNoiseTileUU", 260.0)), hnoise, "UVs")
+    hull = g.binop(unreal.MaterialExpressionMultiply, hband, bow_w)
+    hull = g.binop(unreal.MaterialExpressionMultiply, hull, g.binop(unreal.MaterialExpressionMultiply, g.mask(hnoise, r=True), 1.8))
+    hull = g.binop(unreal.MaterialExpressionMultiply, hull, g.param("HullFoamStrength", 0.0))
+    foam = g.binop(unreal.MaterialExpressionAdd, foam, hull)
     foam = g.link(foam, g.node(unreal.MaterialExpressionSaturate), "")
 
     foam_color = g.node(unreal.MaterialExpressionVectorParameter, parameter_name="FoamColor",

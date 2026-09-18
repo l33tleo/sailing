@@ -4,6 +4,7 @@
 #include "SailingPlayerController.h"
 #include "WindActor.h"
 #include "SailRigComponent.h"
+#include "WakeRibbonComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -25,6 +26,11 @@
 static TAutoConsoleVariable<float> CVarRudderTestDeg(
 	TEXT("sailing.RudderTestDeg"), -999.0f,
 	TEXT("Tvinger rorvinkelen (grader, + = styrbordsving). -999 = av."));
+
+// A/B: slår kjølvann + skrogskum av (--exec "sailing.Wake 0") for å måle kostnaden.
+static TAutoConsoleVariable<int32> CVarWake(
+	TEXT("sailing.Wake"), 1,
+	TEXT("1 = kjølvann og skrogskum på (standard), 0 = av."));
 
 // Testkrok: låser kameraets orbit-yaw (grader rundt båten, 0 = bakfra) for skjermbilder fra siden.
 static TAutoConsoleVariable<float> CVarCamYawTest(
@@ -129,6 +135,9 @@ ASailboatPawn::ASailboatPawn()
 	SprayMesh->SetCastShadow(false);
 	SprayMesh->SetMobility(EComponentMobility::Movable);
 
+	// Kjølvann (absolutt transform, flyttes til akterpunktet hver frame — se UWakeRibbonComponent).
+	WakeRibbon = CreateDefaultSubobject<UWakeRibbonComponent>(TEXT("WakeRibbon"));
+	WakeRibbon->SetupAttachment(CapsuleComp);
 }
 
 void ASailboatPawn::BeginPlay()
@@ -211,6 +220,18 @@ void ASailboatPawn::BeginPlay()
 	{
 		SternShield->SetVisibility(false);
 		SternShield->SetHiddenInGame(true);
+	}
+
+	if (WakeRibbon)
+	{
+		UMaterialInterface* WakeMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Materials/Water/M_Wake.M_Wake"));
+		if (!WakeMat)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[KJOLVANN] /Game/Materials/Water/M_Wake mangler (scripts/create_wake_material.py) — kjølvann av"));
+			bEnableWake = false;
+		}
+		WakeRibbon->InitRibbon(WakeMat);
+		WakeRibbon->SetVisibility(bEnableWake);
 	}
 
 	// Fysikkmasse + senket tyngdepunkt (hindrer urealistisk kantring i kast).
@@ -443,6 +464,22 @@ void ASailboatPawn::Tick(float DeltaTime)
 	// genererer ikke pålitelige overlap-events mot Water-pluginets QUERY_ONLY-kollisjon).
 	ApplyPontoonBuoyancy(DeltaTime);
 
+	// 4a. Kjølvann: skum slippes fra et punkt like akter for akterspeilet (utenfor skrogmasken).
+	const bool bWakeOn = bEnableWake && CVarWake.GetValueOnGameThread() != 0;
+	if (WakeRibbon && WakeRibbon->IsVisible() != bWakeOn)
+	{
+		WakeRibbon->SetVisibility(bWakeOn);
+	}
+	if (bWakeOn && WakeRibbon && BoatMesh)
+	{
+		FVector FlatFwd = Forward;
+		FlatFwd.Z = 0.0f;
+		FlatFwd = FlatFwd.GetSafeNormal();
+		const FVector FlatRight(-FlatFwd.Y, FlatFwd.X, 0.0f);
+		const FVector Stern = BoatMesh->GetComponentLocation() + FlatFwd * WakeStartOffsetX;
+		WakeRibbon->UpdateRibbon(Stern, FlatRight, CurrentSpeed, GetWorld()->GetTimeSeconds(), FindOceanBody());
+	}
+
 	// 4c. Sikkerhetsnett mot å være inne i en landmasse. Landmassene er hule skall
 	// (kollisjon kun langs ytterkysten), så havner båten først på innsiden — via en
 	// lagret posisjon, eller en sjelden gjennomkryping — kan den seile fritt i det tomme
@@ -531,6 +568,12 @@ void ASailboatPawn::Tick(float DeltaTime)
 			ApparentWindAngleDeg, ApparentWindStr, SailRig->SheetLimitDeg, SailRig->bAutoTrim ? TEXT("A") : TEXT("M"),
 			SailRig->BoomAngleDeg, SailRig->AngleOfAttackDeg, SailRig->TrimEfficiency, SailRig->SailFill,
 			SailRig->Flutter, SailRig->bJibing ? TEXT(" JIBB") : TEXT(""), RudderAngleDeg, CurrentSailForce);
+		if (bEnableWake && WakeRibbon)
+		{
+			UE_LOG(LogTemp, Log, TEXT("[KJOLVANN] prover=%d eldste=%.1fs skrogskum=%.2f"),
+				WakeRibbon->GetNumActiveSamples(), WakeRibbon->GetOldestAge(Time),
+				HullFoamMax * FMath::Clamp(FMath::Abs(CurrentSpeed) / HullFoamFullSpeed, 0.0f, 1.0f));
+		}
 	}
 
 	// 4b. Skum/spray
@@ -661,6 +704,10 @@ void ASailboatPawn::UpdateHullWaterMask()
 	WaterMID->SetVectorParameterValue(TEXT("HullMaskPos"), FLinearColor(Center.X, Center.Y, Center.Z, 0.0f));
 	WaterMID->SetVectorParameterValue(TEXT("HullMaskFwd"), FLinearColor(Fwd.X, Fwd.Y, 0.0f, 0.0f));
 	WaterMID->SetVectorParameterValue(TEXT("HullMaskHalfExtent"), FLinearColor(HullMaskHalfExtent.X, HullMaskHalfExtent.Y, 0.0f, 0.0f));
+	// Skrogskum rundt maskeboksen (scripts/add_shore_foam.py), sterkere jo fortere båten går.
+	const bool bFoamOn = bEnableWake && CVarWake.GetValueOnGameThread() != 0;
+	WaterMID->SetScalarParameterValue(TEXT("HullFoamStrength"),
+		bFoamOn ? HullFoamMax * FMath::Clamp(FMath::Abs(CurrentSpeed) / HullFoamFullSpeed, 0.0f, 1.0f) : 0.0f);
 }
 
 void ASailboatPawn::ApplyPontoonBuoyancy(float DeltaTime)

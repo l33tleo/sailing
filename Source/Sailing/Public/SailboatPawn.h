@@ -15,6 +15,7 @@ class UInstancedStaticMeshComponent;
 class UPrimitiveComponent;
 class UWaterBodyComponent;
 class USailRigComponent;
+class UWakeRibbonComponent;
 
 /** Én skum-/spray-partikkel (verdensrom). Simuleres på CPU, tegnes via instanced mesh. */
 struct FSprayParticle
@@ -114,6 +115,24 @@ public:
 	/** Instanced mesh-pool for skum/spray (baug-skum + vinddrift i kast). */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UInstancedStaticMeshComponent> SprayMesh;
+
+	/** Kjølvann-strimmel bak akterspeilet (se UWakeRibbonComponent). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UWakeRibbonComponent> WakeRibbon;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Wake")
+	bool bEnableWake = true;
+
+	/** Hvor langt akter for akterspeilet (uu) strimmelen starter — utenfor skrogmasken i havmaterialet. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Wake")
+	float WakeStartOffsetX = -135.0f;
+
+	/** Skrogskum i havmaterialet (HullFoamStrength) ved full fart; skaleres med saturate(fart/HullFoamFullSpeed). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Wake", meta = (ClampMin = "0"))
+	float HullFoamMax = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Wake", meta = (ClampMin = "1"))
+	float HullFoamFullSpeed = 300.0f;
 
 	// Spray-tuning. Av som standard: skum-kulene (Engine-sfærer) så urealistiske ut og
 	// flimret (hundrevis som popper inn/ut). Kan slås på igjen i editoren om ønskelig.
