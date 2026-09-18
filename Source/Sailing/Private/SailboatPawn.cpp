@@ -3,6 +3,7 @@
 #include "UObject/ConstructorHelpers.h"
 #include "SailingPlayerController.h"
 #include "WindActor.h"
+#include "SailRigComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -18,6 +19,12 @@
 #include "Kismet/GameplayStatics.h"
 #include "ProceduralMeshComponent.h"
 #include "Engine/Engine.h"   // DEBUG (midlertidig): GEngine->AddOnScreenDebugMessage
+#include "HAL/IConsoleManager.h"
+
+// Testkrok: tvinger rorvinkelen for skjermbildeverifikasjon (--exec "sailing.RudderTestDeg 25"). -999 = av.
+static TAutoConsoleVariable<float> CVarRudderTestDeg(
+	TEXT("sailing.RudderTestDeg"), -999.0f,
+	TEXT("Tvinger rorvinkelen (grader, + = styrbordsving). -999 = av."));
 
 ASailboatPawn::ASailboatPawn()
 {
@@ -48,6 +55,25 @@ ASailboatPawn::ASailboatPawn()
 	BoatMesh->SetupAttachment(CapsuleComp);
 	BoatMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	BoatMesh->SetCastShadow(false);   // se BeginPlay
+
+	// Rigg: mastepivot under BoatMesh, bom/sprit/seil-meshet under pivoten igjen. Ror med pivot i
+	// rorakselen. Meshene settes i BeginPlay hvis de splittede assetene finnes; ellers forblir de
+	// tomme og det kombinerte meshet i BoatMesh viser (stillestående) seil og ror som før.
+	SailRig = CreateDefaultSubobject<USailRigComponent>(TEXT("SailRig"));
+	SailRig->SetupAttachment(BoatMesh);
+	SailRig->SetRelativeLocation(SailRig->MastPivotLocal);
+
+	RigMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RigMesh"));
+	RigMesh->SetupAttachment(SailRig);
+	RigMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	RigMesh->SetCastShadow(false);   // samme begrunnelse som BoatMesh (se BeginPlay)
+	SailRig->RigMesh = RigMesh;
+
+	RudderMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RudderMesh"));
+	RudderMesh->SetupAttachment(BoatMesh);
+	RudderMesh->SetRelativeLocation(RudderPivotLocal);
+	RudderMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	RudderMesh->SetCastShadow(false);
 
 	// Gulv i cockpiten (se header). Kuber fra motoren, skalert i BeginPlay.
 	{
@@ -104,13 +130,36 @@ void ASailboatPawn::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// Last kombinert Optimist-mesh (ny modell fra Blender)
-	UStaticMesh* BoatCombinedMesh = LoadObject<UStaticMesh>(nullptr,
-		TEXT("/Game/ModelsV2/Optimist3735.Optimist3735"));
+	// Splittet Optimist (skrog / rigg / ror som egne assets, se scripts/import_boat_parts.py) hvis alle
+	// tre finnes; ellers det gamle kombinerte meshet med stillestående rigg og ror.
+	UStaticMesh* HullPartMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/ModelsV2/SM_Boat_Hull.SM_Boat_Hull"));
+	UStaticMesh* RigPartMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/ModelsV2/SM_Boat_Rig.SM_Boat_Rig"));
+	UStaticMesh* RudderPartMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/ModelsV2/SM_Boat_Rudder.SM_Boat_Rudder"));
+	const bool bSplitParts = HullPartMesh && HullPartMesh->GetNumLODs() > 0
+		&& RigPartMesh && RigPartMesh->GetNumLODs() > 0
+		&& RudderPartMesh && RudderPartMesh->GetNumLODs() > 0;
+
+	UStaticMesh* BoatCombinedMesh = bSplitParts ? HullPartMesh
+		: LoadObject<UStaticMesh>(nullptr, TEXT("/Game/ModelsV2/Optimist3735.Optimist3735"));
+
+	if (bSplitParts)
+	{
+		RigMesh->SetStaticMesh(RigPartMesh);
+		RudderMesh->SetStaticMesh(RudderPartMesh);
+		SailRig->SetRelativeLocation(SailRig->MastPivotLocal);
+		RudderMesh->SetRelativeLocation(RudderPivotLocal);
+		SailRig->InitSailMaterial();
+		UE_LOG(LogTemp, Log, TEXT("[RIGG] Splittet båt: skrog=%d rigg=%d ror=%d trekanter"),
+			HullPartMesh->GetNumTriangles(0), RigPartMesh->GetNumTriangles(0), RudderPartMesh->GetNumTriangles(0));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("[RIGG] fallback kombinert mesh (SM_Boat_Hull/Rig/Rudder mangler) — rigg og ror står stille"));
+	}
 
 	if (BoatCombinedMesh && BoatCombinedMesh->GetNumLODs() > 0 && BoatMesh)
 	{
-		UE_LOG(LogTemp, Log, TEXT("SailboatPawn: Bruker kombinert Optimist-mesh fra ModelsV2: %s"), *BoatCombinedMesh->GetPathName());
+		UE_LOG(LogTemp, Log, TEXT("SailboatPawn: Bruker Optimist-mesh fra ModelsV2: %s"), *BoatCombinedMesh->GetPathName());
 		BoatMesh->SetStaticMesh(BoatCombinedMesh);
 		BoatMesh->SetVisibility(true);
 		BoatMesh->SetHiddenInGame(false);
@@ -180,12 +229,36 @@ void ASailboatPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputCompon
 		{
 			EIC->BindAction(CameraAction, ETriggerEvent::Triggered, this, &ASailboatPawn::HandleCamera);
 		}
+		if (SheetAction)
+		{
+			EIC->BindAction(SheetAction, ETriggerEvent::Triggered, this, &ASailboatPawn::HandleSheet);
+		}
+		if (AutoTrimAction)
+		{
+			EIC->BindAction(AutoTrimAction, ETriggerEvent::Started, this, &ASailboatPawn::HandleAutoTrim);
+		}
 	}
 }
 
 void ASailboatPawn::HandleTurn(const FInputActionValue& Value)
 {
 	TurnInput = Value.Get<float>();
+}
+
+void ASailboatPawn::HandleSheet(const FInputActionValue& Value)
+{
+	if (SailRig)
+	{
+		SailRig->AddSheetInput(Value.Get<float>());
+	}
+}
+
+void ASailboatPawn::HandleAutoTrim(const FInputActionValue& Value)
+{
+	if (SailRig)
+	{
+		SailRig->ToggleAutoTrim();
+	}
 }
 
 void ASailboatPawn::HandleCamera(const FInputActionValue& Value)
@@ -218,26 +291,48 @@ void ASailboatPawn::Tick(float DeltaTime)
 
 	UpdateHullWaterMask();
 
-	// 1. Sving: sett Z-komponenten av vinkelhastigheten direkte. Rull/pitch (X/Y) forblir
-	//    UENDRET av dette — de styres kun av Buoyancy/bølger (naturlig krengning/stamping).
-	FVector AngVel = CapsuleComp->GetPhysicsAngularVelocityInDegrees();
-	AngVel.Z = TurnInput * TurnSpeed;
-	CapsuleComp->SetPhysicsAngularVelocityInDegrees(AngVel);
-	TurnInput = 0.0f;
-
-	// 2. Tilsynelatende vind (apparent wind) og polar-kurve — uendret logikk, men CurrentSpeed
-	//    leses nå fra fysikkhastigheten i stedet for en egen integrert variabel.
 	FVector Forward = GetActorForwardVector();
+	const FVector Right = FVector::CrossProduct(FVector::UpVector, Forward).GetSafeNormal();
 	CurrentSpeed = FVector::DotProduct(CapsuleComp->GetPhysicsLinearVelocity(), Forward);
 
+	// 1. Ror: rorvinkelen legges over med begrenset hastighet mens tasten holdes og går tilbake mot
+	//    midtstilling når den slippes. Svingraten settes som Z-komponenten av vinkelhastigheten direkte;
+	//    rull/pitch (X/Y) forblir UENDRET — de styres kun av oppdrift/bølger. Roret virker svakere i
+	//    stillstand (RudderMinSpeedFactor > 0 så båten kan komme seg ut av jern).
+	{
+		const float RudderTarget = TurnInput * MaxRudderDeg;
+		const float RudderRate = FMath::IsNearlyZero(TurnInput) ? RudderReturnRateDegPerS : RudderRateDegPerS;
+		RudderAngleDeg = FMath::FInterpConstantTo(RudderAngleDeg, RudderTarget, DeltaTime, RudderRate);
+		const float RudderTest = CVarRudderTestDeg.GetValueOnGameThread();
+		if (RudderTest > -998.0f)
+		{
+			RudderAngleDeg = FMath::Clamp(RudderTest, -MaxRudderDeg, MaxRudderDeg);
+		}
+		const float SpeedFactor = FMath::Lerp(RudderMinSpeedFactor, 1.0f,
+			FMath::Clamp(FMath::Abs(CurrentSpeed) / RudderFullEffectSpeed, 0.0f, 1.0f));
+		FVector AngVel = CapsuleComp->GetPhysicsAngularVelocityInDegrees();
+		AngVel.Z = (RudderAngleDeg / MaxRudderDeg) * TurnSpeed * SpeedFactor;
+		CapsuleComp->SetPhysicsAngularVelocityInDegrees(AngVel);
+		TurnInput = 0.0f;
+		// Positiv rorvinkel = styrbordsving: bladet (akter for pivot) skal til styrbord, kulten til
+		// babord — negativ yaw gir det (samme utledning som bommen i USailRigComponent::ApplyToMesh).
+		RudderMesh->SetRelativeRotation(FRotator(0.0f, -RudderAngleDeg, 0.0f));
+	}
+
+	// 2. Tilsynelatende vind (apparent wind), rigg og polar-kurve. Vinden samples ÉN gang her og
+	//    lagres som medlemmer (HUD/spray/rigg leser dem).
 	AWindActor* Wind = FindWind();
 	if (Wind)
 	{
 		// Lokal vind ved båtens posisjon: fanger kast-flekker og vri der båten faktisk er.
-		FVector TrueWindVec = Wind->GetWindVelocityAt(GetActorLocation());
+		// NB: AWindActor sine vektorer peker MOT vindkilden (dit vinden kommer fra) — kast advekteres
+		// og sprut driver langs -WindDir. Tilsynelatende vind i samme konvensjon er derfor
+		// «fra»-vektor PLUSS båtens hastighet (fartsvinden kommer forfra): den dreier forover og øker
+		// når båten går mot vinden. Tidligere sto det minus, som lot den dreie akterover med farten.
+		TrueWindVec = Wind->GetWindVelocityAt(GetActorLocation());
 		FVector BoatVelocity = Forward * CurrentSpeed;
-		FVector ApparentWindVec = TrueWindVec - BoatVelocity;
-		float ApparentWindStr = ApparentWindVec.Size();
+		ApparentWindVec = TrueWindVec + BoatVelocity;
+		ApparentWindStr = ApparentWindVec.Size();
 
 		FVector WindDir;
 		float WindStr;
@@ -252,8 +347,14 @@ void ASailboatPawn::Tick(float DeltaTime)
 			WindStr = ApparentWindStr;
 		}
 
-		float CosAngle = FVector::DotProduct(Forward, WindDir);
-		float AngleToWind = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(CosAngle, -1.0f, 1.0f)));
+		// Signert vinkel fra baugen til retningen vinden kommer fra: positiv når vinden kommer inn
+		// over styrbord side.
+		ApparentWindAngleDeg = FMath::RadiansToDegrees(FMath::Atan2(
+			FVector::DotProduct(Right, WindDir), FVector::DotProduct(Forward, WindDir)));
+		ApparentWindSideSign = ApparentWindAngleDeg >= 0.0f ? 1.0f : -1.0f;
+		float AngleToWind = FMath::Abs(ApparentWindAngleDeg);
+
+		SailRig->UpdateRig(ApparentWindAngleDeg, ApparentWindStr, DeltaTime);
 
 		float ForceMultiplier = 0.0f;
 		if (AngleToWind < NoGoZoneAngle)
@@ -274,12 +375,16 @@ void ASailboatPawn::Tick(float DeltaTime)
 			ForceMultiplier = FMath::Lerp(BroadReachForce, RunningForce, T);
 		}
 
-		CurrentSailForce = WindStr * FMath::Pow(ForceMultiplier, PolarSharpness);
+		// Trim-effektiviteten er 1 under auto-trim (stasjonært); manuell feiltrim og flagring i jern
+		// gir mindre kraft.
+		CurrentSailForce = WindStr * FMath::Pow(ForceMultiplier, PolarSharpness) * SailRig->TrimEfficiency;
 	}
 	else
 	{
 		CurrentSailForce = 0.0f;
+		SailRig->UpdateRig(0.0f, 0.0f, DeltaTime);
 	}
+	SailRig->ApplyToMesh();
 
 	// 3. Fremdrift som massefri akselerasjon (bAccelChange) — bevarer dagens akselerasjonsfølelse
 	//    uavhengig av BoatMassKg. Krengningsmoment er et SEPARAT, mindre bidrag (AddTorque) fra
@@ -287,8 +392,9 @@ void ASailboatPawn::Tick(float DeltaTime)
 	float Drag = DragCoefficient * FMath::Square(FMath::Max(0.0f, CurrentSpeed));
 	CapsuleComp->AddForce(Forward * (CurrentSailForce - Drag) * SailForceAccelScale, NAME_None, /*bAccelChange=*/true);
 
-	const FVector Right = FVector::CrossProduct(FVector::UpVector, Forward).GetSafeNormal();
-	const float HeelTorqueSign = (Wind ? FVector::DotProduct(Right, Wind->GetWindDirection()) : 0.0f) >= 0.0f ? 1.0f : -1.0f;
+	// Krengning mot le for den TILSYNELATENDE vinden (samme side som bommen og seilbukten). Avviker
+	// fra sann vind bare på lens «by the lee», og der skal krengning og bukt uansett følge bommen.
+	const float HeelTorqueSign = ApparentWindSideSign;
 	CapsuleComp->AddTorqueInDegrees(Forward * CurrentSailForce * HeelTorqueScale * HeelTorqueSign,
 		NAME_None, /*bAccelChange=*/false);
 
@@ -415,6 +521,10 @@ void ASailboatPawn::Tick(float DeltaTime)
 		UE_LOG(LogTemp, Log, TEXT("[BAATPOS] pos=(%.0f,%.0f,%.0f)  fart=%.0f  pitch=%.1f rull=%.1f  neds=%.1f"),
 			GetActorLocation().X, GetActorLocation().Y, GetActorLocation().Z, CurrentSpeed,
 			GetActorRotation().Pitch, GetActorRotation().Roll, SurfaceZ - GetActorLocation().Z);
+		UE_LOG(LogTemp, Log, TEXT("[RIGG] awa=%+.0f str=%.0f skjot=%.0f%s bom=%+.0f aoa=%.0f eff=%.2f fyll=%.2f flagr=%.2f%s ror=%+.0f kraft=%.0f"),
+			ApparentWindAngleDeg, ApparentWindStr, SailRig->SheetLimitDeg, SailRig->bAutoTrim ? TEXT("A") : TEXT("M"),
+			SailRig->BoomAngleDeg, SailRig->AngleOfAttackDeg, SailRig->TrimEfficiency, SailRig->SailFill,
+			SailRig->Flutter, SailRig->bJibing ? TEXT(" JIBB") : TEXT(""), RudderAngleDeg, CurrentSailForce);
 	}
 
 	// 4b. Skum/spray

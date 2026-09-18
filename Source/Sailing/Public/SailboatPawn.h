@@ -14,6 +14,7 @@ class AWindActor;
 class UInstancedStaticMeshComponent;
 class UPrimitiveComponent;
 class UWaterBodyComponent;
+class USailRigComponent;
 
 /** Én skum-/spray-partikkel (verdensrom). Simuleres på CPU, tegnes via instanced mesh. */
 struct FSprayParticle
@@ -42,9 +43,46 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UCapsuleComponent> CapsuleComp;
 
-	/** Kombinert Optimist-båt mesh (skrog, mast, seil, ror osv. i ett). */
+	/** Skroget (skrog, mast, sverd, mastetofte). Inntil delene er splittet (fase 1) er dette det
+	 *  kombinerte Optimist-meshet med seil og ror bakt inn. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> BoatMesh;
+
+	/** Mastepivot: bom/sprit/seil svinger om denne (se USailRigComponent). Festet til BoatMesh på MastPivotLocal. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<USailRigComponent> SailRig;
+
+	/** Bom + sprit + seil som ett mesh med pivot i mastaksen. Tomt inntil SM_Boat_Rig finnes. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UStaticMeshComponent> RigMesh;
+
+	/** Ror + rorhode + rorkult som ett mesh med pivot i rorakselen. Tomt inntil SM_Boat_Rudder finnes. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UStaticMeshComponent> RudderMesh;
+
+	/** Rorakselen i BoatMesh-lokale cm (rorhodet sitter på akterspeilet ved x≈-119 i Blender-masteren). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Rudder")
+	FVector RudderPivotLocal = FVector(-119.0f, 0.0f, 0.0f);
+
+	/** Største rorutslag (grader). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Rudder", meta = (ClampMin = "5", ClampMax = "60"))
+	float MaxRudderDeg = 35.0f;
+
+	/** Hvor fort roret legges over når styretasten holdes (grader/s). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Rudder", meta = (ClampMin = "1"))
+	float RudderRateDegPerS = 140.0f;
+
+	/** Hvor fort roret går tilbake mot midtstilling når tasten slippes (grader/s). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Rudder", meta = (ClampMin = "1"))
+	float RudderReturnRateDegPerS = 90.0f;
+
+	/** Andel av full rorvirkning i stillstand (0 = roret virker ikke uten fart; >0 for spillbarhet ut av jern). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Rudder", meta = (ClampMin = "0", ClampMax = "1"))
+	float RudderMinSpeedFactor = 0.35f;
+
+	/** Fart (uu/s) der roret har full virkning. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Rudder", meta = (ClampMin = "1"))
+	float RudderFullEffectSpeed = 300.0f;
 
 	/** Plan bak i båten (stern) med ugjennomtrengelig materiale – blokkerer «innsikt» bakfra. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
@@ -234,6 +272,14 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputAction> CameraAction;
 
+	/** Skjøt: +1 slakk, -1 hal inn (holdes). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+	TObjectPtr<UInputAction> SheetAction;
+
+	/** Slår auto-trim av/på. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+	TObjectPtr<UInputAction> AutoTrimAction;
+
 	// State
 	UPROPERTY(BlueprintReadOnly, Category = "Sailing|State")
 	float CurrentSailForce = 0.0f;
@@ -242,9 +288,36 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Sailing|State")
 	float CurrentSpeed = 0.0f;
 
+	// Vind ved båten, beregnet ÉN gang per Tick. HUD/spray/rigg leser disse i stedet for å sample
+	// Perlin-vindfeltet på nytt. Vektorene peker dit vinden BLÅSER (vindhastighet i uu/s).
+	UPROPERTY(BlueprintReadOnly, Category = "Sailing|State")
+	FVector TrueWindVec = FVector::ZeroVector;
+
+	/** Tilsynelatende vind = sann vind - båtens hastighet. */
+	UPROPERTY(BlueprintReadOnly, Category = "Sailing|State")
+	FVector ApparentWindVec = FVector::ZeroVector;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Sailing|State")
+	float ApparentWindStr = 0.0f;
+
+	/** Signert vinkel (-180..180) mellom baugen og retningen vinden KOMMER fra. Positiv = vind fra styrbord.
+	 *  0 = i jern, ±180 = lens. Bruker sann vindretning når tilsynelatende vind er ~0. */
+	UPROPERTY(BlueprintReadOnly, Category = "Sailing|State")
+	float ApparentWindAngleDeg = 0.0f;
+
+	/** +1 vind fra styrbord, -1 fra babord (fortegnet på ApparentWindAngleDeg). */
+	UPROPERTY(BlueprintReadOnly, Category = "Sailing|State")
+	float ApparentWindSideSign = 1.0f;
+
+	/** Rorvinkel (grader), positiv = styrbordsving. */
+	UPROPERTY(BlueprintReadOnly, Category = "Sailing|State")
+	float RudderAngleDeg = 0.0f;
+
 	// Input handlers (public so PlayerController can bind them)
 	void HandleTurn(const FInputActionValue& Value);
 	void HandleCamera(const FInputActionValue& Value);
+	void HandleSheet(const FInputActionValue& Value);
+	void HandleAutoTrim(const FInputActionValue& Value);
 
 private:
 

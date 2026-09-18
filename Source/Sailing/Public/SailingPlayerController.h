@@ -53,5 +53,11 @@ private:
 	UPROPERTY()
 	TObjectPtr<UInputAction> CameraAction;
 
+	UPROPERTY()
+	TObjectPtr<UInputAction> SheetAction;
+
+	UPROPERTY()
+	TObjectPtr<UInputAction> AutoTrimAction;
+
 	void CreateInputAssets();
 };
