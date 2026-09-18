@@ -233,6 +233,13 @@ def build(tex):
     color = g.lerp(near, ortho_rgb, g.mul(far, ortho_ok))
     # Våtbånd: mørkere og blankere fra sjøbunn til litt over vannlinjen.
     color = g.mul(color, g.lerp(g.const(1.0), g.param("WetDarken", 0.55), wet))
+    # Sjøbunn: under vann går fargen mot mørk tang/mudder med dybden, uten fototoning (flyfotoet
+    # av havflaten er lyst/gult). Ellers ser bunnen ut som en gul flekk der båtens skygge fjerner
+    # speilingen i vannflaten.
+    submerged = g.one_minus(g.ramp(height_m, g.param("SeabedDeepM", -5.0), g.param("SeabedShallowM", -0.3)))
+    seabed_col = g.node(unreal.MaterialExpressionVectorParameter, parameter_name="SeabedColor",
+                        default_value=unreal.LinearColor(0.045, 0.07, 0.05, 1.0))
+    color = g.lerp(color, seabed_col, submerged)
     mel.connect_material_property(color, "", unreal.MaterialProperty.MP_BASE_COLOR)
 
     rough = g.lerp(g.mask(arm, g=True), g.param("WetRoughness", 0.25), wet)

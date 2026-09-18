@@ -1,5 +1,6 @@
 #include "SailboatPawn.h"
 #include "Sailing.h"
+#include "StaticMeshResources.h"
 #include "SailingPlayerController.h"
 #include "WindActor.h"
 #include "Components/SceneComponent.h"
@@ -100,6 +101,28 @@ void ASailboatPawn::BeginPlay()
 		BoatMesh->SetRelativeRotation(FRotator::ZeroRotator);
 		BoatMesh->SetRelativeScale3D(FVector(1.0f, 1.0f, 1.0f));
 		// FBX-materialer fra Blender brukes direkte (M_Hull, M_Sail, M_Wood, M_Board)
+
+		// Seilet kaster ikke skygge. Sola står lavt («gyllen time»), så det 3,5 m høye seilet kaster
+		// en ~30 m lang skygge på vannet — og i Single Layer Water blir en skygge ikke bare mørkere:
+		// uten sol-spredning gjenstår bare speilingen av den gulbrune himmelen, og stripen ser ut som
+		// mudder bak båten. Skrogets skygge (2–3 m) beholdes. Per-seksjons-flagget finnes bare på
+		// asseten/renderdataene (ikke på komponenten), så det settes her i minnet — asseten røres ikke.
+		if (FStaticMeshRenderData* RenderData = BoatCombinedMesh->GetRenderData())
+		{
+			const TArray<FStaticMaterial>& Mats = BoatCombinedMesh->GetStaticMaterials();
+			for (FStaticMeshLODResources& LOD : RenderData->LODResources)
+			{
+				for (FStaticMeshSection& Section : LOD.Sections)
+				{
+					if (Mats.IsValidIndex(Section.MaterialIndex)
+						&& Mats[Section.MaterialIndex].MaterialSlotName.ToString().StartsWith(TEXT("M_Sail")))
+					{
+						Section.bCastShadow = false;
+					}
+				}
+			}
+			BoatMesh->MarkRenderStateDirty();
+		}
 	}
 	else
 	{

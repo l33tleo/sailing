@@ -11,6 +11,9 @@
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
+#include "EngineUtils.h"
+#include "WaterBodyActor.h"
+#include "Sailing.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshActor.h"
 #include "Components/StaticMeshComponent.h"
@@ -39,7 +42,8 @@ bool UFjordBenchmarkComponent::IsRequestedOnCommandLine()
 {
 	return FParse::Param(FCommandLine::Get(), TEXT("FjordShots"))
 		|| FParse::Param(FCommandLine::Get(), TEXT("FjordBench"))
-		|| FParse::Param(FCommandLine::Get(), TEXT("FjordGroundTest"));
+		|| FParse::Param(FCommandLine::Get(), TEXT("FjordGroundTest"))
+		|| FParse::Param(FCommandLine::Get(), TEXT("FjordBoatShot"));
 }
 
 void UFjordBenchmarkComponent::BeginPlay()
@@ -49,6 +53,12 @@ void UFjordBenchmarkComponent::BeginPlay()
 	bShots = FParse::Param(FCommandLine::Get(), TEXT("FjordShots"));
 	bBench = FParse::Param(FCommandLine::Get(), TEXT("FjordBench"));
 	FParse::Value(FCommandLine::Get(), TEXT("FjordLabel="), Label);
+
+	bBoatShot = FParse::Param(FCommandLine::Get(), TEXT("FjordBoatShot"));
+	if (bBoatShot)
+	{
+		return;
+	}
 
 	bGroundTest = FParse::Param(FCommandLine::Get(), TEXT("FjordGroundTest"));
 	if (bGroundTest)
@@ -133,6 +143,11 @@ void UFjordBenchmarkComponent::TickComponent(float DeltaTime, ELevelTick TickTyp
 	if (bGroundTest)
 	{
 		TickGroundTest(DeltaTime);
+		return;
+	}
+	if (bBoatShot)
+	{
+		TickBoatShot(DeltaTime);
 		return;
 	}
 
@@ -300,4 +315,59 @@ void UFjordBenchmarkComponent::TickGroundTest(float DeltaTime)
 		SetComponentTickEnabled(false);
 		FPlatformMisc::RequestExit(false);
 	}
+}
+
+void UFjordBenchmarkComponent::TickBoatShot(float DeltaTime)
+{
+	BoatShotTime += DeltaTime;
+	if (BoatShotTime < FirstStationWarmupSeconds)
+	{
+		return;
+	}
+	if (BoatShotTime < FirstStationWarmupSeconds + ShotSettleSeconds)
+	{
+		if (!bGroundTestPlaced)   // gjenbrukt som «bilde tatt»-flagg
+		{
+			bGroundTestPlaced = true;
+			const FString Dir = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / TEXT("renders/landscape") / Label);
+			IFileManager::Get().MakeDirectory(*Dir, true);
+			if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+			{
+				PC->ConsoleCommand(FString::Printf(TEXT("HighResShot 1600x900 filename=\"%s\""), *(Dir / TEXT("boat.png"))));
+
+				// Diagnose: hva ligger i/over vannflaten rundt båten? (stråler ned i et rutenett)
+				if (APawn* Pawn = PC->GetPawn())
+				{
+					const FVector P = Pawn->GetActorLocation();
+					for (int32 dy = -4; dy <= 4; ++dy)
+					{
+						for (int32 dx = -4; dx <= 4; ++dx)
+						{
+							const FVector S(P.X + dx * 500.0, P.Y + dy * 500.0, 5000.0);
+							TArray<FHitResult> Hits;
+							FCollisionQueryParams Q(SCENE_QUERY_STAT(BoatShotDiag), true, Pawn);
+							for (TActorIterator<AWaterBody> It(GetWorld()); It; ++It)
+							{
+								Q.AddIgnoredActor(*It);
+							}
+							FCollisionObjectQueryParams Obj;
+							Obj.AddObjectTypesToQuery(ECC_WorldStatic);
+							Obj.AddObjectTypesToQuery(ECC_FjordLand);
+							GetWorld()->LineTraceMultiByObjectType(Hits, S, FVector(S.X, S.Y, -5000.0), Obj, Q);
+							for (const FHitResult& Hit : Hits)
+							{
+								if (Hit.ImpactPoint.Z > 60.0 && Hit.bBlockingHit)
+								{
+									UE_LOG(LogTemp, Log, TEXT("[BOATDIAG] (%+d,%+d) z=%.0f aktor=%s komp=%s"), dx, dy, Hit.ImpactPoint.Z,
+										*GetNameSafe(Hit.GetActor()), *GetNameSafe(Hit.GetComponent()));
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+		return;
+	}
+	FPlatformMisc::RequestExit(false);
 }

@@ -13,6 +13,7 @@ class ACameraActor;
  *
  *   -FjordShots            HighResShot per stasjon til renders/landscape/<label>/<stasjon>.png
  *   -FjordBench            logger «[FPSBENCH] stasjon=… snitt=… p1=…» per stasjon
+ *   -FjordBoatShot         ett skjermbilde fra spillerkameraet (båten i bildet) etter oppvarming
  *   -FjordGroundTest       skyver båten fra åpent vann mot Hovedøya og logger «[GROUNDTEST]»:
  *                          verifiserer kollisjon/grunnstøting mot bakt terreng uten manuell seiling
  *   -FjordLabel=<navn>     undermappe/merkelapp (standard «baseline»)
@@ -63,8 +64,11 @@ private:
 	void AdvancePhase();
 	void FinishBench();
 	void TickGroundTest(float DeltaTime);
+	void TickBoatShot(float DeltaTime);
 
 	bool bGroundTest = false;
+	bool bBoatShot = false;
+	float BoatShotTime = 0.0f;
 	bool bGroundTestPlaced = false;
 	float GroundTestTime = 0.0f;
 	float GroundTestStillTime = 0.0f;
