@@ -37,6 +37,10 @@ uv run --with numpy --with scipy --with pillow --with trimesh --with fast-simpli
 uv run --with numpy --with scipy --with pillow --with trimesh --with fast-simplification \
 	python scripts/bake/bake_vegetation.py
 
+echo "== Baker avstand-til-kyst-felt (strandskum) =="
+uv run --with numpy --with scipy --with pillow --with trimesh --with fast-simplification \
+	python scripts/bake/bake_shore_field.py
+
 echo "== Bygger landmateriale M_LandV2 (headless) =="
 MATLOG="$ROOT/Saved/Logs/LandMat.log"
 "$UE_CMD" "$ROOT/Sailing.uproject" -run=pythonscript \
@@ -58,3 +62,10 @@ VEGLOG="$ROOT/Saved/Logs/VegImport.log"
 	-unattended -nosplash -nullrhi -abslog="$VEGLOG" >/dev/null 2>&1 || true
 grep -a "\[VEGIMPORT\] ferdig" "$VEGLOG" | sed 's/^.*\[VEGIMPORT\]/[VEGIMPORT]/' \
 	|| { echo "Vegetasjonsimport feilet — se $VEGLOG" >&2; exit 1; }
+
+echo "== Legger strandskum inn i M_FjordWater (headless) =="
+FOAMLOG="$ROOT/Saved/Logs/Foam.log"
+"$UE_CMD" "$ROOT/Sailing.uproject" -run=pythonscript \
+	-script="$ROOT/scripts/add_shore_foam.py" \
+	-unattended -nosplash -nullrhi -abslog="$FOAMLOG" >/dev/null 2>&1 || true
+grep -aq "\[FOAM\] skum lagt inn" "$FOAMLOG" || { echo "Skum-innlegging feilet — se $FOAMLOG" >&2; exit 1; }
