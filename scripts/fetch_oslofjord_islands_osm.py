@@ -10,8 +10,16 @@ already returns via `out geom;`:
     closed against the query bbox on the land side -> filled Landmasses
 
 Usage:
-  uv run --directory scripts/mcp-overpass -- python scripts/fetch_oslofjord_islands_osm.py
-  uv run --directory scripts/mcp-overpass -- python scripts/fetch_oslofjord_islands_osm.py --output json
+  uv run --directory scripts/mcp-overpass --with numpy --with shapely -- python scripts/fetch_oslofjord_islands_osm.py
+  ... --output json                      skriv hele scripts/fjord_data.json (øyer + fastland)
+  ... --output json --landmasses-only    bytt BARE Landmasses i eksisterende fjord_data.json (øyene
+                                         styrer bakte assets og skal ikke endres i forbifarten)
+
+Fastlandet: kystlinje-ways hentes for et område som dekker hele vannsonen, klippes mot sonens
+rektangel (CLIP_RECT_M) og lukkes langs rektangelkanten etter OSM-regelen «land til venstre». Den
+gamle metoden (lukk mot punktenes bbox på siden uten øyenes midtpunkt) ga en selvkryssende ring som
+la ~33 km² sjø under en landflate på z=190. Resultatet valideres mot DTM-en (validate_landmasses):
+skriptet nekter å skrive en ring som krysser seg selv, dekker sjø eller en øy.
 
 Output:
   - C++ TArray<FFjordIslandDef> snippet (centroid-only) for the compact FjordMapManager fallback.
@@ -20,7 +28,10 @@ Output:
 from __future__ import annotations
 
 import json
+import math
 import sys
+import time
+import zlib
 from pathlib import Path
 
 # Paths so we can import from scripts/ and scripts/mcp-overpass
@@ -140,56 +151,110 @@ def stitch_ways(ways: list[list[tuple[float, float]]]) -> list[list[tuple[float,
     return result
 
 
-def close_to_bbox(polyline, bmin, bmax, water_center) -> list[tuple[float, float]]:
-    """Close an open coastline polyline into a land polygon by walking the bbox
-    perimeter. Picks the closure side that does NOT contain the fjord water center
-    (land is the outer region)."""
-    if _key(polyline[0]) == _key(polyline[-1]):
-        return polyline
-    (minx, miny), (maxx, maxy) = bmin, bmax
-    corners = [(minx, miny), (maxx, miny), (maxx, maxy), (minx, maxy)]
+# Vannsonen i meter (= AOceanWaterSetupActor ZoneCenter ± ZoneExtent/2, delt på DistanceScale 100).
+# Utenfor den finnes ikke vann, så landpolygonene trenger ikke gå lenger.
+CLIP_RECT_M = ((-18840.0, -34870.0), (5160.0, 5130.0))
+# Overpass-området må dekke hele klipperektangelet (med margin), ellers mangler kystlinjebiter som
+# går ut og inn av området — det var det som ga 1,9 km-hullet i den gamle ringen.
+QUERY_MARGIN_M = 2000.0
+# Skjær mindre enn dette etter forenkling droppes (de blir ellers degenererte 2–3-punktsringer).
+MIN_RING_AREA_M2 = 25.0
 
-    def perim_t(p):
-        x, y = p
-        if abs(y - miny) <= abs(y - maxy) and abs(y - miny) <= min(abs(x - minx), abs(x - maxx)):
-            return (x - minx) / (maxx - minx)              # bottom edge: 0..1
-        if abs(x - maxx) <= abs(x - minx):
-            return 1 + (y - miny) / (maxy - miny)          # right edge: 1..2
-        if abs(y - maxy) <= abs(y - miny):
-            return 3 - (x - minx) / (maxx - minx)          # top edge: 2..3
-        return 4 - (y - miny) / (maxy - miny)              # left edge: 3..4
 
-    t_end, t_start = perim_t(polyline[-1]), perim_t(polyline[0])
+def _clip_segment(a, b, rect):
+    """Liang–Barsky: den delen av segmentet a→b som ligger i rektangelet, eller None."""
+    (minx, miny), (maxx, maxy) = rect
+    x0, y0 = a
+    dx, dy = b[0] - x0, b[1] - y0
+    t0, t1 = 0.0, 1.0
+    for p, q in ((-dx, x0 - minx), (dx, maxx - x0), (-dy, y0 - miny), (dy, maxy - y0)):
+        if p == 0:
+            if q < 0:
+                return None
+            continue
+        r = q / p
+        if p < 0:
+            if r > t1:
+                return None
+            t0 = max(t0, r)
+        else:
+            if r < t0:
+                return None
+            t1 = min(t1, r)
+    return (x0 + t0 * dx, y0 + t0 * dy), (x0 + t1 * dx, y0 + t1 * dy)
 
-    def corners_between(forward: bool):
-        # Walk the perimeter from t_end to t_start in the given direction, returning
-        # the bbox corners passed along the way, in order.
-        span = (t_start - t_end) % 4 if forward else (t_end - t_start) % 4
-        passed = []
-        for c in range(4):
-            d = (c - t_end) % 4 if forward else (t_end - c) % 4
-            if 0 < d < span:
-                passed.append((d, corners[c]))
-        passed.sort()
-        return [pt for _, pt in passed]
 
-    ring_fwd = polyline + corners_between(True)
-    ring_bwd = polyline + corners_between(False)
+def clip_polyline(pl, rect):
+    """Klipper en polylinje mot rektangelet. Returnerer bitene som ligger inni, i samme retning."""
+    pieces, cur = [], []
+    for a, b in zip(pl, pl[1:]):
+        seg = _clip_segment(a, b, rect)
+        if seg is None:
+            if cur:
+                pieces.append(cur)
+                cur = []
+            continue
+        p0, p1 = seg
+        if not cur:
+            cur = [p0]
+        elif _key(cur[-1], 3) != _key(p0, 3):   # gikk ut og inn igjen mellom to punkter
+            pieces.append(cur)
+            cur = [p0]
+        cur.append(p1)
+        if _key(p1, 3) != _key(b, 3):            # segmentet går ut av rektangelet her
+            pieces.append(cur)
+            cur = []
+    if cur:
+        pieces.append(cur)
+    return [p for p in pieces if len(p) >= 2]
 
-    def contains(ring, pt) -> bool:
-        x, y = pt
-        inside = False
-        n = len(ring)
-        for i in range(n):
-            x1, y1 = ring[i]
-            x2, y2 = ring[(i + 1) % n]
-            if (y1 > y) != (y2 > y):
-                xin = x1 + (y - y1) / (y2 - y1) * (x2 - x1)
-                if x < xin:
-                    inside = not inside
-        return inside
 
-    return ring_bwd if contains(ring_fwd, water_center) else ring_fwd
+def _perim_t(p, rect) -> float:
+    """Posisjon langs rektangelkanten, MOT klokka (y = nord): sør 0..1, øst 1..2, nord 2..3, vest 3..4.
+    Punktet klassifiseres etter den NÆRMESTE kanten (den gamle if-kjeden kunne velge feil kant)."""
+    (minx, miny), (maxx, maxy) = rect
+    x, y = p
+    d = {"s": abs(y - miny), "e": abs(x - maxx), "n": abs(y - maxy), "w": abs(x - minx)}
+    edge = min(d, key=d.get)
+    if edge == "s":
+        return (x - minx) / (maxx - minx)
+    if edge == "e":
+        return 1 + (y - miny) / (maxy - miny)
+    if edge == "n":
+        return 3 - (x - minx) / (maxx - minx)
+    return 4 - (y - miny) / (maxy - miny)
+
+
+def assemble_land(pieces, rect):
+    """Lukker åpne kystlinjebiter (endepunkter på rektangelkanten) til landpolygoner.
+
+    OSM tegner kystlinjen med land til VENSTRE. Et landpolygon med land til venstre går mot klokka,
+    så fra et utgangspunkt fortsetter vi mot klokka langs kanten til nærmeste inngangspunkt for en
+    kystlinjebit, følger den, og slik videre til vi er tilbake ved første bit."""
+    (minx, miny), (maxx, maxy) = rect
+    corners = [(1.0, (maxx, miny)), (2.0, (maxx, maxy)), (3.0, (minx, maxy)), (4.0, (minx, miny))]
+    starts = [_perim_t(pc[0], rect) for pc in pieces]
+    unused = set(range(len(pieces)))
+    rings = []
+    while unused:
+        first = min(unused)
+        unused.discard(first)
+        ring = list(pieces[first])
+        cur = first
+        for _ in range(len(pieces) + 1):
+            t_end = _perim_t(pieces[cur][-1], rect)
+            cands = [(( starts[k] - t_end) % 4.0 or 4.0, k) for k in unused | {first}]
+            dist, nxt = min(cands)
+            for ct, c in sorted(corners, key=lambda c: (c[0] - t_end) % 4.0 or 4.0):
+                if 0.0 < (ct - t_end) % 4.0 < dist:
+                    ring.append(c)
+            if nxt == first:
+                break
+            unused.discard(nxt)
+            ring.extend(pieces[nxt])
+            cur = nxt
+        rings.append(ring)
+    return rings
 
 
 # ---------------------------------------------------------------------------
@@ -226,33 +291,203 @@ def fetch_islands(south, west, north, east):
     return islands
 
 
-def fetch_landmasses(south, west, north, east, water_center):
-    bbox = f"({south},{west},{north},{east})"
-    raw = run_query(f'[out:json];way["natural"="coastline"]{bbox};out geom;')
+def _query_bbox_latlon(rect, margin):
+    """Klipperektangel (meter) + margin → Overpass-bbox (south, west, north, east)."""
+    (minx, miny), (maxx, maxy) = rect
+    m_lat = 111320.0
+    m_lon = 111320.0 * math.cos(math.radians(ORIGIN_LAT))
+    return (ORIGIN_LAT + (miny - margin) / m_lat, ORIGIN_LON + (minx - margin) / m_lon,
+            ORIGIN_LAT + (maxy + margin) / m_lat, ORIGIN_LON + (maxx + margin) / m_lon)
+
+
+def _stitch_directed(ways):
+    """Som stitch_ways, men skjøter BARE slutt→start: kystlinjens retning (land til venstre) må
+    bevares, og stitch_ways kan snu en way."""
+    remaining = [w[:] for w in ways if len(w) >= 2]
+    out = []
+    while remaining:
+        cur = remaining.pop(0)
+        changed = True
+        while changed:
+            changed = False
+            for i, w in enumerate(remaining):
+                if _key(w[0]) == _key(cur[-1]):
+                    cur = cur + w[1:]
+                elif _key(w[-1]) == _key(cur[0]):
+                    cur = w[:-1] + cur
+                else:
+                    continue
+                remaining.pop(i)
+                changed = True
+                break
+        out.append(cur)
+    return out
+
+
+def fetch_landmasses(rect=CLIP_RECT_M):
+    s, w, n, e = _query_bbox_latlon(rect, QUERY_MARGIN_M)
+    query = f'[out:json][timeout:180];way["natural"="coastline"]({s:.6f},{w:.6f},{n:.6f},{e:.6f});out geom;'
+    # Overpass er treg/ustabil (504) — svaret mellomlagres per spørring; --refresh henter på nytt.
+    cache = SCRIPTS / "cache" / "osm" / f"coastline_{zlib.crc32(query.encode()):08x}.json"
+    if cache.exists() and "--refresh" not in sys.argv:
+        raw = json.loads(cache.read_text(encoding="utf-8"))
+        print(f"Kystlinje fra mellomlager {cache.name}", file=sys.stderr)
+    else:
+        for attempt in range(4):
+            try:
+                raw = run_query(query)
+                break
+            except Exception as exc:   # 429/504 fra Overpass: vent og prøv igjen
+                if attempt == 3:
+                    raise
+                print(f"Overpass feilet ({exc}); nytt forsøk om {30 * (attempt + 1)} s", file=sys.stderr)
+                time.sleep(30 * (attempt + 1))
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        cache.write_text(json.dumps(raw), encoding="utf-8")
     ways = [_geom_to_xy(el["geometry"]) for el in raw.get("elements", []) if el.get("geometry")]
     if not ways:
         return []
-    xs = [p[0] for w in ways for p in w]
-    ys = [p[1] for w in ways for p in w]
-    margin = 500.0
-    bmin = (min(xs) - margin, min(ys) - margin)
-    bmax = (max(xs) + margin, max(ys) + margin)
+    lines = _stitch_directed(ways)
+    closed = [l for l in lines if len(l) >= 4 and _key(l[0]) == _key(l[-1])]
+    open_lines = [l for l in lines if not (len(l) >= 4 and _key(l[0]) == _key(l[-1]))]
+
+    (minx, miny), (maxx, maxy) = rect
     rings = []
-    for pl in stitch_ways(ways):
-        ring = close_to_bbox(pl, bmin, bmax, water_center)
-        ring = simplify(ring, SIMPLIFY_TOLERANCE_M)
-        if len(ring) >= 3:
-            rings.append(ring)
-    return rings
+    for ring in closed:   # øyer/holmer: beholdes hvis de ligger (delvis) i sonen
+        if any(minx <= x <= maxx and miny <= y <= maxy for x, y in ring):
+            rings.append(ring[:-1])
+    pieces = [pc for l in open_lines for pc in clip_polyline(l, rect)]
+    # Etter klipping skal alle åpne biter starte og slutte på rektangelkanten. Gjør de ikke det,
+    # mangler det kystlinje i OSM-svaret, og en lukking ville gjettet — stopp heller.
+    eps = 1.0
+    def on_edge(p):
+        return min(abs(p[0] - minx), abs(p[0] - maxx), abs(p[1] - miny), abs(p[1] - maxy)) < eps
+    dangling = [pc for pc in pieces if not (on_edge(pc[0]) and on_edge(pc[-1]))]
+    if dangling:
+        for pc in dangling:
+            print(f"  ÅPEN KYSTLINJE {pc[0]} -> {pc[-1]} ({len(pc)} pkt)", file=sys.stderr)
+        sys.exit(f"{len(dangling)} kystlinjebit(er) slutter inne i sonen — OSM-svaret er ufullstendig.")
+    rings += assemble_land(pieces, rect)
+    print(f"Kystlinje: {len(ways)} ways -> {len(closed)} lukkede ringer + {len(pieces)} klippede biter "
+          f"-> {len(rings)} landpolygoner", file=sys.stderr)
+
+    # Douglas-Peucker kan gjøre små skjær til sløyfer/streker. Reparer (største del) eller dropp.
+    from shapely.geometry import Polygon
+    from shapely.validation import make_valid
+    out, dropped, repaired = [], 0, 0
+    for ring in rings:
+        ring = simplify(ring + [ring[0]], SIMPLIFY_TOLERANCE_M)[:-1]
+        poly = Polygon(ring) if len(ring) >= 3 else None
+        if poly is not None and not poly.is_valid:
+            geoms = [g for g in getattr(make_valid(poly), "geoms", [make_valid(poly)]) if g.geom_type == "Polygon"]
+            poly = max(geoms, key=lambda g: g.area) if geoms else None
+            if poly is not None:
+                ring = list(poly.exterior.coords)[:-1]
+                repaired += 1
+        if poly is None or poly.area < MIN_RING_AREA_M2:
+            dropped += 1
+            continue
+        out.append(ring)
+    print(f"Forenkling: {repaired} ringer reparert, {dropped} for små droppet (< {MIN_RING_AREA_M2:.0f} m²)",
+          file=sys.stderr)
+    return out
+
+
+# ---------------------------------------------------------------------------
+# Validering mot DTM
+# ---------------------------------------------------------------------------
+
+DTM_JSON = REPO_ROOT / "Content" / "Fjord" / "Terrain" / "oslofjord_dtm.json"
+SEA_MAX_M = 0.5          # DTM-høyde (m) som regnes som sjø (havet kommer som ~0 m)
+SAMPLE_STEP_M = 100.0
+# Sjø som ligger mer enn DEEP_INSIDE_M innenfor kystlinjen teller; nærmere er det bare avvik mellom
+# OSM-kysten og den grove DTM-en (~34 m/px). Målt på korrekt fastland 2026-09-19: 0,23 km² (elve-
+# munninger/flate havneområder som DTM-en har på ~0 m). Den gamle, feillukkede ringen: 34 km².
+DEEP_INSIDE_M = 150.0
+MAX_SEA_KM2 = 0.5
+
+
+def validate_landmasses(landmasses, islands) -> bool:
+    """Sjekker hver landring: ingen selvkryssing, ingen øyposisjon inni, og maks MAX_SEA_KM2 sjø
+    (DTM ≤ SEA_MAX_M) inni. Skriver en linje per avvik; returnerer True hvis alt er OK."""
+    import numpy as np
+    from shapely.geometry import LineString, Point, Polygon
+
+    meta = json.loads(DTM_JSON.read_text(encoding="utf-8"))
+    raw = np.fromfile(DTM_JSON.with_suffix(".r16"), dtype="<u2").reshape(meta["height"], meta["width"])
+    dtm = meta["min_m"] + raw.astype(np.float32) / 65535.0 * (meta["max_m"] - meta["min_m"])
+    bb = meta["bbox_m"]
+    xs = np.arange(bb["min_x"] + SAMPLE_STEP_M / 2, bb["max_x"], SAMPLE_STEP_M)
+    ys = np.arange(bb["min_y"] + SAMPLE_STEP_M / 2, bb["max_y"], SAMPLE_STEP_M)
+    gx, gy = np.meshgrid(xs, ys)
+    cols = ((gx - bb["min_x"]) / (bb["max_x"] - bb["min_x"]) * (meta["width"] - 1)).round().astype(int)
+    rows = ((bb["max_y"] - gy) / (bb["max_y"] - bb["min_y"]) * (meta["height"] - 1)).round().astype(int)
+    sea = dtm[rows, cols] <= SEA_MAX_M
+    cell_km2 = SAMPLE_STEP_M * SAMPLE_STEP_M / 1e6
+
+    sea_x, sea_y = gx[sea], gy[sea]
+    isl_xy = np.array([i["position"] for i in islands], dtype=np.float64).reshape(-1, 2)
+
+    def even_odd(ring, px, py):
+        """Partall/odde-test (som ear-clipperen i FjordGeometry i praksis fyller for en
+        selvkryssende ring — shapely sin buffer(0) ville undervurdert den)."""
+        inside = np.zeros(px.shape, dtype=bool)
+        n = len(ring)
+        for a in range(n):
+            x1, y1 = ring[a]
+            x2, y2 = ring[(a + 1) % n]
+            if y1 == y2:
+                continue
+            crosses = (y1 > py) != (y2 > py)
+            xin = x1 + (py - y1) / (y2 - y1) * (x2 - x1)
+            inside ^= crosses & (px < xin)
+        return inside
+
+    ok = True
+    for k, ring in enumerate(landmasses):
+        if not Polygon(ring).is_valid:
+            print(f"  RING {k}: ugyldig polygon (selvkryssende), {len(ring)} pkt", file=sys.stderr)
+            ok = False
+        rx, ry = zip(*ring)
+        box = (sea_x >= min(rx)) & (sea_x <= max(rx)) & (sea_y >= min(ry)) & (sea_y <= max(ry))
+        hit = even_odd(ring, sea_x[box], sea_y[box])
+        n_sea = int(hit.sum())
+        if n_sea:
+            edge = LineString(list(ring) + [ring[0]])
+            n_deep = sum(1 for x, y in zip(sea_x[box][hit], sea_y[box][hit])
+                         if edge.distance(Point(x, y)) > DEEP_INSIDE_M)
+            if n_deep * cell_km2 > MAX_SEA_KM2:
+                print(f"  RING {k}: dekker {n_deep * cell_km2:.2f} km² sjø mer enn {DEEP_INSIDE_M:.0f} m inne "
+                      f"({n_sea * cell_km2:.2f} km² totalt), {len(ring)} pkt", file=sys.stderr)
+                ok = False
+        in_ring = even_odd(ring, isl_xy[:, 0], isl_xy[:, 1]) if len(isl_xy) else []
+        # En øys egen kystring inneholder selvsagt øya; en ANNEN ring med en øy inni er fastland over sjø.
+        cx, cy = _centroid(ring)
+        inside = [i["name"] for i, hit in zip(islands, in_ring)
+                  if hit and math.hypot(i["position"][0] - cx, i["position"][1] - cy) > 50.0]
+        if inside:
+            print(f"  RING {k}: inneholder øy(er) {', '.join(inside)}", file=sys.stderr)
+            ok = False
+    print(f"Validering: {len(landmasses)} ringer mot {int(sea.sum())} DTM-sjøprøver ({SAMPLE_STEP_M:.0f} m) — "
+          f"{'OK' if ok else 'FEIL'}", file=sys.stderr)
+    return ok
+
+
+def _islands_from_json(path):
+    data = json.loads(path.read_text(encoding="utf-8"))
+    return [{"name": i["Name"], "position": (i["Position"]["X"], i["Position"]["Y"]),
+             "scale": i["Scale"], "outline": [(p["X"], p["Y"]) for p in i["Outline"]]}
+            for i in data["Islands"]]
 
 
 def main() -> None:
     # Inner Oslofjord: Drøbak to Oslo (south, west, north, east)
     south, west, north, east = 59.65, 10.5, 59.95, 10.85
+    out_path = SCRIPTS / "fjord_data.json"
+    landmasses_only = "--landmasses-only" in sys.argv
 
-    islands = fetch_islands(south, west, north, east)
-    water_center = _centroid([i["position"] for i in islands]) if islands else (-5000.0, -12000.0)
-    landmasses = fetch_landmasses(south, west, north, east, water_center)
+    islands = _islands_from_json(out_path) if landmasses_only else fetch_islands(south, west, north, east)
+    landmasses = fetch_landmasses()
 
     n_isl_pts = sum(len(i["outline"]) for i in islands)
     n_land_pts = sum(len(r) for r in landmasses)
@@ -260,37 +495,45 @@ def main() -> None:
           f"Landmasses: {len(landmasses)} ({n_land_pts} pts). "
           f"Simplify tol={SIMPLIFY_TOLERANCE_M} m.", file=sys.stderr)
 
-    # C++ snippet: centroid-only, for the compact hardcoded fallback in FjordMapManager
-    def cpp_float(f: float) -> str:
-        return f"{f:.1f}f"
+    if not validate_landmasses(landmasses, islands):
+        sys.exit("Landmassene besto ikke valideringen — fjord_data.json er IKKE skrevet.")
 
-    lines = ["\t\tTestData->Islands = {"]
-    for i in islands:
-        x, y = i["position"]
-        name = i["name"].replace('"', '\\"')
-        lines.append(f'\t\t\t{{ TEXT("{name}"),   FVector2D({cpp_float(x)}, {cpp_float(y)}), {i["scale"]}f }},')
-    if lines[-1].endswith(","):
-        lines[-1] = lines[-1][:-1]
-    lines.append("\t\t};")
-    print("// Paste into FjordMapManager.cpp fallback (centroid-only; polygons live in the asset)")
-    print("\n".join(lines))
+    if not landmasses_only:
+        # C++ snippet: centroid-only, for the compact hardcoded fallback in FjordMapManager
+        def cpp_float(f: float) -> str:
+            return f"{f:.1f}f"
+
+        lines = ["\t\tTestData->Islands = {"]
+        for i in islands:
+            x, y = i["position"]
+            name = i["name"].replace('"', '\\"')
+            lines.append(f'\t\t\t{{ TEXT("{name}"),   FVector2D({cpp_float(x)}, {cpp_float(y)}), {i["scale"]}f }},')
+        if lines[-1].endswith(","):
+            lines[-1] = lines[-1][:-1]
+        lines.append("\t\t};")
+        print("// Paste into FjordMapManager.cpp fallback (centroid-only; polygons live in the asset)")
+        print("\n".join(lines))
 
     if "--output" in sys.argv and "json" in sys.argv:
-        out = {
-            "Landmasses": [[{"X": x, "Y": y} for x, y in r] for r in landmasses],
-            "Islands": [
-                {
-                    "Name": i["name"],
-                    "Position": {"X": i["position"][0], "Y": i["position"][1]},
-                    "Scale": i["scale"],
-                    "Outline": [{"X": x, "Y": y} for x, y in i["outline"]],
-                }
-                for i in islands
-            ],
-            "WorldOrigin": {"X": 0.0, "Y": 0.0},
-            "MetersPerUnit": 1.0,
-        }
-        out_path = SCRIPTS / "fjord_data.json"
+        land_json = [[{"X": x, "Y": y} for x, y in r] for r in landmasses]
+        if landmasses_only:
+            out = json.loads(out_path.read_text(encoding="utf-8"))
+            out["Landmasses"] = land_json
+        else:
+            out = {
+                "Landmasses": land_json,
+                "Islands": [
+                    {
+                        "Name": i["name"],
+                        "Position": {"X": i["position"][0], "Y": i["position"][1]},
+                        "Scale": i["scale"],
+                        "Outline": [{"X": x, "Y": y} for x, y in i["outline"]],
+                    }
+                    for i in islands
+                ],
+                "WorldOrigin": {"X": 0.0, "Y": 0.0},
+                "MetersPerUnit": 1.0,
+            }
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(out, f, indent=2, ensure_ascii=False)
         print("Wrote", out_path, file=sys.stderr)

@@ -1,6 +1,10 @@
 #include "SailboatPawn.h"
+#include "Sailing.h"
+#include "UObject/ConstructorHelpers.h"
 #include "SailingPlayerController.h"
 #include "WindActor.h"
+#include "SailRigComponent.h"
+#include "WakeRibbonComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -16,6 +20,27 @@
 #include "Kismet/GameplayStatics.h"
 #include "ProceduralMeshComponent.h"
 #include "Engine/Engine.h"   // DEBUG (midlertidig): GEngine->AddOnScreenDebugMessage
+#include "HAL/IConsoleManager.h"
+
+// Testkrok: tvinger rorvinkelen for skjermbildeverifikasjon (--exec "sailing.RudderTestDeg 25"). -999 = av.
+static TAutoConsoleVariable<float> CVarRudderTestDeg(
+	TEXT("sailing.RudderTestDeg"), -999.0f,
+	TEXT("Tvinger rorvinkelen (grader, + = styrbordsving). -999 = av."));
+
+// A/B: slår kjølvann + skrogskum av (--exec "sailing.Wake 0") for å måle kostnaden.
+static TAutoConsoleVariable<int32> CVarWake(
+	TEXT("sailing.Wake"), 1,
+	TEXT("1 = kjølvann og skrogskum på (standard), 0 = av."));
+
+// Testkrok: tvinger baugsprut uansett fart (--exec "sailing.SprayTest 1").
+static TAutoConsoleVariable<int32> CVarSprayTest(
+	TEXT("sailing.SprayTest"), 0,
+	TEXT("1 = tving baugsprut uansett fart."));
+
+// Testkrok: låser kameraets orbit-yaw (grader rundt båten, 0 = bakfra) for skjermbilder fra siden.
+static TAutoConsoleVariable<float> CVarCamYawTest(
+	TEXT("sailing.CamYawTest"), -999.0f,
+	TEXT("Låser kameraets yaw rundt båten (grader). -999 = av."));
 
 ASailboatPawn::ASailboatPawn()
 {
@@ -45,7 +70,43 @@ ASailboatPawn::ASailboatPawn()
 	BoatMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BoatMesh"));
 	BoatMesh->SetupAttachment(CapsuleComp);
 	BoatMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	BoatMesh->SetCastShadow(true);
+	BoatMesh->SetCastShadow(false);   // se BeginPlay
+
+	// Rigg: mastepivot under BoatMesh, bom/sprit/seil-meshet under pivoten igjen. Ror med pivot i
+	// rorakselen. Meshene settes i BeginPlay hvis de splittede assetene finnes; ellers forblir de
+	// tomme og det kombinerte meshet i BoatMesh viser (stillestående) seil og ror som før.
+	SailRig = CreateDefaultSubobject<USailRigComponent>(TEXT("SailRig"));
+	SailRig->SetupAttachment(BoatMesh);
+	SailRig->SetRelativeLocation(SailRig->MastPivotLocal);
+
+	RigMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RigMesh"));
+	RigMesh->SetupAttachment(SailRig);
+	RigMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	RigMesh->SetCastShadow(false);   // samme begrunnelse som BoatMesh (se BeginPlay)
+	SailRig->RigMesh = RigMesh;
+
+	RudderMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RudderMesh"));
+	RudderMesh->SetupAttachment(BoatMesh);
+	RudderMesh->SetRelativeLocation(RudderPivotLocal);
+	RudderMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	RudderMesh->SetCastShadow(false);
+
+	// Gulv i cockpiten (se header). Kuber fra motoren, skalert i BeginPlay.
+	{
+		static ConstructorHelpers::FObjectFinder<UStaticMesh> Cube(TEXT("/Engine/BasicShapes/Cube"));
+		for (int32 i = 0; i < 3; ++i)
+		{
+			UStaticMeshComponent* Plate = CreateDefaultSubobject<UStaticMeshComponent>(*FString::Printf(TEXT("CockpitFloor%d"), i));
+			Plate->SetupAttachment(BoatMesh);
+			Plate->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			Plate->SetCastShadow(false);
+			if (Cube.Succeeded())
+			{
+				Plate->SetStaticMesh(Cube.Object);
+			}
+			CockpitFloorPlates.Add(Plate);
+		}
+	}
 
 	// Plan bak i båten (stern) – ugjennomtrengelig, så man ikke ser «inn» bakfra
 	SternShield = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("SternShield"));
@@ -79,19 +140,45 @@ ASailboatPawn::ASailboatPawn()
 	SprayMesh->SetCastShadow(false);
 	SprayMesh->SetMobility(EComponentMobility::Movable);
 
+	// Kjølvann (absolutt transform, flyttes til akterpunktet hver frame — se UWakeRibbonComponent).
+	WakeRibbon = CreateDefaultSubobject<UWakeRibbonComponent>(TEXT("WakeRibbon"));
+	WakeRibbon->SetupAttachment(CapsuleComp);
 }
 
 void ASailboatPawn::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// Last kombinert Optimist-mesh (ny modell fra Blender)
-	UStaticMesh* BoatCombinedMesh = LoadObject<UStaticMesh>(nullptr,
-		TEXT("/Game/ModelsV2/Optimist3735.Optimist3735"));
+	// Splittet Optimist (skrog / rigg / ror som egne assets, se scripts/import_boat_parts.py) hvis alle
+	// tre finnes; ellers det gamle kombinerte meshet med stillestående rigg og ror.
+	UStaticMesh* HullPartMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/ModelsV2/SM_Boat_Hull.SM_Boat_Hull"));
+	UStaticMesh* RigPartMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/ModelsV2/SM_Boat_Rig.SM_Boat_Rig"));
+	UStaticMesh* RudderPartMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/ModelsV2/SM_Boat_Rudder.SM_Boat_Rudder"));
+	const bool bSplitParts = HullPartMesh && HullPartMesh->GetNumLODs() > 0
+		&& RigPartMesh && RigPartMesh->GetNumLODs() > 0
+		&& RudderPartMesh && RudderPartMesh->GetNumLODs() > 0;
+
+	UStaticMesh* BoatCombinedMesh = bSplitParts ? HullPartMesh
+		: LoadObject<UStaticMesh>(nullptr, TEXT("/Game/ModelsV2/Optimist3735.Optimist3735"));
+
+	if (bSplitParts)
+	{
+		RigMesh->SetStaticMesh(RigPartMesh);
+		RudderMesh->SetStaticMesh(RudderPartMesh);
+		SailRig->SetRelativeLocation(SailRig->MastPivotLocal);
+		RudderMesh->SetRelativeLocation(RudderPivotLocal);
+		SailRig->InitSailMaterial();
+		UE_LOG(LogTemp, Log, TEXT("[RIGG] Splittet båt: skrog=%d rigg=%d ror=%d trekanter"),
+			HullPartMesh->GetNumTriangles(0), RigPartMesh->GetNumTriangles(0), RudderPartMesh->GetNumTriangles(0));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("[RIGG] fallback kombinert mesh (SM_Boat_Hull/Rig/Rudder mangler) — rigg og ror står stille"));
+	}
 
 	if (BoatCombinedMesh && BoatCombinedMesh->GetNumLODs() > 0 && BoatMesh)
 	{
-		UE_LOG(LogTemp, Log, TEXT("SailboatPawn: Bruker kombinert Optimist-mesh fra ModelsV2: %s"), *BoatCombinedMesh->GetPathName());
+		UE_LOG(LogTemp, Log, TEXT("SailboatPawn: Bruker Optimist-mesh fra ModelsV2: %s"), *BoatCombinedMesh->GetPathName());
 		BoatMesh->SetStaticMesh(BoatCombinedMesh);
 		BoatMesh->SetVisibility(true);
 		BoatMesh->SetHiddenInGame(false);
@@ -99,6 +186,33 @@ void ASailboatPawn::BeginPlay()
 		BoatMesh->SetRelativeRotation(FRotator::ZeroRotator);
 		BoatMesh->SetRelativeScale3D(FVector(1.0f, 1.0f, 1.0f));
 		// FBX-materialer fra Blender brukes direkte (M_Hull, M_Sail, M_Wood, M_Board)
+
+		// Båten kaster ikke skygge på vannet. I Single Layer Water blir en skygge ikke bare mørkere:
+		// der sola ikke treffer forsvinner sol-spredningen, og det som gjenstår er speilingen av den
+		// gulbrune «gyllen time»-himmelen — seilets ~30 m lange skygge så ut som en mudderstripe, og
+		// skrogets 2–3 m skygge som om man så bunnen rett under båten. Verifisert med --boat-shot og
+		// ShowFlag.DynamicShadows 0. Sol og himmel skygger fortsatt skroget selv (self-shadow er av
+		// samme flagg, men det tapet er knapt synlig på en hvit Optimist).
+		BoatMesh->SetCastShadow(false);
+
+		// Gulvplater: kuben er 100 cm; skaler til platens plan og 2 cm tykkelse. Skrogets materiale
+		// (hvit), så de leses som innsiden av båten.
+		UMaterialInterface* FloorMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ModelsV2/M_Cockpit.M_Cockpit"));
+		if (!FloorMat)
+		{
+			FloorMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/ModelsV2/M_Hull.M_Hull"));
+		}
+		for (int32 i = 0; i < CockpitFloorPlates.Num() && i < CockpitFloorPlateSpecs.Num(); ++i)
+		{
+			const FVector& Spec = CockpitFloorPlateSpecs[i];
+			UStaticMeshComponent* Plate = CockpitFloorPlates[i];
+			Plate->SetRelativeLocation(FVector((Spec.X + Spec.Y) * 0.5f, 0.0f, CockpitFloorZ));
+			Plate->SetRelativeScale3D(FVector((Spec.Y - Spec.X) / 100.0f, Spec.Z / 50.0f, 0.02f));
+			if (FloorMat)
+			{
+				Plate->SetMaterial(0, FloorMat);
+			}
+		}
 	}
 	else
 	{
@@ -111,6 +225,18 @@ void ASailboatPawn::BeginPlay()
 	{
 		SternShield->SetVisibility(false);
 		SternShield->SetHiddenInGame(true);
+	}
+
+	if (WakeRibbon)
+	{
+		UMaterialInterface* WakeMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Materials/Water/M_Wake.M_Wake"));
+		if (!WakeMat)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[KJOLVANN] /Game/Materials/Water/M_Wake mangler (scripts/create_wake_material.py) — kjølvann av"));
+			bEnableWake = false;
+		}
+		WakeRibbon->InitRibbon(WakeMat);
+		WakeRibbon->SetVisibility(bEnableWake);
 	}
 
 	// Fysikkmasse + senket tyngdepunkt (hindrer urealistisk kantring i kast).
@@ -134,12 +260,36 @@ void ASailboatPawn::SetupPlayerInputComponent(UInputComponent* PlayerInputCompon
 		{
 			EIC->BindAction(CameraAction, ETriggerEvent::Triggered, this, &ASailboatPawn::HandleCamera);
 		}
+		if (SheetAction)
+		{
+			EIC->BindAction(SheetAction, ETriggerEvent::Triggered, this, &ASailboatPawn::HandleSheet);
+		}
+		if (AutoTrimAction)
+		{
+			EIC->BindAction(AutoTrimAction, ETriggerEvent::Started, this, &ASailboatPawn::HandleAutoTrim);
+		}
 	}
 }
 
 void ASailboatPawn::HandleTurn(const FInputActionValue& Value)
 {
 	TurnInput = Value.Get<float>();
+}
+
+void ASailboatPawn::HandleSheet(const FInputActionValue& Value)
+{
+	if (SailRig)
+	{
+		SailRig->AddSheetInput(Value.Get<float>());
+	}
+}
+
+void ASailboatPawn::HandleAutoTrim(const FInputActionValue& Value)
+{
+	if (SailRig)
+	{
+		SailRig->ToggleAutoTrim();
+	}
 }
 
 void ASailboatPawn::HandleCamera(const FInputActionValue& Value)
@@ -172,26 +322,49 @@ void ASailboatPawn::Tick(float DeltaTime)
 
 	UpdateHullWaterMask();
 
-	// 1. Sving: sett Z-komponenten av vinkelhastigheten direkte. Rull/pitch (X/Y) forblir
-	//    UENDRET av dette — de styres kun av Buoyancy/bølger (naturlig krengning/stamping).
-	FVector AngVel = CapsuleComp->GetPhysicsAngularVelocityInDegrees();
-	AngVel.Z = TurnInput * TurnSpeed;
-	CapsuleComp->SetPhysicsAngularVelocityInDegrees(AngVel);
-	TurnInput = 0.0f;
-
-	// 2. Tilsynelatende vind (apparent wind) og polar-kurve — uendret logikk, men CurrentSpeed
-	//    leses nå fra fysikkhastigheten i stedet for en egen integrert variabel.
 	FVector Forward = GetActorForwardVector();
+	const FVector Right = FVector::CrossProduct(FVector::UpVector, Forward).GetSafeNormal();
 	CurrentSpeed = FVector::DotProduct(CapsuleComp->GetPhysicsLinearVelocity(), Forward);
 
+	// 1. Ror: rorvinkelen legges over med begrenset hastighet mens tasten holdes og går tilbake mot
+	//    midtstilling når den slippes. Svingraten settes som Z-komponenten av vinkelhastigheten direkte;
+	//    rull/pitch (X/Y) forblir UENDRET — de styres kun av oppdrift/bølger. Roret virker svakere i
+	//    stillstand (RudderMinSpeedFactor > 0 så båten kan komme seg ut av jern).
+	{
+		const float RudderTarget = TurnInput * MaxRudderDeg;
+		const float RudderRate = FMath::IsNearlyZero(TurnInput) ? RudderReturnRateDegPerS : RudderRateDegPerS;
+		RudderAngleDeg = FMath::FInterpConstantTo(RudderAngleDeg, RudderTarget, DeltaTime, RudderRate);
+		const float RudderTest = CVarRudderTestDeg.GetValueOnGameThread();
+		if (RudderTest > -998.0f)
+		{
+			RudderAngleDeg = FMath::Clamp(RudderTest, -MaxRudderDeg, MaxRudderDeg);
+		}
+		const float SpeedFactor = FMath::Lerp(RudderMinSpeedFactor, 1.0f,
+			FMath::Clamp(FMath::Abs(CurrentSpeed) / RudderFullEffectSpeed, 0.0f, 1.0f));
+		FVector AngVel = CapsuleComp->GetPhysicsAngularVelocityInDegrees();
+		AngVel.Z = (RudderAngleDeg / MaxRudderDeg) * TurnSpeed * SpeedFactor;
+		CapsuleComp->SetPhysicsAngularVelocityInDegrees(AngVel);
+		TurnInput = 0.0f;
+		// Positiv rorvinkel = styrbordsving: bladet (akter for pivot) skal til styrbord, kulten til
+		// babord — negativ yaw gir det (samme utledning som bommen i USailRigComponent::ApplyToMesh).
+		// Verifisert med --boat-shot --exec "sailing.RudderTestDeg 30".
+		RudderMesh->SetRelativeRotation(FRotator(0.0f, -RudderAngleDeg, 0.0f));
+	}
+
+	// 2. Tilsynelatende vind (apparent wind), rigg og polar-kurve. Vinden samples ÉN gang her og
+	//    lagres som medlemmer (HUD/spray/rigg leser dem).
 	AWindActor* Wind = FindWind();
 	if (Wind)
 	{
 		// Lokal vind ved båtens posisjon: fanger kast-flekker og vri der båten faktisk er.
-		FVector TrueWindVec = Wind->GetWindVelocityAt(GetActorLocation());
+		// NB: AWindActor sine vektorer peker MOT vindkilden (dit vinden kommer fra) — kast advekteres
+		// og sprut driver langs -WindDir. Tilsynelatende vind i samme konvensjon er derfor
+		// «fra»-vektor PLUSS båtens hastighet (fartsvinden kommer forfra): den dreier forover og øker
+		// når båten går mot vinden. Tidligere sto det minus, som lot den dreie akterover med farten.
+		TrueWindVec = Wind->GetWindVelocityAt(GetActorLocation());
 		FVector BoatVelocity = Forward * CurrentSpeed;
-		FVector ApparentWindVec = TrueWindVec - BoatVelocity;
-		float ApparentWindStr = ApparentWindVec.Size();
+		ApparentWindVec = TrueWindVec + BoatVelocity;
+		ApparentWindStr = ApparentWindVec.Size();
 
 		FVector WindDir;
 		float WindStr;
@@ -206,15 +379,28 @@ void ASailboatPawn::Tick(float DeltaTime)
 			WindStr = ApparentWindStr;
 		}
 
-		float CosAngle = FVector::DotProduct(Forward, WindDir);
-		float AngleToWind = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(CosAngle, -1.0f, 1.0f)));
+		// Signert vinkel fra baugen til retningen vinden kommer fra: positiv når vinden kommer inn
+		// over styrbord side.
+		ApparentWindAngleDeg = FMath::RadiansToDegrees(FMath::Atan2(
+			FVector::DotProduct(Right, WindDir), FVector::DotProduct(Forward, WindDir)));
+		ApparentWindSideSign = ApparentWindAngleDeg >= 0.0f ? 1.0f : -1.0f;
+		float AngleToWind = FMath::Abs(ApparentWindAngleDeg);
+
+		SailRig->UpdateRig(ApparentWindAngleDeg, ApparentWindStr, DeltaTime);
 
 		float ForceMultiplier = 0.0f;
+		const float CloseAngle = FMath::Max(CloseHauledAngle, NoGoZoneAngle + 1.0f);
 		if (AngleToWind < NoGoZoneAngle)
 			ForceMultiplier = 0.0f;
+		else if (AngleToWind < CloseAngle)
+		{
+			// Kryss: glir mot null når man kniper, i stedet for et hardt sprang til 0 ved no-go-kanten.
+			float T = (AngleToWind - NoGoZoneAngle) / (CloseAngle - NoGoZoneAngle);
+			ForceMultiplier = FMath::Lerp(0.0f, CloseHauledForce, T);
+		}
 		else if (AngleToWind < 90.0f)
 		{
-			float T = (AngleToWind - NoGoZoneAngle) / (90.0f - NoGoZoneAngle);
+			float T = (AngleToWind - CloseAngle) / (90.0f - CloseAngle);
 			ForceMultiplier = FMath::Lerp(CloseHauledForce, BeamReachForce, T);
 		}
 		else if (AngleToWind < 135.0f)
@@ -228,12 +414,16 @@ void ASailboatPawn::Tick(float DeltaTime)
 			ForceMultiplier = FMath::Lerp(BroadReachForce, RunningForce, T);
 		}
 
-		CurrentSailForce = WindStr * FMath::Pow(ForceMultiplier, PolarSharpness);
+		// Trim-effektiviteten er 1 under auto-trim (stasjonært); manuell feiltrim og flagring i jern
+		// gir mindre kraft.
+		CurrentSailForce = WindStr * FMath::Pow(ForceMultiplier, PolarSharpness) * SailRig->TrimEfficiency;
 	}
 	else
 	{
 		CurrentSailForce = 0.0f;
+		SailRig->UpdateRig(0.0f, 0.0f, DeltaTime);
 	}
+	SailRig->ApplyToMesh();
 
 	// 3. Fremdrift som massefri akselerasjon (bAccelChange) — bevarer dagens akselerasjonsfølelse
 	//    uavhengig av BoatMassKg. Krengningsmoment er et SEPARAT, mindre bidrag (AddTorque) fra
@@ -241,8 +431,9 @@ void ASailboatPawn::Tick(float DeltaTime)
 	float Drag = DragCoefficient * FMath::Square(FMath::Max(0.0f, CurrentSpeed));
 	CapsuleComp->AddForce(Forward * (CurrentSailForce - Drag) * SailForceAccelScale, NAME_None, /*bAccelChange=*/true);
 
-	const FVector Right = FVector::CrossProduct(FVector::UpVector, Forward).GetSafeNormal();
-	const float HeelTorqueSign = (Wind ? FVector::DotProduct(Right, Wind->GetWindDirection()) : 0.0f) >= 0.0f ? 1.0f : -1.0f;
+	// Krengning mot le for den TILSYNELATENDE vinden (samme side som bommen og seilbukten). Avviker
+	// fra sann vind bare på lens «by the lee», og der skal krengning og bukt uansett følge bommen.
+	const float HeelTorqueSign = ApparentWindSideSign;
 	CapsuleComp->AddTorqueInDegrees(Forward * CurrentSailForce * HeelTorqueScale * HeelTorqueSign,
 		NAME_None, /*bAccelChange=*/false);
 
@@ -285,6 +476,22 @@ void ASailboatPawn::Tick(float DeltaTime)
 	// genererer ikke pålitelige overlap-events mot Water-pluginets QUERY_ONLY-kollisjon).
 	ApplyPontoonBuoyancy(DeltaTime);
 
+	// 4a. Kjølvann: skum slippes fra et punkt like akter for akterspeilet (utenfor skrogmasken).
+	const bool bWakeOn = bEnableWake && CVarWake.GetValueOnGameThread() != 0;
+	if (WakeRibbon && WakeRibbon->IsVisible() != bWakeOn)
+	{
+		WakeRibbon->SetVisibility(bWakeOn);
+	}
+	if (bWakeOn && WakeRibbon && BoatMesh)
+	{
+		FVector FlatFwd = Forward;
+		FlatFwd.Z = 0.0f;
+		FlatFwd = FlatFwd.GetSafeNormal();
+		const FVector FlatRight(-FlatFwd.Y, FlatFwd.X, 0.0f);
+		const FVector Stern = BoatMesh->GetComponentLocation() + FlatFwd * WakeStartOffsetX;
+		WakeRibbon->UpdateRibbon(Stern, FlatRight, CurrentSpeed, GetWorld()->GetTimeSeconds(), FindOceanBody());
+	}
+
 	// 4c. Sikkerhetsnett mot å være inne i en landmasse. Landmassene er hule skall
 	// (kollisjon kun langs ytterkysten), så havner båten først på innsiden — via en
 	// lagret posisjon, eller en sjelden gjennomkryping — kan den seile fritt i det tomme
@@ -315,7 +522,7 @@ void ASailboatPawn::Tick(float DeltaTime)
 				{
 					const float Ang = A * (2.0f * PI / 24.0f);
 					FVector Test(Base.X + FMath::Cos(Ang) * R, Base.Y + FMath::Sin(Ang) * R, WaterZ);
-					if (!IsOverLand(Test))
+					if (IsOpenWater(Test, OpenWaterClearance))
 					{
 						SetActorLocation(Test, /*bSweep=*/false);
 						CapsuleComp->SetPhysicsLinearVelocity(FVector::ZeroVector);
@@ -341,6 +548,28 @@ void ASailboatPawn::Tick(float DeltaTime)
 		LastSafeLoc = GetActorLocation();
 		bHasSafeLoc = true;
 	}
+
+	// 4d. Lagringsposisjon + etterprøving av start. IsOpenWater er 17 strålespor, så den kjøres
+	// bare et par ganger i sekundet.
+	OpenWaterCheckTimer -= DeltaTime;
+	if (OpenWaterCheckTimer <= 0.0f)
+	{
+		OpenWaterCheckTimer = 0.5f;
+		const bool bOpen = IsOpenWater(GetActorLocation(), OpenWaterClearance);
+		if (bOpen)
+		{
+			LastOpenWaterLoc = GetActorLocation();
+			bHasOpenWaterLoc = true;
+		}
+		else if (StartCheckTimeLeft > 0.0f && !IsOpenWater(GetActorLocation(), 400.0f))
+		{
+			// Startet likevel på grunne/land: landkollisjonen finnes ikke ennå på frame 0 når
+			// PlaceAtStart kjører første gang (verifisert — den svarte «åpent vann» midt på en strand).
+			// Bare båtens eget fotavtrykk sjekkes her, så en båt som seiler FORBI en grunne får være.
+			PlaceAtStart(GetActorLocation());
+		}
+	}
+	StartCheckTimeLeft = FMath::Max(0.0f, StartCheckTimeLeft - DeltaTime);
 
 	const float Time = GetWorld()->GetTimeSeconds();
 
@@ -369,6 +598,16 @@ void ASailboatPawn::Tick(float DeltaTime)
 		UE_LOG(LogTemp, Log, TEXT("[BAATPOS] pos=(%.0f,%.0f,%.0f)  fart=%.0f  pitch=%.1f rull=%.1f  neds=%.1f"),
 			GetActorLocation().X, GetActorLocation().Y, GetActorLocation().Z, CurrentSpeed,
 			GetActorRotation().Pitch, GetActorRotation().Roll, SurfaceZ - GetActorLocation().Z);
+		UE_LOG(LogTemp, Log, TEXT("[RIGG] awa=%+.0f str=%.0f skjot=%.0f%s bom=%+.0f aoa=%.0f eff=%.2f fyll=%.2f flagr=%.2f%s ror=%+.0f kraft=%.0f"),
+			ApparentWindAngleDeg, ApparentWindStr, SailRig->SheetLimitDeg, SailRig->bAutoTrim ? TEXT("A") : TEXT("M"),
+			SailRig->BoomAngleDeg, SailRig->AngleOfAttackDeg, SailRig->TrimEfficiency, SailRig->SailFill,
+			SailRig->Flutter, SailRig->bJibing ? TEXT(" JIBB") : TEXT(""), RudderAngleDeg, CurrentSailForce);
+		if (bEnableWake && WakeRibbon)
+		{
+			UE_LOG(LogTemp, Log, TEXT("[KJOLVANN] prover=%d eldste=%.1fs skrogskum=%.2f"),
+				WakeRibbon->GetNumActiveSamples(), WakeRibbon->GetOldestAge(Time),
+				HullFoamMax * FMath::Clamp(FMath::Abs(CurrentSpeed) / HullFoamFullSpeed, 0.0f, 1.0f));
+		}
 	}
 
 	// 4b. Skum/spray
@@ -383,6 +622,11 @@ void ASailboatPawn::Tick(float DeltaTime)
 		FRotator ArmRot = SpringArm->GetRelativeRotation();
 		ArmRot.Yaw += CameraYawInput * 2.0f;
 		ArmRot.Pitch = FMath::Clamp(ArmRot.Pitch + CameraPitchInput * 2.0f, -50.0f, 15.0f);
+		const float CamYawTest = CVarCamYawTest.GetValueOnGameThread();
+		if (CamYawTest > -998.0f)
+		{
+			ArmRot.Yaw = CamYawTest;
+		}
 		SpringArm->SetRelativeRotation(ArmRot);
 	}
 	CameraYawInput = 0.0f;
@@ -392,9 +636,9 @@ void ASailboatPawn::Tick(float DeltaTime)
 void ASailboatPawn::HandleCapsuleHit(UPrimitiveComponent* HitComp, AActor* OtherActor, UPrimitiveComponent* OtherComp,
 	FVector NormalImpulse, const FHitResult& Hit)
 {
-	// Bare fjord-landmassene (øyer/kystlinje) er ProceduralMeshComponent — samme filter som
-	// IsOverLand() bruker, slik at vannkollisjon/andre aktører ikke trigger grunnstøtingsrespons.
-	if (!OtherComp || !OtherComp->IsA(UProceduralMeshComponent::StaticClass()))
+	// Bare fjordens land (øyer/kystlinje, bakt eller prosedural) ligger på FjordLand-kanalen — samme
+	// filter som IsOverLand() bruker, slik at vannkollisjon/andre aktører ikke trigger grunnstøtingsrespons.
+	if (!OtherComp || OtherComp->GetCollisionObjectType() != ECC_FjordLand)
 	{
 		return;
 	}
@@ -427,14 +671,116 @@ bool ASailboatPawn::IsOverLand(const FVector& Loc) const
 	const FVector End(Loc.X, Loc.Y, -100000.0f);
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(BoatOverLand), /*bTraceComplex=*/true, this);
 	FHitResult Hit;
-	if (!World->LineTraceSingleByChannel(Hit, Start, End, ECC_WorldStatic, Params))
+	// Kun FjordLand-objekter: nivåets Landscape-backdrop (WorldStatic) skal IKKE telle som «land»
+	// her, ellers tror båten den er inne i land overalt og blir stående fast.
+	if (!World->LineTraceSingleByObjectType(Hit, Start, End, FCollisionObjectQueryParams(ECC_FjordLand), Params))
 	{
 		return false;
 	}
-	// Bare fjord-landmassene (øyer/kystlinje) er ProceduralMeshComponent. Nivåets
-	// Landscape-backdrop er en heightfield-komponent og skal IKKE telle som «land»
-	// her, ellers tror båten den er inne i land overalt og blir stående fast.
-	return Hit.GetComponent() && Hit.GetComponent()->IsA(UProceduralMeshComponent::StaticClass());
+	// Bakt terreng fortsetter som sjøbunn under vannflaten; bare terreng som stikker tydelig opp
+	// over vannet (over bølgetoppene, ~0,7 m) er «land». De hule prosedurale skallene har toppen
+	// på z≥190 og passerer også.
+	return Hit.ImpactPoint.Z > OverLandMinZ;
+}
+
+bool ASailboatPawn::IsOpenWater(const FVector& Loc, float ClearanceRadius) const
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return true;
+	}
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(BoatOpenWater), /*bTraceComplex=*/true, this);
+	const FCollisionObjectQueryParams LandOnly(ECC_FjordLand);
+	const float MaxBottomZ = WaterZ - OpenWaterMinDepth;
+	auto DeepEnough = [&](float X, float Y)
+	{
+		FHitResult Hit;
+		// Nedstrålen treffer toppen av terrenget (bakt sjøbunn/strand/land, eller lokket på de hule
+		// prosedurale skallene). Ingen treff = åpent hav uten bunn.
+		return !World->LineTraceSingleByObjectType(Hit, FVector(X, Y, 100000.0f), FVector(X, Y, -100000.0f), LandOnly, Params)
+			|| Hit.ImpactPoint.Z < MaxBottomZ;
+	};
+	if (!DeepEnough(Loc.X, Loc.Y))
+	{
+		return false;
+	}
+	// To ringer: båtens eget fotavtrykk + manøvreringsrom, så man ikke havner i en kulp bak en grunne.
+	for (const float R : { FMath::Min(400.0f, ClearanceRadius), ClearanceRadius })
+	{
+		for (int32 A = 0; A < 8; ++A)
+		{
+			const float Ang = A * (2.0f * PI / 8.0f) + (R == ClearanceRadius ? PI / 8.0f : 0.0f);
+			if (!DeepEnough(Loc.X + FMath::Cos(Ang) * R, Loc.Y + FMath::Sin(Ang) * R))
+			{
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+FVector ASailboatPawn::FindNearestOpenWater(const FVector& Loc, float ClearanceRadius) const
+{
+	const FVector Base(Loc.X, Loc.Y, WaterZ);
+	if (IsOpenWater(Base, ClearanceRadius))
+	{
+		return Base;
+	}
+	for (float R = 1000.0f; R <= 400000.0f; R += (R < 20000.0f ? 1000.0f : 4000.0f))
+	{
+		const int32 NumAngles = FMath::Clamp(FMath::RoundToInt(2.0f * PI * R / 1500.0f), 12, 48);
+		for (int32 A = 0; A < NumAngles; ++A)
+		{
+			const float Ang = A * (2.0f * PI / NumAngles);
+			const FVector Test(Base.X + FMath::Cos(Ang) * R, Base.Y + FMath::Sin(Ang) * R, WaterZ);
+			if (IsOpenWater(Test, ClearanceRadius))
+			{
+				return Test;
+			}
+		}
+	}
+	UE_LOG(LogTemp, Error, TEXT("[START] Fant ikke åpent vann innen 4 km fra (%.0f,%.0f)."), Base.X, Base.Y);
+	return Base;
+}
+
+void ASailboatPawn::PlaceAtStart(const FVector& Loc)
+{
+	// Dobbel klaring for selve startpunktet: båten seiler av gårde med en gang (auto-trim), og
+	// spilleren skal rekke å orientere seg før nærmeste grunne.
+	const FVector Target = FindNearestOpenWater(Loc, OpenWaterClearance * 2.0f);
+	const float Moved = FVector::Dist2D(Target, Loc);
+	if (Moved > 1.0f)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[START] (%.0f,%.0f) er land/grunne — flyttet %.0f m til åpent vann (%.0f,%.0f)."),
+			Loc.X, Loc.Y, Moved / 100.0f, Target.X, Target.Y);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("[START] (%.0f,%.0f) er åpent vann."), Target.X, Target.Y);
+	}
+	FRotator Rot = GetActorRotation();
+	if (Moved > 1.0f)
+	{
+		// Flyttet ut fra land: vend baugen videre utover, ellers seiler den rett inn igjen.
+		Rot = FRotator(0.0f, (Target - Loc).GetSafeNormal2D().Rotation().Yaw, 0.0f);
+	}
+	SetActorLocationAndRotation(Target, Rot, /*bSweep=*/false, nullptr, ETeleportType::TeleportPhysics);
+	if (CapsuleComp)
+	{
+		CapsuleComp->SetPhysicsLinearVelocity(FVector::ZeroVector);
+		CapsuleComp->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
+	}
+	CurrentSpeed = 0.0f;
+	LastSafeLoc = LastOpenWaterLoc = Target;
+	bHasSafeLoc = bHasOpenWaterLoc = true;
+	StartCheckTimeLeft = 3.0f;
+	OpenWaterCheckTimer = 0.5f;
+}
+
+FVector ASailboatPawn::GetSaveLocation() const
+{
+	return bHasOpenWaterLoc ? LastOpenWaterLoc : GetActorLocation();
 }
 
 AWindActor* ASailboatPawn::FindWind() const
@@ -492,6 +838,10 @@ void ASailboatPawn::UpdateHullWaterMask()
 	WaterMID->SetVectorParameterValue(TEXT("HullMaskPos"), FLinearColor(Center.X, Center.Y, Center.Z, 0.0f));
 	WaterMID->SetVectorParameterValue(TEXT("HullMaskFwd"), FLinearColor(Fwd.X, Fwd.Y, 0.0f, 0.0f));
 	WaterMID->SetVectorParameterValue(TEXT("HullMaskHalfExtent"), FLinearColor(HullMaskHalfExtent.X, HullMaskHalfExtent.Y, 0.0f, 0.0f));
+	// Skrogskum rundt maskeboksen (scripts/add_shore_foam.py), sterkere jo fortere båten går.
+	const bool bFoamOn = bEnableWake && CVarWake.GetValueOnGameThread() != 0;
+	WaterMID->SetScalarParameterValue(TEXT("HullFoamStrength"),
+		bFoamOn ? HullFoamMax * FMath::Clamp(FMath::Abs(CurrentSpeed) / HullFoamFullSpeed, 0.0f, 1.0f) : 0.0f);
 }
 
 void ASailboatPawn::ApplyPontoonBuoyancy(float DeltaTime)
@@ -588,17 +938,26 @@ void ASailboatPawn::InitSpray()
 	}
 	bSprayInitialized = true;
 
-	// Små kuler i stedet for flate plan (unngår «papirlapp»-utseendet). Ingen egne assets nødvendig.
-	UStaticMesh* DropMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+	// Kameravendte skum-quads (Engine-plan, 100×100 uu i XY) med M_SprayQuad
+	// (scripts/create_spray_material.py): rund, støyet dråpe som fader med levetiden. Levetiden
+	// legges i instansens Z-skala og leses i materialet — planet er flatt, så skalaen er usynlig.
+	// Fallback uten materialet: hvite Engine-kuler som før (så urealistiske ut, derfor quads).
+	UMaterialInterface* QuadMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Materials/Water/M_SprayQuad.M_SprayQuad"));
+	UStaticMesh* DropMesh = LoadObject<UStaticMesh>(nullptr,
+		QuadMat ? TEXT("/Engine/BasicShapes/Plane.Plane") : TEXT("/Engine/BasicShapes/Sphere.Sphere"));
 	if (DropMesh)
 	{
 		SprayMesh->SetStaticMesh(DropMesh);
 	}
-	UMaterialInterface* BaseMat = LoadObject<UMaterialInterface>(nullptr,
-		TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
-	if (BaseMat)
+	bSprayQuads = QuadMat != nullptr;
+	if (QuadMat)
 	{
-		// Dynamisk instans for å tinte skummet hvitt (param-navn ignoreres hvis det ikke finnes).
+		SprayMesh->SetMaterial(0, QuadMat);
+	}
+	else if (UMaterialInterface* BaseMat = LoadObject<UMaterialInterface>(nullptr,
+		TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial")))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[SPRUT] /Game/Materials/Water/M_SprayQuad mangler (scripts/create_spray_material.py) — bruker kuler"));
 		UMaterialInstanceDynamic* FoamMID = UMaterialInstanceDynamic::Create(BaseMat, this);
 		if (FoamMID)
 		{
@@ -616,6 +975,7 @@ void ASailboatPawn::InitSpray()
 	// Forhåndsallokér hele poolen som usynlige (null-skala) instanser.
 	SprayParticles.SetNum(FMath::Max(8, SprayPoolSize));
 	SprayMesh->ClearInstances();
+	SprayMesh->SetNumCustomDataFloats(1);   // [0] = levetidsfraksjon
 	FTransform Hidden(FRotator::ZeroRotator, FVector::ZeroVector, FVector::ZeroVector);
 	for (int32 i = 0; i < SprayParticles.Num(); ++i)
 	{
@@ -653,13 +1013,18 @@ void ASailboatPawn::UpdateSpray(float DeltaTime, const FVector& Forward, float T
 	AWindActor* Wind = FindWind();
 
 	// --- Emisjon: baug-skum når farten er høy ---
-	if (CurrentSpeed > SpraySpeedThreshold)
+	const bool bSprayTest = CVarSprayTest.GetValueOnGameThread() != 0;
+	if (CurrentSpeed > SpraySpeedThreshold || bSprayTest)
 	{
-		float SpeedFrac = (CurrentSpeed - SpraySpeedThreshold) / FMath::Max(1.0f, MaxBoatSpeed - SpraySpeedThreshold);
+		float SpeedFrac = bSprayTest ? 0.8f
+			: (CurrentSpeed - SpraySpeedThreshold) / FMath::Max(1.0f, MaxBoatSpeed - SpraySpeedThreshold);
 		float Rate = 45.0f * FMath::Clamp(SpeedFrac, 0.0f, 1.0f); // partikler/sekund
 		SprayEmitAccumulator += Rate * DeltaTime;
 
-		FVector Bow = BoatLoc + Forward * 130.0f;
+		// Spawn ved vannlinjen: kapselsenteret ligger ~11 uu UNDER vannflaten, og en partikkel som
+		// starter under WaterZ resirkuleres umiddelbart («landet på vannet»).
+		FVector Bow = BoatLoc + Forward * 120.0f;
+		Bow.Z = FMath::Max(BoatLoc.Z, WaterZ) + 12.0f;
 		FVector Right = FVector::CrossProduct(FVector::UpVector, Forward).GetSafeNormal();
 
 		while (SprayEmitAccumulator >= 1.0f)
@@ -669,8 +1034,8 @@ void ASailboatPawn::UpdateSpray(float DeltaTime, const FVector& Forward, float T
 			FVector SpawnPos = Bow + Right * (Side * 70.0f);
 			// Sprut: bakover + utover til siden + opp, skalert med fart.
 			FVector V = -Forward * (CurrentSpeed * 0.35f)
-				+ Right * (Side * CurrentSpeed * 0.25f)
-				+ FVector(0.0f, 0.0f, FMath::FRandRange(180.0f, 320.0f) * (0.5f + SpeedFrac));
+				+ Right * (Side * CurrentSpeed * 0.3f)
+				+ FVector(0.0f, 0.0f, FMath::FRandRange(120.0f, 220.0f) * (0.5f + SpeedFrac));
 			EmitSprayParticle(SpawnPos, V, 0.8f + SpeedFrac * 0.6f);
 		}
 	}
@@ -699,6 +1064,7 @@ void ASailboatPawn::UpdateSpray(float DeltaTime, const FVector& Forward, float T
 	// lever (og ingen levde forrige frame) hoppes oppdateringen helt over.
 	bool bAnyAlive = false;
 	SprayTransforms.SetNum(SprayParticles.Num(), EAllowShrinking::No);
+	const FVector CamPos = Camera ? Camera->GetComponentLocation() : BoatLoc + FVector(0, 0, 500);
 	for (int32 i = 0; i < SprayParticles.Num(); ++i)
 	{
 		FSprayParticle& P = SprayParticles[i];
@@ -710,15 +1076,28 @@ void ASailboatPawn::UpdateSpray(float DeltaTime, const FVector& Forward, float T
 			P.Position += P.Velocity * DeltaTime;
 			P.Life -= DeltaTime;
 
-			// Krymp mot slutten av levetiden som «fade».
 			float LifeFrac = FMath::Clamp(P.Life / FMath::Max(0.01f, P.MaxLife), 0.0f, 1.0f);
-			float Scale = P.Size * FMath::Sin(LifeFrac * PI); // opp og ned: dukker opp og forsvinner
 
 			if (P.Position.Z < WaterZ)
 			{
 				P.Life = 0.0f; // landet på vannet → resirkuler
 			}
-			Xform = FTransform(FRotator(0.0f, P.Yaw, 0.0f), P.Position, FVector(Scale));
+			if (bSprayQuads)
+			{
+				// Planet vendes mot kameraet (normal +Z mot kameraet, rullet med partikkelens yaw).
+				// Levetidsfraksjonen går som custom data 0 til M_SprayQuad (fader i shaderen);
+				// bMarkRenderStateDirty=false her — batch-oppdateringen under laster opp alt.
+				const FVector ToCam = (CamPos - P.Position).GetSafeNormal();
+				const FRotator Facing = FRotationMatrix::MakeFromZX(ToCam, FRotator(0.0f, P.Yaw, 0.0f).Vector()).Rotator();
+				Xform = FTransform(Facing, P.Position, FVector(P.Size));
+				SprayMesh->SetCustomDataValue(i, 0, LifeFrac, /*bMarkRenderStateDirty=*/false);
+			}
+			else
+			{
+				// Kuler: krymp mot slutten av levetiden som «fade».
+				float Scale = P.Size * FMath::Sin(LifeFrac * PI);
+				Xform = FTransform(FRotator(0.0f, P.Yaw, 0.0f), P.Position, FVector(Scale));
+			}
 		}
 		else
 		{

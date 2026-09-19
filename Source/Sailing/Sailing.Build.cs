@@ -17,5 +17,8 @@ public class Sailing : ModuleRules
 			"Json",
 			"Water"
 		});
+
+		// DoesPlatformSupportNanite/UseNanite (måleverktøyets Nanite-status).
+		PrivateDependencyModuleNames.AddRange(new string[] { "RenderCore", "RHI" });
 	}
 }

@@ -37,9 +37,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HUD|Units", meta = (ClampMin = "0.0001"))
 	float WindStrengthToMs = 0.01f;
 
-	/** Fart (spill-enheter/s) × denne faktoren = knop (f.eks. 0.00625 → 800 gir 5 kn). */
+	/** Fart (cm/s) × denne faktoren = knop: 1 kn = 51,444 cm/s. Var 0.00625 (en vilkårlig skala fra
+	 *  første versjon, «800 gir 5 kn»), som viste ~3,1× for lav fart — lens på 5,3 kn sto som 1,7 kn. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HUD|Units", meta = (ClampMin = "0.0001"))
-	float SpeedToKnots = 0.00625f;
+	float SpeedToKnots = 1.0f / 51.444f;
 
 	// Oversiktskart
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "HUD|Map", meta = (ClampMin = "1000"))

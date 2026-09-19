@@ -13,6 +13,15 @@
 #   scripts/run_fullscreen.sh --hitches    logg hakk >60 ms til Saved/Logs/Fullscreen.log
 #   scripts/run_fullscreen.sh --quality 2  grafikkvalitet 0–3 (lav/medium/høy/epic; standard er 3)
 #   scripts/run_fullscreen.sh --fps 30     lås bildefrekvensen (jevnere enn ulåst ~25–35 fps)
+#   scripts/run_fullscreen.sh --shots     faste skjermbilder ved referanseøyer → renders/landscape/<label>/
+#   scripts/run_fullscreen.sh --bench     fps per stasjon som [FPSBENCH]-linjer (skrives ut til slutt)
+#   scripts/run_fullscreen.sh --boat-shot   ett bilde fra spillerkameraet med båten → renders/landscape/<label>/boat.png
+#   scripts/run_fullscreen.sh --ground-test   skyver båten mot Hovedøya; [GROUNDTEST]/[GRUNNSTOT]/[REDNING] vises
+#   scripts/run_fullscreen.sh --water-check   vannsjekk: [VANNSJEKK] land over sjø / utenfor havmesh + bilder fra sonens ytterkanter
+#   scripts/run_fullscreen.sh --label fase2   merkelapp for --shots/--bench (standard «baseline»)
+#   scripts/run_fullscreen.sh --spike-mesh /Game/Sti/Mesh   testmesh foran første stasjon (med --shots/--bench)
+#   scripts/run_fullscreen.sh --arg -FjordTreeShadow=0   vilkårlig kommandolinjeflagg til spillet (A/B)
+#   scripts/run_fullscreen.sh --exec "r.Shadow.Virtual.Enable 1"   vilkårlig konsollkommando (A/B-måling)
 #   scripts/run_fullscreen.sh --force      start selv om editoren er åpen (frarådes, se under)
 # Avslutt spillet med Cmd+Q.
 
@@ -27,6 +36,9 @@ BUILD=1
 FORCE=0
 RES=""
 EXEC_CMDS=""
+MEASURE_ARGS=()
+MEASURE_EXTRA=()
+LABEL=""
 
 add_cmd() { EXEC_CMDS="${EXEC_CMDS:+$EXEC_CMDS,}$1"; }
 
@@ -47,8 +59,19 @@ while [[ $# -gt 0 ]]; do
 			FPS="${2:-}"; shift
 			[[ "$FPS" =~ ^[0-9]+$ ]] || { echo "--fps må være et heltall" >&2; exit 2; }
 			add_cmd "t.MaxFPS $FPS" ;;
+		--shots)    MEASURE_ARGS+=(-FjordShots) ;;
+		--bench)    MEASURE_ARGS+=(-FjordBench) ;;
+		--ground-test) MEASURE_ARGS+=(-FjordGroundTest) ;;
+		--boat-shot) MEASURE_ARGS+=(-FjordBoatShot) ;;
+		--water-check) MEASURE_ARGS+=(-FjordWaterCheck) ;;
+		--arg)      MEASURE_EXTRA+=("${2:-}"); shift ;;
+		--spike-mesh) MEASURE_EXTRA+=(-FjordSpikeMesh="${2:-}"); shift ;;
+		--label)
+			LABEL="${2:-}"; shift
+			[[ "$LABEL" =~ ^[A-Za-z0-9_-]+$ ]] || { echo "--label: kun bokstaver, tall, _ og -" >&2; exit 2; } ;;
+		--exec)     add_cmd "${2:-}"; shift ;;
 		--res)      RES="${2:-}"; shift ;;
-		-h|--help)  sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+		-h|--help)  sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
 		*) echo "Ukjent valg: $1 (se --help)" >&2; exit 2 ;;
 	esac
 	shift
@@ -86,6 +109,18 @@ if [[ -n "$RES" ]]; then
 fi
 if [[ -n "$EXEC_CMDS" ]]; then
 	ARGS+=(-ExecCmds="$EXEC_CMDS")
+fi
+
+if [[ ${#MEASURE_ARGS[@]} -gt 0 ]]; then
+	# Målekjøring: spillet avslutter seg selv etter siste stasjon; vis resultatene etterpå.
+	ARGS+=("${MEASURE_ARGS[@]}")
+	[[ ${#MEASURE_EXTRA[@]} -gt 0 ]] && ARGS+=("${MEASURE_EXTRA[@]}")
+	[[ -n "$LABEL" ]] && ARGS+=(-FjordLabel="$LABEL")
+	echo "Starter målekjøring (logg: $LOG). Spillet avslutter seg selv."
+	"$EDITOR_BIN" "${ARGS[@]}" || true
+	grep -aE "\[(FPSBENCH|GROUNDTEST|GRUNNSTOT|REDNING|VANNSJEKK|VANN)\]" "$LOG" \
+		| sed -E 's/^.*\[(FPSBENCH|GROUNDTEST|GRUNNSTOT|REDNING|VANNSJEKK|VANN)\]/[\1]/'
+	exit 0
 fi
 
 echo "Starter Sailing i fullskjerm (logg: $LOG). Avslutt med Cmd+Q."

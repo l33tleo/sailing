@@ -2,6 +2,10 @@
 #include "SailboatPawn.h"
 #include "IslandNameGenerator.h"
 #include "FjordGeometry.h"
+#include "Sailing.h"
+#include "FjordIslandBakeData.h"
+#include "Misc/CommandLine.h"
+#include "Components/InstancedStaticMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SphereComponent.h"
 #include "ProceduralMeshComponent.h"
@@ -46,7 +50,7 @@ AIslandActor::AIslandActor()
 	// Filled polygon land mesh (used for fjord islands with a real outline).
 	LandMesh = CreateDefaultSubobject<UProceduralMeshComponent>(TEXT("LandMesh"));
 	LandMesh->SetupAttachment(RootComponent);
-	LandMesh->SetCollisionProfileName(TEXT("BlockAll"));
+	LandMesh->SetCollisionProfileName(TEXT("FjordLand"));
 
 	DiscoverySphere = CreateDefaultSubobject<USphereComponent>(TEXT("DiscoverySphere"));
 	DiscoverySphere->SetupAttachment(RootComponent);
@@ -130,10 +134,21 @@ void AIslandActor::InitializeFjordIslandPolygon(const FString& InName, int32 InI
 	if (LocalOutline.Num() >= 3)
 	{
 		bUsingPolygon = true;
-		BuildPolygonMesh();
+		if (BakedMesh && IslandMesh)
+		{
+			// Bakt terreng: z=0 i meshen er middelvannstand, og aktøren står på WaterZ.
+			IslandMesh->SetStaticMesh(BakedMesh);
+			IslandMesh->SetCollisionProfileName(TEXT("FjordLand"));
+			ApplyLandMaterial(IslandMesh);
+			UE_LOG(LogTemp, Log, TEXT("Island %s: bakt terreng %s"), *IslandName, *BakedMesh->GetName());
+		}
+		else
+		{
+			BuildPolygonMesh();
+		}
 
 		// Hide the fallback static mesh; the polygon provides shape and collision.
-		if (IslandMesh)
+		if (IslandMesh && !BakedMesh)
 		{
 			IslandMesh->SetVisibility(false);
 			IslandMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -156,6 +171,59 @@ void AIslandActor::InitializeFjordIslandPolygon(const FString& InName, int32 InI
 	{
 		SetDiscovered(true);
 	}
+}
+
+void AIslandActor::BuildBakedInstances(const UFjordIslandBakeData* Data)
+{
+	// Vegetasjonen er plassert på den bakte terrengmeshen; uten den ville trærne sveve/stå i sjøen.
+	if (!Data || !BakedMesh)
+	{
+		return;
+	}
+
+	int32 Total = 0;
+	for (const FFjordInstanceSet& Set : Data->InstanceSets)
+	{
+		UStaticMesh* Mesh = Set.Mesh.LoadSynchronous();
+		const int32 Count = Set.Packed.Num() / FFjordInstanceSet::Stride;
+		if (!Mesh || Count == 0)
+		{
+			continue;
+		}
+
+		UInstancedStaticMeshComponent* ISM = NewObject<UInstancedStaticMeshComponent>(this);
+		ISM->SetStaticMesh(Mesh);
+		// Samme mobilitet som roten: en Static-komponent kan ikke festes til en ikke-statisk forelder
+		// (festingen avvises stille og komponenten blir liggende i verdens origo).
+		ISM->SetMobility(RootComponent->Mobility);
+		ISM->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		// -FjordTreeShadow=0 slår av skyggekasting for A/B-måling (scripts/run_fullscreen.sh --exec virker
+		// ikke her: dette er en komponentegenskap, ikke en konsollvariabel).
+		int32 TreeShadow = 1;
+		FParse::Value(FCommandLine::Get(), TEXT("FjordTreeShadow="), TreeShadow);
+		ISM->SetCastShadow(Set.bCastShadow && TreeShadow != 0);
+		ISM->SetCanEverAffectNavigation(false);
+		if (Set.CullDistance > 0.0f)
+		{
+			ISM->SetCullDistances(0, FMath::RoundToInt(Set.CullDistance));
+		}
+		ISM->SetupAttachment(RootComponent);
+		ISM->RegisterComponent();
+
+		TArray<FTransform> Transforms;
+		Transforms.Reserve(Count);
+		const float* P = Set.Packed.GetData();
+		for (int32 i = 0; i < Count; ++i, P += FFjordInstanceSet::Stride)
+		{
+			Transforms.Emplace(FRotator(0.0f, P[3], 0.0f), FVector(P[0], P[1], P[2]), FVector(P[4]));
+		}
+		// Ett batch-kall; ingen per-frame oppdatering (jf. MarkRenderStateDirty-hakkene på sprut-ISM-en).
+		ISM->AddInstances(Transforms, /*bShouldReturnIndices=*/false, /*bWorldSpace=*/false);
+		BakedInstanceComponents.Add(ISM);
+		Total += Count;
+
+	}
+	UE_LOG(LogTemp, Log, TEXT("Island %s: %d bakte instanser i %d sett"), *IslandName, Total, BakedInstanceComponents.Num());
 }
 
 void AIslandActor::SetTerrainSource(TSharedPtr<FjordGeometry::FHeightGrid> InGrid,
@@ -190,14 +258,24 @@ void AIslandActor::BuildPolygonMesh()
 		bBuilt = FjordGeometry::BuildFilledPolygon(LandMesh, LocalOutline, IslandTopZLocal, IslandSkirtDepth, 0, LandColor);
 	}
 
+	ApplyLandMaterial(LandMesh);
+}
+
+void AIslandActor::ApplyLandMaterial(UMeshComponent* Target)
+{
 	// Prefer the aerial M_Land material (as a dynamic instance so discovery can highlight
 	// without replacing the photo). Fall back to the flat green materials if it is absent.
-	UMaterialInterface* LandBase = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Fjord/M_Land.M_Land"));
+	// M_LandV2 = lagdelt PBR (scripts/create_land_material_v2.py); M_Land = kun flyfoto.
+	UMaterialInterface* LandBase = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Fjord/M_LandV2.M_LandV2"));
+	if (!LandBase)
+	{
+		LandBase = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Fjord/M_Land.M_Land"));
+	}
 	if (LandBase)
 	{
 		LandMID = UMaterialInstanceDynamic::Create(LandBase, this);
 		LandMID->SetScalarParameterValue(TEXT("Discovered"), bDiscovered ? 1.0f : 0.0f);
-		LandMesh->SetMaterial(0, LandMID);
+		Target->SetMaterial(0, LandMID);
 	}
 	else
 	{
@@ -205,7 +283,7 @@ void AIslandActor::BuildPolygonMesh()
 			nullptr, bDiscovered ? TEXT("/Game/Materials/M_IslandDiscovered") : TEXT("/Game/Materials/M_Island"));
 		if (Mat)
 		{
-			LandMesh->SetMaterial(0, Mat);
+			Target->SetMaterial(0, Mat);
 		}
 	}
 }
@@ -244,7 +322,7 @@ void AIslandActor::ApplyDiscoveredMaterial()
 		return;
 	}
 
-	if (bUsingPolygon && LandMesh)
+	if (bUsingPolygon && LandMesh && !BakedMesh)
 	{
 		LandMesh->SetMaterial(0, DiscoveredMat);
 		return;

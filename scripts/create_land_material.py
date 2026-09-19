@@ -96,6 +96,8 @@ def main() -> bool:
     mel.connect_material_expressions(tint, "", emissive, "B")
     mel.connect_material_property(emissive, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
 
+    # Bakt land er Nanite-mesher; uten flagget brukes standardmaterialet i spillet.
+    mel.set_material_usage(material, unreal.MaterialUsage.MATUSAGE_NANITE)
     mel.recompile_material(material)
     unreal.EditorAssetLibrary.save_asset("/Game/Fjord/M_Land")
     unreal.log(f"Created /Game/Fjord/M_Land (bbox {min_x:.0f},{min_y:.0f}..{max_x:.0f},{max_y:.0f})")

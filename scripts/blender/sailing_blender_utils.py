@@ -386,9 +386,14 @@ def optimist_class_stations():
 
 def create_optimist_sail(name="Sail", tack=None, clew=None, throat=None, peak=None,
                          nu=8, nv=10, draft=0.10, lee=1.0, material="M_Sail",
-                         leech_corner=None, leech_v=0.6):
+                         leech_corner=None, leech_v=0.6, uv=False):
     """
     Bygg et Optimist spri-seil med bukt (camber).
+
+    `uv=True` skriver et rektangulært UV0-kart: u = forlig(0)→leech(1), v = fot(0)→topp(1).
+    Seilmaterialet i spillet (M_SailV2) bruker det til bukt/flagring via WorldPositionOffset og til
+    prosedyrale sømmer — da skal seilet være FLATT (draft=0) og enkeltsidig (ingen Solidify), så
+    all bukt kommer fra shaderen og kan speiles ved halseskifte. NB: UE flipper V ved import.
 
     Optimist-seilet er FEMKANTET: leech (akterkanten) har et knekkpunkt (roach)
     der øvre battenen sitter. Sett `leech_corner` (verdenskoord.) for å aktivere
@@ -461,6 +466,13 @@ def create_optimist_sail(name="Sail", tack=None, clew=None, throat=None, peak=No
     for poly in me.polygons:
         poly.use_smooth = True
 
+    if uv:
+        layer = me.uv_layers.new(name="UVMap")
+        for poly in me.polygons:
+            for li in poly.loop_indices:
+                vi = me.loops[li].vertex_index
+                layer.data[li].uv = ((vi % row) / nu, (vi // row) / nv)
+
     obj = bpy.data.objects.new(name, me)
     if target_colls:
         for c in target_colls:
@@ -518,6 +530,87 @@ def setup_ue_export(filepath, objects=None):
 
     import os
     return os.path.getsize(filepath)
+
+
+def export_boat_parts(parts, out_dir, manifest_name="boat_parts_manifest.json"):
+    """
+    Eksporter båten som flere FBX-er med hver sin pivot — én per bevegelig del (skrog, rigg, ror).
+
+    parts: {navn: {"objects": [objektnavn, ...],
+                   "pivot": (x, y, z),                     # verdenskoord. som blir meshets origo
+                   "offsets": {objektnavn: (dx, dy, dz)}}} # valgfri forskyvning per objekt
+
+    For hver del kopieres objektene, modifikatorer appliseres, verdens-transformen bakes inn i
+    verteksene, alt forskyves med -pivot og slås sammen til ett objekt som eksporteres med
+    setup_ue_export(). Pivoten ligger dermed i selve geometrien: UE-importen baker uansett
+    node-transformer inn i verteksene (transform_vertex_to_absolute), så objekt-origo i Blender
+    er ikke til å stole på. Scenen endres ikke (kopiene slettes etterpå).
+
+    Skriver <out_dir>/<navn>.fbx og <out_dir>/<manifest_name> med trekanttall, pivot (cm, UE)
+    og materialslot-rekkefølge per del — import-scriptet verifiserer mot dette.
+    Returnerer manifest-dicten.
+    """
+    import os
+    import json
+    from mathutils import Matrix
+
+    os.makedirs(out_dir, exist_ok=True)
+    manifest = {}
+    scene_coll = bpy.context.scene.collection
+
+    for name, spec in parts.items():
+        pivot = Vector(spec["pivot"])
+        offsets = spec.get("offsets", {})
+        copies = []
+        for src_name in spec["objects"]:
+            src = bpy.data.objects.get(src_name)
+            if src is None:
+                raise ValueError(f"Objekt '{src_name}' finnes ikke")
+            dup = src.copy()
+            dup.data = src.data.copy()
+            dup.name = f"_export_{name}_{src_name}"
+            scene_coll.objects.link(dup)
+            bpy.context.view_layer.update()
+            # Appliser modifikatorer via evaluert mesh (beholder materialer)
+            deps = bpy.context.evaluated_depsgraph_get()
+            me = bpy.data.meshes.new_from_object(dup.evaluated_get(deps))
+            dup.modifiers.clear()
+            old_me = dup.data
+            dup.data = me
+            bpy.data.meshes.remove(old_me)
+            # Verdenstransform + forskyvning - pivot inn i verteksene
+            me.transform(src.matrix_world)
+            me.transform(Matrix.Translation(Vector(offsets.get(src_name, (0, 0, 0))) - pivot))
+            dup.matrix_world = Matrix.Identity(4)
+            copies.append(dup)
+
+        bpy.ops.object.select_all(action="DESELECT")
+        for c in copies:
+            c.select_set(True)
+        bpy.context.view_layer.objects.active = copies[0]
+        if len(copies) > 1:
+            bpy.ops.object.join()
+        joined = copies[0]
+        joined.name = name
+
+        tris = sum(len(p.vertices) - 2 for p in joined.data.polygons)
+        fbx = os.path.join(out_dir, name + ".fbx")
+        setup_ue_export(fbx, [joined.name])
+        manifest[name] = {
+            "fbx": fbx,
+            "tris": tris,
+            "verts": len(joined.data.vertices),
+            "pivot_cm": [round(pivot.x * 100, 2), round(pivot.y * 100, 2), round(pivot.z * 100, 2)],
+            "material_slots": [m.name if m else None for m in joined.data.materials],
+            "objects": list(spec["objects"]),
+        }
+        me = joined.data
+        bpy.data.objects.remove(joined, do_unlink=True)
+        bpy.data.meshes.remove(me)
+
+    with open(os.path.join(out_dir, manifest_name), "w", encoding="utf-8") as f:
+        json.dump(manifest, f, indent=1, ensure_ascii=False)
+    return manifest
 
 
 # ----- Rendering for verifisering ----------------------------------------

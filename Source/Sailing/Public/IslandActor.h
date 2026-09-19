@@ -8,6 +8,10 @@
 class USphereComponent;
 class UProceduralMeshComponent;
 class UMaterialInstanceDynamic;
+class UMeshComponent;
+class UStaticMesh;
+class UFjordIslandBakeData;
+class UInstancedStaticMeshComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnIslandDiscovered, AIslandActor*, Island, const FString&, IslandName);
 
@@ -66,6 +70,13 @@ public:
 	void SetTerrainSource(TSharedPtr<FjordGeometry::FHeightGrid> InGrid,
 		float InHeightExaggeration, float InDistanceScale);
 
+	/** Bruk en offline-bakt terrengmesh i stedet for den prosedurale polygonen.
+	 *  Kall før InitializeFjordIslandPolygon. */
+	void SetBakedMesh(UStaticMesh* InMesh) { BakedMesh = InMesh; }
+
+	/** Bygg instansiert vegetasjon fra bakte data. Kall etter InitializeFjordIslandPolygon. */
+	void BuildBakedInstances(const UFjordIslandBakeData* Data);
+
 	// Mark island as discovered (called from save system or overlap)
 	void SetDiscovered(bool bFromSaveGame = false);
 
@@ -88,6 +99,14 @@ private:
 	TSharedPtr<FjordGeometry::FHeightGrid> HeightGrid;
 	float HeightExaggeration = 1.0f;
 	float DistanceScale = 100.0f;
+
+	UPROPERTY()
+	TObjectPtr<UStaticMesh> BakedMesh;
+
+	UPROPERTY()
+	TArray<TObjectPtr<UInstancedStaticMeshComponent>> BakedInstanceComponents;
+
+	void ApplyLandMaterial(UMeshComponent* Target);
 
 	// Dynamic instance of M_Land so discovery can highlight without losing the aerial texture.
 	UPROPERTY()

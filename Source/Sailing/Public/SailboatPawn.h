@@ -14,6 +14,8 @@ class AWindActor;
 class UInstancedStaticMeshComponent;
 class UPrimitiveComponent;
 class UWaterBodyComponent;
+class USailRigComponent;
+class UWakeRibbonComponent;
 
 /** Én skum-/spray-partikkel (verdensrom). Simuleres på CPU, tegnes via instanced mesh. */
 struct FSprayParticle
@@ -38,17 +40,81 @@ public:
 	virtual void Tick(float DeltaTime) override;
 	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 
+	/** Sant hvis Loc og en ring rundt (ClearanceRadius) har minst OpenWaterMinDepth vann — dvs. at
+	 *  båten flyter fritt der, ikke bare «ikke over land». */
+	bool IsOpenWater(const FVector& Loc, float ClearanceRadius) const;
+
+	/** Nærmeste punkt til Loc med åpent vann i ClearanceRadius (Loc selv hvis den er åpen). Z = WaterZ. */
+	FVector FindNearestOpenWater(const FVector& Loc, float ClearanceRadius) const;
+
+	/** Plasserer båten ved start (lagret posisjon / fjordstart) — ALDRI på land eller grunne: flyttes
+	 *  til nærmeste åpne vann ved behov, og etterprøves de første sekundene. */
+	void PlaceAtStart(const FVector& Loc);
+
+	/** Posisjonen som skal lagres: siste åpne vann, ikke en eventuell grunnstøtt posisjon. */
+	FVector GetSaveLocation() const;
+
 	// Components – kapselen er rot slik at den sveiper mot land, og båt/kamera flyttes med den
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UCapsuleComponent> CapsuleComp;
 
-	/** Kombinert Optimist-båt mesh (skrog, mast, seil, ror osv. i ett). */
+	/** Skroget (skrog, mast, sverd, mastetofte). Inntil delene er splittet (fase 1) er dette det
+	 *  kombinerte Optimist-meshet med seil og ror bakt inn. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> BoatMesh;
+
+	/** Mastepivot: bom/sprit/seil svinger om denne (se USailRigComponent). Festet til BoatMesh på MastPivotLocal. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<USailRigComponent> SailRig;
+
+	/** Bom + sprit + seil som ett mesh med pivot i mastaksen. Tomt inntil SM_Boat_Rig finnes. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UStaticMeshComponent> RigMesh;
+
+	/** Ror + rorhode + rorkult som ett mesh med pivot i rorakselen. Tomt inntil SM_Boat_Rudder finnes. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UStaticMeshComponent> RudderMesh;
+
+	/** Rorakselen i BoatMesh-lokale cm (rorhodet sitter på akterspeilet ved x≈-119 i Blender-masteren). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Rudder")
+	FVector RudderPivotLocal = FVector(-119.0f, 0.0f, 0.0f);
+
+	/** Største rorutslag (grader). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Rudder", meta = (ClampMin = "5", ClampMax = "60"))
+	float MaxRudderDeg = 35.0f;
+
+	/** Hvor fort roret legges over når styretasten holdes (grader/s). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Rudder", meta = (ClampMin = "1"))
+	float RudderRateDegPerS = 140.0f;
+
+	/** Hvor fort roret går tilbake mot midtstilling når tasten slippes (grader/s). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Rudder", meta = (ClampMin = "1"))
+	float RudderReturnRateDegPerS = 90.0f;
+
+	/** Andel av full rorvirkning i stillstand (0 = roret virker ikke uten fart; >0 for spillbarhet ut av jern). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Rudder", meta = (ClampMin = "0", ClampMax = "1"))
+	float RudderMinSpeedFactor = 0.35f;
+
+	/** Fart (uu/s) der roret har full virkning. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Rudder", meta = (ClampMin = "1"))
+	float RudderFullEffectSpeed = 200.0f;
 
 	/** Plan bak i båten (stern) med ugjennomtrengelig materiale – blokkerer «innsikt» bakfra. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UStaticMeshComponent> SternShield;
+
+	/** Gulvplater i cockpiten. Skrogmodellen er åpne skall uten gulv, og havmaterialet klipper bort
+	 *  vannet inne i skroget — uten gulv ser man rett ned på sjøbunnen gjennom cockpiten. Tre plater
+	 *  fordi skroget smalner mot baugen (halvbredde 48 cm midtskips, 31 i baugen); målt fra meshen. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TArray<TObjectPtr<UStaticMeshComponent>> CockpitFloorPlates;
+
+	/** Plater i BoatMesh-lokale cm: X = (xmin, xmax), Y = halvbredde. Skrogbunnen ligger på z −10..−5. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Visual")
+	TArray<FVector> CockpitFloorPlateSpecs = { FVector(-108.0f, 45.0f, 39.0f), FVector(45.0f, 85.0f, 34.0f), FVector(85.0f, 105.0f, 29.0f) };
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Visual")
+	float CockpitFloorZ = -3.0f;
 
 	/** Målpunkt for kamera (over båten) slik at båten havner lavere i bildet. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
@@ -64,10 +130,28 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	TObjectPtr<UInstancedStaticMeshComponent> SprayMesh;
 
-	// Spray-tuning. Av som standard: skum-kulene (Engine-sfærer) så urealistiske ut og
-	// flimret (hundrevis som popper inn/ut). Kan slås på igjen i editoren om ønskelig.
+	/** Kjølvann-strimmel bak akterspeilet (se UWakeRibbonComponent). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UWakeRibbonComponent> WakeRibbon;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Wake")
+	bool bEnableWake = true;
+
+	/** Hvor langt akter for akterspeilet (uu) strimmelen starter — utenfor skrogmasken i havmaterialet. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Wake")
+	float WakeStartOffsetX = -135.0f;
+
+	/** Skrogskum i havmaterialet (HullFoamStrength) ved full fart; skaleres med saturate(fart/HullFoamFullSpeed). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Wake", meta = (ClampMin = "0"))
+	float HullFoamMax = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Wake", meta = (ClampMin = "1"))
+	float HullFoamFullSpeed = 300.0f;
+
+	// Spray-tuning. Kameravendte skum-quads med M_SprayQuad (se InitSpray); de gamle Engine-kulene
+	// så urealistiske ut og var derfor avslått.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Spray")
-	bool bEnableSpray = false;
+	bool bEnableSpray = true;
 
 	/** Antall partikler i poolen (forhåndsallokert). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Spray", meta = (ClampMin = "8", ClampMax = "256"))
@@ -75,7 +159,7 @@ public:
 
 	/** Fart (enheter/s) der baug-skum begynner å danne seg. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Spray", meta = (ClampMin = "0"))
-	float SpraySpeedThreshold = 280.0f;
+	float SpraySpeedThreshold = 230.0f;
 
 	/** Levetid per partikkel (s). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Spray", meta = (ClampMin = "0.1"))
@@ -94,36 +178,62 @@ public:
 	float TurnSpeed = 90.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Tuning")
-	float MaxBoatSpeed = 800.0f;
+	float MaxBoatSpeed = 450.0f;
 
 	/** Andel av farten som beholdes ved frontal grunnstøting (0 = full stopp, 1 = ingen brems). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Tuning", meta = (ClampMin = "0", ClampMax = "1"))
 	float GroundingSpeedRetain = 0.1f;
 
-	/** Hullmotstand: drag = DragCoefficient * Speed^2 (enheter: 1/lengde). */
+	/** Verdens-Z terrenget må stikke over for å regnes som «land» i IsOverLand (vannflaten er
+	 *  z=100, bølgetopper ~169). Bakt terreng fortsetter som sjøbunn under dette nivået. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Grounding")
+	float OverLandMinZ = 170.0f;
+
+	/** Minste vanndybde (cm under WaterZ) for at et punkt regnes som seilbart i IsOpenWater. IsOverLand
+	 *  godtar strender/grunner under OverLandMinZ som «ikke land», men der står båten fast. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Grounding", meta = (ClampMin = "0"))
+	float OpenWaterMinDepth = 90.0f;
+
+	/** Klaring (cm) til grunne/land som kreves rundt start-, rednings- og lagringsposisjoner. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Grounding", meta = (ClampMin = "100"))
+	float OpenWaterClearance = 1500.0f;
+
+	/** Hullmotstand: drag = DragCoefficient * Speed^2 (enheter: 1/lengde). Kalibrert sammen med polaren
+	 *  og SailForceAccelScale mot reell Optimist-fart (lens 9 m/s ≈ 4,3 kn, kryss ≈ 3,3 kn, halv vind
+	 *  ≈ 5,6 kn) — se scripts/tuning/optimist_polar_fit.py. NB: kapselens LinearDamping (0.5) er også
+	 *  en del av motstanden og inngår i kalibreringen. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Tuning", meta = (ClampMin = "0"))
-	float DragCoefficient = 0.0012f;
+	float DragCoefficient = 0.0043f;
 
 	// Polar curve tuning — kraftmultiplikator per kurs relativt til vind
-	// No-go zone: vinkel fra vindretning der seilet ikke kan generere kraft
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|WindModel", meta = (ClampMin = "30", ClampMax = "60"))
-	float NoGoZoneAngle = 50.0f;
+	// NB: alle polarvinklene er TILSYNELATENDE vindvinkel (AWA). På kryss med sann vind ~45° ligger
+	// AWA på ~30°, så en no-go på 50° (et tall for SANN vind) ga null kraft på hele krysset.
+	// No-go zone: tilsynelatende vinkel der seilet ikke lenger gir fremdrift (kraft 0, stiger lineært
+	// til CloseHauledForce ved CloseHauledAngle)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|WindModel", meta = (ClampMin = "15", ClampMax = "45"))
+	float NoGoZoneAngle = 25.0f;
 
-	// Kraft ved close-hauled (rett utenfor no-go zone)
+	// Tilsynelatende vinkel der CloseHauledForce gjelder (lineært herfra til BeamReachForce ved 90°)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|WindModel", meta = (ClampMin = "30", ClampMax = "70"))
+	float CloseHauledAngle = 50.0f;
+
+	// Kraft ved CloseHauledAngle
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|WindModel", meta = (ClampMin = "0", ClampMax = "1"))
-	float CloseHauledForce = 0.18f;
+	float CloseHauledForce = 0.75f;
 
-	// Kraft ved beam reach (90° fra vind) — maksimal ytelse
+	// Kraft ved 90° tilsynelatende vind. Polaren er bevisst flat: tilsynelatende vind (styrke og
+	// dreining forover med farten) former allerede det meste av fartspolaren.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|WindModel", meta = (ClampMin = "0", ClampMax = "1"))
 	float BeamReachForce = 1.0f;
 
 	// Kraft ved broad reach (~135° fra vind)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|WindModel", meta = (ClampMin = "0", ClampMax = "1"))
-	float BroadReachForce = 0.5f;
+	float BroadReachForce = 1.0f;
 
-	// Kraft ved running (180° fra vind, ren drag)
+	// Kraft ved running (180° fra vind). Tilsynelatende vind er her sann vind MINUS båtfart, så
+	// lens blir uansett tregest — 0.22 ga urealistisk stor forskjell mot slør.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|WindModel", meta = (ClampMin = "0", ClampMax = "1"))
-	float RunningForce = 0.22f;
+	float RunningForce = 0.85f;
 
 	/** Potens på kraftmultiplikator (1 = lineær; >1 gir skarpere polar, dårlige vinkler tregere). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|WindModel", meta = (ClampMin = "0.5", ClampMax = "2"))
@@ -181,7 +291,7 @@ public:
 	/** Skalering fra CurrentSailForce (uendret polar-modell) til fremdriftsakselerasjon. Massefri
 	 *  (AddForce med bAccelChange), så fremdriftsfølelsen forblir lik den kinematiske modellen. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Physics", meta = (ClampMin = "0"))
-	float SailForceAccelScale = 1.0f;
+	float SailForceAccelScale = 0.3f;
 
 	/** Høyde over kapselsenteret der seilkraften angriper — gir naturlig krengningsmoment. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Physics")
@@ -216,6 +326,14 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
 	TObjectPtr<UInputAction> CameraAction;
 
+	/** Skjøt: +1 slakk, -1 hal inn (holdes). */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+	TObjectPtr<UInputAction> SheetAction;
+
+	/** Slår auto-trim av/på. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Input")
+	TObjectPtr<UInputAction> AutoTrimAction;
+
 	// State
 	UPROPERTY(BlueprintReadOnly, Category = "Sailing|State")
 	float CurrentSailForce = 0.0f;
@@ -224,9 +342,36 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "Sailing|State")
 	float CurrentSpeed = 0.0f;
 
+	// Vind ved båten, beregnet ÉN gang per Tick. HUD/spray/rigg leser disse i stedet for å sample
+	// Perlin-vindfeltet på nytt. Vektorene peker dit vinden BLÅSER (vindhastighet i uu/s).
+	UPROPERTY(BlueprintReadOnly, Category = "Sailing|State")
+	FVector TrueWindVec = FVector::ZeroVector;
+
+	/** Tilsynelatende vind = sann vind - båtens hastighet. */
+	UPROPERTY(BlueprintReadOnly, Category = "Sailing|State")
+	FVector ApparentWindVec = FVector::ZeroVector;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Sailing|State")
+	float ApparentWindStr = 0.0f;
+
+	/** Signert vinkel (-180..180) mellom baugen og retningen vinden KOMMER fra. Positiv = vind fra styrbord.
+	 *  0 = i jern, ±180 = lens. Bruker sann vindretning når tilsynelatende vind er ~0. */
+	UPROPERTY(BlueprintReadOnly, Category = "Sailing|State")
+	float ApparentWindAngleDeg = 0.0f;
+
+	/** +1 vind fra styrbord, -1 fra babord (fortegnet på ApparentWindAngleDeg). */
+	UPROPERTY(BlueprintReadOnly, Category = "Sailing|State")
+	float ApparentWindSideSign = 1.0f;
+
+	/** Rorvinkel (grader), positiv = styrbordsving. */
+	UPROPERTY(BlueprintReadOnly, Category = "Sailing|State")
+	float RudderAngleDeg = 0.0f;
+
 	// Input handlers (public so PlayerController can bind them)
 	void HandleTurn(const FInputActionValue& Value);
 	void HandleCamera(const FInputActionValue& Value);
+	void HandleSheet(const FInputActionValue& Value);
+	void HandleAutoTrim(const FInputActionValue& Value);
 
 private:
 
@@ -249,10 +394,20 @@ private:
 	FVector LastSafeLoc = FVector::ZeroVector;
 	bool bHasSafeLoc = false;
 
+	/** Siste posisjon med ÅPENT vann rundt (IsOpenWater) — det er denne som lagres, aldri en
+	 *  grunnstøtt posisjon. Oppdateres ~2 ganger i sekundet. */
+	FVector LastOpenWaterLoc = FVector::ZeroVector;
+	bool bHasOpenWaterLoc = false;
+	float OpenWaterCheckTimer = 0.0f;
+
+	/** Gjenstående tid (s) der startposisjonen etterprøves (i tilfelle landkollisjon kommer sent). */
+	float StartCheckTimeLeft = 0.0f;
+
 	// Spray-state
 	TArray<FSprayParticle> SprayParticles;
 	float SprayEmitAccumulator = 0.0f;
 	bool bSprayInitialized = false;
+	bool bSprayQuads = false;   // M_SprayQuad + plan (ellers kule-fallback)
 
 	void InitSpray();
 	void UpdateSpray(float DeltaTime, const FVector& Forward, float Time);

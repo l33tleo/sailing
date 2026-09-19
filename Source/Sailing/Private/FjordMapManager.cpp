@@ -1,4 +1,5 @@
 #include "FjordMapManager.h"
+#include "FjordIslandBakeData.h"
 #include "FjordMapData.h"
 #include "FjordGeometry.h"
 #include "IslandActor.h"
@@ -101,7 +102,9 @@ void AFjordMapManager::BeginPlay()
 					LocalOutline.Add((P - Def.Position) * DistanceScale);
 				}
 				Island->SetTerrainSource(HeightGrid, HeightExaggeration, DistanceScale);
+				Island->SetBakedMesh(Def.BakedMesh.LoadSynchronous());
 				Island->InitializeFjordIslandPolygon(Def.Name, i, bWasDiscovered, LocalOutline);
+				Island->BuildBakedInstances(Def.BakeData.LoadSynchronous());
 			}
 			else
 			{

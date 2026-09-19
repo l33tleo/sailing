@@ -1,6 +1,7 @@
 #include "SailingHUD.h"
 #include "WindActor.h"
 #include "SailboatPawn.h"
+#include "SailRigComponent.h"
 #include "IslandActor.h"
 #include "SailingGameMode.h"
 #include "SailingPlayerController.h"
@@ -145,7 +146,7 @@ void ASailingHUD::DrawCompass()
 
 	// Compass position and size - bottom-left corner
 	float CenterX = 90.0f;
-	float CenterY = Canvas->ClipY - 170.0f;
+	float CenterY = Canvas->ClipY - 194.0f;   // over info-panelet (som ble 24 px høyere med SKJØT-linja)
 	float Radius = 65.0f;
 
 	// Dark background circle
@@ -299,6 +300,40 @@ void ASailingHUD::DrawCompass()
 			CenterX + MCos * (Radius - 2.0f), CenterY + MSin * (Radius - 2.0f),
 			FLinearColor(1.0f, 1.0f, 1.0f, 0.45f), 2.0f);
 	}
+
+	// Rigg: bommen som en tykk strek fra masten (sentrum) akterover, dreid til bomvinkelen, og den
+	// TILSYNELATENDE vinden som en tynn cyan pil — det er den seilet og flagringen følger, og den
+	// avviker fra den gule (sanne) pila jo fortere båten går. Båtrelative vinkler: 0 = forover,
+	// positiv = styrbord; på skjermen er forover opp, så skjermvinkel = vinkel − 90°.
+	if (const ASailboatPawn* Boat = Cast<ASailboatPawn>(Pawn))
+	{
+		if (Boat->SailRig)
+		{
+			const float BoomScreen = FMath::DegreesToRadians(180.0f - Boat->SailRig->BoomAngleDeg) - PI * 0.5f;
+			const float BoomLen = Radius * 0.5f;
+			const FLinearColor BoomColor = Boat->SailRig->Flutter > 0.5f
+				? FLinearColor(1.0f, 0.35f, 0.3f, 1.0f) : FLinearColor(0.85f, 0.7f, 0.45f, 1.0f);
+			DrawLine(CenterX, CenterY,
+				CenterX + FMath::Cos(BoomScreen) * BoomLen, CenterY + FMath::Sin(BoomScreen) * BoomLen,
+				BoomColor, 4.0f);
+		}
+		if (Boat->ApparentWindStr > 1.0f)
+		{
+			const float AwaScreen = FMath::DegreesToRadians(Boat->ApparentWindAngleDeg) - PI * 0.5f;
+			const float ACos = FMath::Cos(AwaScreen);
+			const float ASin = FMath::Sin(AwaScreen);
+			const float TailR = Radius * 0.3f;
+			const float TipR = Radius * 0.85f;
+			const FLinearColor AwaColor(0.4f, 0.9f, 1.0f, 0.9f);
+			// Som den gule pila: peker utover mot der vinden kommer FRA.
+			DrawLine(CenterX + ACos * TailR, CenterY + ASin * TailR,
+				CenterX + ACos * TipR, CenterY + ASin * TipR, AwaColor, 2.0f);
+			const float PerpX = -ASin, PerpY = ACos;
+			const float HeadX = CenterX + ACos * (TipR - 8.0f), HeadY = CenterY + ASin * (TipR - 8.0f);
+			DrawLine(CenterX + ACos * TipR, CenterY + ASin * TipR, HeadX + PerpX * 5.0f, HeadY + PerpY * 5.0f, AwaColor, 2.0f);
+			DrawLine(CenterX + ACos * TipR, CenterY + ASin * TipR, HeadX - PerpX * 5.0f, HeadY - PerpY * 5.0f, AwaColor, 2.0f);
+		}
+	}
 }
 
 void ASailingHUD::DrawWindAndSpeed()
@@ -316,9 +351,9 @@ void ASailingHUD::DrawWindAndSpeed()
 
 	// Info panel below compass (bottom-left)
 	float PanelX = 90.0f - 100.0f;
-	float PanelY = Canvas->ClipY - 118.0f;
+	float PanelY = Canvas->ClipY - 142.0f;
 	float PanelW = 200.0f;
-	float PanelH = 108.0f;
+	float PanelH = 132.0f;
 
 	// Dark background
 	DrawRect(FLinearColor(0.0f, 0.05f, 0.15f, 0.7f), PanelX, PanelY, PanelW, PanelH);
@@ -327,9 +362,10 @@ void ASailingHUD::DrawWindAndSpeed()
 	const ASailboatPawn* Boat = Cast<ASailboatPawn>(Pawn);
 	if (Wind)
 	{
-		// Lokal vind ved båten (inkl. kast) – det spilleren faktisk seiler i.
+		// Lokal vind ved båten (inkl. kast) – det spilleren faktisk seiler i. Pawnen har allerede
+		// samplet den denne framen.
 		FVector BoatLoc = Pawn->GetActorLocation();
-		float WindMs = Wind->GetWindVelocityAt(BoatLoc).Size() * WindStrengthToMs;
+		float WindMs = (Boat ? Boat->TrueWindVec.Size() : Wind->GetWindVelocityAt(BoatLoc).Size()) * WindStrengthToMs;
 
 		// Glatt et snitt for trend-pil (bygger ↑ / avtar ↓).
 		float DeltaTime = GetWorld()->GetDeltaSeconds();
@@ -351,11 +387,9 @@ void ASailingHUD::DrawWindAndSpeed()
 		// Point of sail label
 		if (Boat)
 		{
-			FVector BoatFwd = Pawn->GetActorForwardVector();
-			FVector WindDir = Wind->GetWindDirection();
-			// WindDir peker mot vindkilden: 0° = mot vind, 180° = med vind
-			float CosA = FVector::DotProduct(BoatFwd, WindDir);
-			float Angle = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(CosA, -1.0f, 1.0f)));
+			// Samme TILSYNELATENDE vindvinkel som polaren og riggen bruker (0 = mot vind, 180 = med),
+			// så etiketten stemmer med når seilet faktisk trekker/flagrer.
+			float Angle = FMath::Abs(Boat->ApparentWindAngleDeg);
 
 			FString PointOfSail;
 			FLinearColor PointColor;
@@ -427,12 +461,46 @@ void ASailingHUD::DrawWindAndSpeed()
 		}
 	}
 
+	// Skjøt: grense (grader ut fra senterlinjen) + AUTO/MAN, og FLAGRER når seilet står i vinden.
+	if (Boat && Boat->SailRig)
+	{
+		const USailRigComponent* Rig = Boat->SailRig;
+		FString SheetText = FString::Printf(TEXT("SKJØT: %.0f%c %s"), Rig->SheetLimitDeg, (TCHAR)0x00B0,
+			Rig->bAutoTrim ? TEXT("AUTO") : TEXT("MAN"));
+		DrawText(SheetText, Rig->bAutoTrim ? FLinearColor(0.7f, 0.85f, 1.0f, 1.0f) : FLinearColor(1.0f, 0.9f, 0.5f, 1.0f),
+			PanelX + 15.0f, PanelY + 80.0f, nullptr, 1.1f);
+		// Trimvarsel med hva spilleren skal gjøre. Manuell skjøt blir stående når man faller av fra
+		// kryss — et overhalt seil på slør gir ~40 % kraft, og uten varsel oppleves båten bare treg.
+		const float Flash = 0.5f + 0.5f * FMath::Sin(GustFlashPhase);   // samme blinkfase som kast-varselet
+		FString TrimWarning;
+		FLinearColor TrimColor = FLinearColor::White;
+		if (Rig->Flutter > 0.5f)
+		{
+			TrimWarning = Rig->bAutoTrim ? TEXT("FLAGRER") : TEXT("FLAGRER - hal inn (W)");
+			TrimColor = FLinearColor(1.0f, 0.3f + 0.3f * Flash, 0.3f, 1.0f);
+		}
+		else if (!Rig->bAutoTrim && Rig->OverSheetAmount > 0.35f)
+		{
+			TrimWarning = FString::Printf(TEXT("OVERHALT, %.0f%% kraft - slakk (S) / auto (T)"), Rig->TrimEfficiency * 100.0f);
+			TrimColor = FLinearColor(1.0f, 0.5f + 0.3f * Flash, 0.2f, 1.0f);
+		}
+		if (!TrimWarning.IsEmpty())
+		{
+			// Egen boks til høyre for panelet: teksten er bredere enn det som er igjen av SKJØT-linja.
+			float TextW = 0.0f, TextH = 0.0f;
+			GetTextSize(TrimWarning, TextW, TextH, nullptr, 1.1f);
+			const float BoxX = PanelX + PanelW + 6.0f;
+			DrawRect(FLinearColor(0.0f, 0.05f, 0.15f, 0.7f), BoxX, PanelY + 76.0f, TextW + 16.0f, TextH + 8.0f);
+			DrawText(TrimWarning, TrimColor, BoxX + 8.0f, PanelY + 80.0f, nullptr, 1.1f);
+		}
+	}
+
 	// Speed (knop)
 	if (Boat)
 	{
 		float SpeedKn = Boat->CurrentSpeed * SpeedToKnots;
 		FLinearColor SpeedColor;
-		if (Boat->CurrentSpeed > 500.0f)
+		if (Boat->CurrentSpeed > 260.0f)   // ~5 kn: over skrogfart, planer
 			SpeedColor = FLinearColor(0.2f, 1.0f, 0.2f, 1.0f); // Green = fast
 		else if (Boat->CurrentSpeed > 100.0f)
 			SpeedColor = FLinearColor(1.0f, 1.0f, 0.3f, 1.0f); // Yellow = medium
@@ -441,7 +509,7 @@ void ASailingHUD::DrawWindAndSpeed()
 
 		FString SpeedText = FString::Printf(TEXT("FART: %.1f kn"), SpeedKn);
 		DrawText(SpeedText, SpeedColor,
-			PanelX + 15.0f, PanelY + 80.0f, nullptr, 1.3f);
+			PanelX + 15.0f, PanelY + 104.0f, nullptr, 1.3f);
 	}
 }
 

@@ -209,6 +209,17 @@ void ASailingPlayerController::CreateInputAssets()
 
 	// Map Mouse XY to Camera look
 	SailingMappingContext->MapKey(CameraAction, EKeys::Mouse2D);
+
+	// Skjøt (1D-akse): S = slakk (+1), W = hal inn (-1). Manuell skjøt slår av auto-trim; T slår den på igjen.
+	SheetAction = NewObject<UInputAction>(this, TEXT("IA_Sheet"));
+	SheetAction->ValueType = EInputActionValueType::Axis1D;
+	SailingMappingContext->MapKey(SheetAction, EKeys::S);
+	FEnhancedActionKeyMapping& WMapping = SailingMappingContext->MapKey(SheetAction, EKeys::W);
+	WMapping.Modifiers.Add(NewObject<UInputModifierNegate>(this));
+
+	AutoTrimAction = NewObject<UInputAction>(this, TEXT("IA_AutoTrim"));
+	AutoTrimAction->ValueType = EInputActionValueType::Boolean;
+	SailingMappingContext->MapKey(AutoTrimAction, EKeys::T);
 }
 
 void ASailingPlayerController::BeginPlay()
@@ -229,11 +240,15 @@ void ASailingPlayerController::BeginPlay()
 	{
 		Boat->TurnAction = TurnAction;
 		Boat->CameraAction = CameraAction;
+		Boat->SheetAction = SheetAction;
+		Boat->AutoTrimAction = AutoTrimAction;
 
 		if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(Boat->InputComponent))
 		{
 			EIC->BindAction(TurnAction, ETriggerEvent::Triggered, Boat, &ASailboatPawn::HandleTurn);
 			EIC->BindAction(CameraAction, ETriggerEvent::Triggered, Boat, &ASailboatPawn::HandleCamera);
+			EIC->BindAction(SheetAction, ETriggerEvent::Triggered, Boat, &ASailboatPawn::HandleSheet);
+			EIC->BindAction(AutoTrimAction, ETriggerEvent::Started, Boat, &ASailboatPawn::HandleAutoTrim);
 		}
 	}
 
