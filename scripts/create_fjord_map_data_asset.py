@@ -21,7 +21,7 @@ except ImportError:
 
 def get_json_path():
     # When executed via Editor, __file__ may not be set; use project dir
-    if "__file__" in dir():
+    if "__file__" in globals():
         return os.path.join(os.path.dirname(os.path.abspath(__file__)), "fjord_data.json")
     try:
         project_dir = unreal.SystemLibrary.get_project_directory()
@@ -78,10 +78,20 @@ def main():
         land_list.append(r)
     data.set_editor_property("landmasses", land_list)
 
-    # Islands: TArray<FFjordIslandDef> with name, position, scale, outline
+    # Islands: TArray<FFjordIslandDef> with name, position, scale, outline.
+    # Bakte koblinger (BakedMesh/BakeData, satt av scripts/bake/import_*.py) finnes ikke i JSON-en —
+    # ta vare på dem fra den eksisterende asseten, ellers mister alle øyene terreng og vegetasjon.
+    baked_by_name = {}
+    for old in (data.get_editor_property("islands") or []):
+        baked_by_name[str(old.get_editor_property("name"))] = (
+            old.get_editor_property("baked_mesh"), old.get_editor_property("bake_data"))
     isl_list = []
     for i in data_json.get("Islands", []):
         entry = unreal.FjordIslandDef()
+        if i["Name"] in baked_by_name:
+            mesh, bake = baked_by_name[i["Name"]]
+            entry.set_editor_property("baked_mesh", mesh)
+            entry.set_editor_property("bake_data", bake)
         entry.set_editor_property("name", i["Name"])
         entry.set_editor_property("position", unreal.Vector2D(float(i["Position"]["X"]), float(i["Position"]["Y"])))
         entry.set_editor_property("scale", float(i["Scale"]))
@@ -94,9 +104,10 @@ def main():
     data.set_editor_property("world_origin", unreal.Vector2D(float(wo.get("X", 0)), float(wo.get("Y", 0))))
     data.set_editor_property("meters_per_unit", float(data_json.get("MetersPerUnit", 1.0)))
 
+    n_baked = sum(1 for e in isl_list if e.get_editor_property("baked_mesh"))
+    unreal.log_warning(f"[FJORDDATA] landmasser={len(land_list)} øyer={len(isl_list)} med bakt terreng={n_baked}")
     unreal.EditorAssetLibrary.save_asset(full_path)
     print("Saved.", full_path)
     return True
 
-if __name__ == "__main__":
-    main()
+main()   # headless (-run=pythonscript) setter __name__ til noe annet enn "__main__"

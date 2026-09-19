@@ -107,7 +107,16 @@ void ASailingGameMode::BeginPlay()
 			{
 				if (APawn* Pawn = PC->GetPawn())
 				{
-					Pawn->SetActorLocation(TargetLoc);
+					// Aldri start på land/grunne: en lagret posisjon kan være grunnstøtt (eldre lagringer),
+					// og fjordstart kan havne i land hvis kartdataene endres.
+					if (ASailboatPawn* Boat = Cast<ASailboatPawn>(Pawn))
+					{
+						Boat->PlaceAtStart(TargetLoc);
+					}
+					else
+					{
+						Pawn->SetActorLocation(TargetLoc);
+					}
 					UE_LOG(LogTemp, Log, TEXT("SailingGameMode: Spiller flyttet til %s"),
 						bUseSavedPosition ? TEXT("lagret posisjon") : TEXT("fjord start"));
 				}
@@ -166,7 +175,9 @@ void ASailingGameMode::SaveGame_()
 		{
 			if (APawn* Pawn = PC->GetPawn())
 			{
-				SaveGame->LastPlayerLocation = Pawn->GetActorLocation();
+				// Siste ÅPNE vann, ikke en grunnstøtt posisjon — ellers starter neste økt på land.
+				const ASailboatPawn* Boat = Cast<ASailboatPawn>(Pawn);
+				SaveGame->LastPlayerLocation = Boat ? Boat->GetSaveLocation() : Pawn->GetActorLocation();
 			}
 		}
 

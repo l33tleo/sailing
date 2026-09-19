@@ -18,6 +18,10 @@
 #include "Engine/StaticMeshActor.h"
 #include "Components/StaticMeshComponent.h"
 #include "RenderUtils.h"
+#include "FjordGeometry.h"
+#include "OceanWaterSetupActor.h"
+#include "WaterBodyComponent.h"
+#include "WaterZoneActor.h"
 
 UFjordBenchmarkComponent::UFjordBenchmarkComponent()
 {
@@ -43,7 +47,8 @@ bool UFjordBenchmarkComponent::IsRequestedOnCommandLine()
 	return FParse::Param(FCommandLine::Get(), TEXT("FjordShots"))
 		|| FParse::Param(FCommandLine::Get(), TEXT("FjordBench"))
 		|| FParse::Param(FCommandLine::Get(), TEXT("FjordGroundTest"))
-		|| FParse::Param(FCommandLine::Get(), TEXT("FjordBoatShot"));
+		|| FParse::Param(FCommandLine::Get(), TEXT("FjordBoatShot"))
+		|| FParse::Param(FCommandLine::Get(), TEXT("FjordWaterCheck"));
 }
 
 void UFjordBenchmarkComponent::BeginPlay()
@@ -57,7 +62,27 @@ void UFjordBenchmarkComponent::BeginPlay()
 	bBoatShot = FParse::Param(FCommandLine::Get(), TEXT("FjordBoatShot"));
 	if (bBoatShot)
 	{
+		// -FjordBoatShotDelay=<s>: vent lenger før bildet (f.eks. for å se en bølgeovertoning).
+		FParse::Value(FCommandLine::Get(), TEXT("FjordBoatShotDelay="), FirstStationWarmupSeconds);
 		return;
+	}
+
+	bWaterCheck = FParse::Param(FCommandLine::Get(), TEXT("FjordWaterCheck"));
+	if (bWaterCheck)
+	{
+		// Bildene tas fra vannsonens ytterkanter i stedet for referanseøyene: der manglet vannflaten
+		// (havets bounds var sentrert på origo, se UFjordOceanBodyComponent). Punktene er åpent vann
+		// i DTM-en (≥400 m til land, unntatt Nesøya som er selve feilstedet). 25 m over vannet,
+		// blikk ~600 m frem, så bildet viser mest vannflate.
+		bShots = true;
+		const float CheckEyeZ = 2500.0f;
+		Stations = {
+			{ TEXT("vann_nesoya"),  FVector(-1209000.0, -389100.0, CheckEyeZ),  FVector(-1150000.0, -360000.0, 100.0) },
+			{ TEXT("vann_vest"),    FVector(-1354000.0, -640200.0, CheckEyeZ),  FVector(-1300000.0, -600000.0, 100.0) },
+			{ TEXT("vann_sor"),     FVector(-700000.0, -3100000.0, CheckEyeZ),  FVector(-700000.0, -3040000.0, 100.0) },
+			{ TEXT("vann_midt"),    FVector(-910100.0, -1387100.0, CheckEyeZ),  FVector(-850000.0, -1330000.0, 100.0) },
+			{ TEXT("vann_nordost"), FVector(-5000.0, -318500.0, CheckEyeZ),     FVector(50000.0, -280000.0, 100.0) },
+		};
 	}
 
 	bGroundTest = FParse::Param(FCommandLine::Get(), TEXT("FjordGroundTest"));
@@ -154,6 +179,14 @@ void UFjordBenchmarkComponent::TickComponent(float DeltaTime, ELevelTick TickTyp
 	if (Phase == EPhase::Done || !Camera)
 	{
 		return;
+	}
+
+	// Vannsjekken kjøres én gang etter oppvarmingen på første stasjon: da er landkollisjonen bygd
+	// (den finnes ikke på frame 0) og vannmeshen har hatt tid til å bygges.
+	if (bWaterCheck && !bWaterCheckDone && StationIndex == 0 && PhaseTime > FirstStationWarmupSeconds * 0.5f)
+	{
+		bWaterCheckDone = true;
+		RunWaterCheck();
 	}
 
 	// Spillerkontrolleren finnes ikke nødvendigvis i GameMode::BeginPlay; hold visningen låst her.
@@ -370,4 +403,89 @@ void UFjordBenchmarkComponent::TickBoatShot(float DeltaTime)
 		return;
 	}
 	FPlatformMisc::RequestExit(false);
+}
+
+void UFjordBenchmarkComponent::RunWaterCheck()
+{
+	UWorld* World = GetWorld();
+	const TSharedPtr<FjordGeometry::FHeightGrid> Grid = FjordGeometry::FHeightGrid::Load();
+	if (!World || !Grid.IsValid() || !Grid->IsValid())
+	{
+		UE_LOG(LogTemp, Error, TEXT("[VANNSJEKK] mangler DTM (Content/Fjord/Terrain/oslofjord_dtm) — ingen sjekk."));
+		return;
+	}
+
+	// Havets render-bounds: vannmeshen bygges bare der. Setup-aktøren logger også om bounds dekket
+	// sonen i det øyeblikket meshen ble bygd (det var der feilen satt).
+	FBox2D OceanBox(ForceInit);
+	float WaterZ = 100.0f;
+	for (TActorIterator<AWaterBody> It(World); It; ++It)
+	{
+		if (const UWaterBodyComponent* Body = It->GetWaterBodyComponent())
+		{
+			if (Body->GetWaterBodyType() == EWaterBodyType::Ocean)
+			{
+				OceanBox += FBox2D(FVector2D(Body->Bounds.Origin - Body->Bounds.BoxExtent),
+					FVector2D(Body->Bounds.Origin + Body->Bounds.BoxExtent));
+				WaterZ = Body->GetComponentLocation().Z;
+			}
+		}
+	}
+	bool bSetupCovered = false;
+	for (TActorIterator<AOceanWaterSetupActor> It(World); It; ++It)
+	{
+		bSetupCovered = It->bOceanBoundsCoveredZoneAtSetup;
+	}
+
+	// Sjø = DTM ≤ 0,5 m i punktet OG 100 m ut i fire retninger, så avvik mellom OSM-kysten og den
+	// grove DTM-en (~34 m/px) langs strendene ikke gir falske treff.
+	constexpr float SeaMaxM = 0.5f;
+	constexpr double StepUU = 25000.0;     // 250 m
+	constexpr double ProbeUU = 10000.0;    // 100 m
+	auto IsSea = [&](double X, double Y)
+	{
+		return Grid->SampleMeters(X, Y) <= SeaMaxM
+			&& Grid->SampleMeters(X + ProbeUU, Y) <= SeaMaxM && Grid->SampleMeters(X - ProbeUU, Y) <= SeaMaxM
+			&& Grid->SampleMeters(X, Y + ProbeUU) <= SeaMaxM && Grid->SampleMeters(X, Y - ProbeUU) <= SeaMaxM;
+	};
+
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(FjordWaterCheck), /*bTraceComplex=*/true);
+	const FCollisionObjectQueryParams LandOnly(ECC_FjordLand);
+	int32 NumSea = 0, NumLandOverSea = 0, NumOutsideOcean = 0, NumLogged = 0;
+	constexpr int32 MaxLogged = 40;
+	for (double Y = Grid->MinY + StepUU * 0.5; Y < Grid->MaxY; Y += StepUU)
+	{
+		for (double X = Grid->MinX + StepUU * 0.5; X < Grid->MaxX; X += StepUU)
+		{
+			if (!IsSea(X, Y))
+			{
+				continue;
+			}
+			++NumSea;
+			if (!OceanBox.IsInside(FVector2D(X, Y)))
+			{
+				++NumOutsideOcean;
+				if (NumLogged++ < MaxLogged)
+				{
+					UE_LOG(LogTemp, Warning, TEXT("[VANNSJEKK] UTENFOR_HAVMESH (%.0f,%.0f)"), X, Y);
+				}
+				continue;
+			}
+			FHitResult Hit;
+			if (World->LineTraceSingleByObjectType(Hit, FVector(X, Y, 100000.0), FVector(X, Y, -100000.0), LandOnly, Params)
+				&& Hit.ImpactPoint.Z > WaterZ)
+			{
+				++NumLandOverSea;
+				if (NumLogged++ < MaxLogged)
+				{
+					UE_LOG(LogTemp, Warning, TEXT("[VANNSJEKK] LAND_OVER_SJO (%.0f,%.0f) z=%.0f aktor=%s"),
+						X, Y, Hit.ImpactPoint.Z, *GetNameSafe(Hit.GetActor()));
+				}
+			}
+		}
+	}
+	const int32 NumErrors = NumLandOverSea + NumOutsideOcean + (bSetupCovered ? 0 : 1);
+	UE_LOG(LogTemp, Log, TEXT("[VANNSJEKK] sjopunkter=%d land_over_sjo=%d (%.2f km2) utenfor_havmesh=%d havbounds_ved_oppsett=%s feil=%d"),
+		NumSea, NumLandOverSea, NumLandOverSea * StepUU * StepUU / 1e10, NumOutsideOcean,
+		bSetupCovered ? TEXT("dekket") : TEXT("DEKKET_IKKE"), NumErrors);
 }

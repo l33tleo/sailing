@@ -88,9 +88,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Rig")
 	bool bAutoTrim = true;
 
-	/** Mastaksen i bomhøyde, i BoatMesh-lokale cm (mast på x=75, bom på z=16.5 i Blender-masteren). */
+	/** Mastaksen i bomhøyde, i BoatMesh-lokale cm: mast på x=75, bom 168 cm under mastetoppen (z=66.5,
+	 *  CR 3.5.2.13). Må stemme med MAST_PIVOT i scripts/blender/export_optimist_parts.py. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Sailing|Rig")
-	FVector MastPivotLocal = FVector(75.0f, 0.0f, 16.5f);
+	FVector MastPivotLocal = FVector(75.0f, 0.0f, 66.5f);
 
 	// --- Tilstand ---
 
@@ -108,6 +109,10 @@ public:
 	/** 0..1, ganges inn i seilkraften av pawnen. 1 under auto-trim i stasjonær tilstand. */
 	UPROPERTY(BlueprintReadOnly, Category = "Sailing|Rig|State")
 	float TrimEfficiency = 1.0f;
+
+	/** 0..1: hvor overhalt seilet er (1 = OverSheetRangeDeg eller mer innenfor ideell trim). HUD-varsel. */
+	UPROPERTY(BlueprintReadOnly, Category = "Sailing|Rig|State")
+	float OverSheetAmount = 0.0f;
 
 	/** 0..1 flagring (shader-parameter). */
 	UPROPERTY(BlueprintReadOnly, Category = "Sailing|Rig|State")

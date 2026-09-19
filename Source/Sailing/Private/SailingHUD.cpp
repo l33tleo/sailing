@@ -469,11 +469,29 @@ void ASailingHUD::DrawWindAndSpeed()
 			Rig->bAutoTrim ? TEXT("AUTO") : TEXT("MAN"));
 		DrawText(SheetText, Rig->bAutoTrim ? FLinearColor(0.7f, 0.85f, 1.0f, 1.0f) : FLinearColor(1.0f, 0.9f, 0.5f, 1.0f),
 			PanelX + 15.0f, PanelY + 80.0f, nullptr, 1.1f);
+		// Trimvarsel med hva spilleren skal gjøre. Manuell skjøt blir stående når man faller av fra
+		// kryss — et overhalt seil på slør gir ~40 % kraft, og uten varsel oppleves båten bare treg.
+		const float Flash = 0.5f + 0.5f * FMath::Sin(GustFlashPhase);   // samme blinkfase som kast-varselet
+		FString TrimWarning;
+		FLinearColor TrimColor = FLinearColor::White;
 		if (Rig->Flutter > 0.5f)
 		{
-			const float Flash = 0.5f + 0.5f * FMath::Sin(GustFlashPhase);   // samme blinkfase som kast-varselet
-			DrawText(TEXT("FLAGRER"), FLinearColor(1.0f, 0.3f + 0.3f * Flash, 0.3f, 1.0f),
-				PanelX + 125.0f, PanelY + 80.0f, nullptr, 1.1f);
+			TrimWarning = Rig->bAutoTrim ? TEXT("FLAGRER") : TEXT("FLAGRER - hal inn (W)");
+			TrimColor = FLinearColor(1.0f, 0.3f + 0.3f * Flash, 0.3f, 1.0f);
+		}
+		else if (!Rig->bAutoTrim && Rig->OverSheetAmount > 0.35f)
+		{
+			TrimWarning = FString::Printf(TEXT("OVERHALT, %.0f%% kraft - slakk (S) / auto (T)"), Rig->TrimEfficiency * 100.0f);
+			TrimColor = FLinearColor(1.0f, 0.5f + 0.3f * Flash, 0.2f, 1.0f);
+		}
+		if (!TrimWarning.IsEmpty())
+		{
+			// Egen boks til høyre for panelet: teksten er bredere enn det som er igjen av SKJØT-linja.
+			float TextW = 0.0f, TextH = 0.0f;
+			GetTextSize(TrimWarning, TextW, TextH, nullptr, 1.1f);
+			const float BoxX = PanelX + PanelW + 6.0f;
+			DrawRect(FLinearColor(0.0f, 0.05f, 0.15f, 0.7f), BoxX, PanelY + 76.0f, TextW + 16.0f, TextH + 8.0f);
+			DrawText(TrimWarning, TrimColor, BoxX + 8.0f, PanelY + 80.0f, nullptr, 1.1f);
 		}
 	}
 
@@ -482,7 +500,7 @@ void ASailingHUD::DrawWindAndSpeed()
 	{
 		float SpeedKn = Boat->CurrentSpeed * SpeedToKnots;
 		FLinearColor SpeedColor;
-		if (Boat->CurrentSpeed > 500.0f)
+		if (Boat->CurrentSpeed > 260.0f)   // ~5 kn: over skrogfart, planer
 			SpeedColor = FLinearColor(0.2f, 1.0f, 0.2f, 1.0f); // Green = fast
 		else if (Boat->CurrentSpeed > 100.0f)
 			SpeedColor = FLinearColor(1.0f, 1.0f, 0.3f, 1.0f); // Yellow = medium

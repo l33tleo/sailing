@@ -389,11 +389,18 @@ void ASailboatPawn::Tick(float DeltaTime)
 		SailRig->UpdateRig(ApparentWindAngleDeg, ApparentWindStr, DeltaTime);
 
 		float ForceMultiplier = 0.0f;
+		const float CloseAngle = FMath::Max(CloseHauledAngle, NoGoZoneAngle + 1.0f);
 		if (AngleToWind < NoGoZoneAngle)
 			ForceMultiplier = 0.0f;
+		else if (AngleToWind < CloseAngle)
+		{
+			// Kryss: glir mot null når man kniper, i stedet for et hardt sprang til 0 ved no-go-kanten.
+			float T = (AngleToWind - NoGoZoneAngle) / (CloseAngle - NoGoZoneAngle);
+			ForceMultiplier = FMath::Lerp(0.0f, CloseHauledForce, T);
+		}
 		else if (AngleToWind < 90.0f)
 		{
-			float T = (AngleToWind - NoGoZoneAngle) / (90.0f - NoGoZoneAngle);
+			float T = (AngleToWind - CloseAngle) / (90.0f - CloseAngle);
 			ForceMultiplier = FMath::Lerp(CloseHauledForce, BeamReachForce, T);
 		}
 		else if (AngleToWind < 135.0f)
@@ -515,7 +522,7 @@ void ASailboatPawn::Tick(float DeltaTime)
 				{
 					const float Ang = A * (2.0f * PI / 24.0f);
 					FVector Test(Base.X + FMath::Cos(Ang) * R, Base.Y + FMath::Sin(Ang) * R, WaterZ);
-					if (!IsOverLand(Test))
+					if (IsOpenWater(Test, OpenWaterClearance))
 					{
 						SetActorLocation(Test, /*bSweep=*/false);
 						CapsuleComp->SetPhysicsLinearVelocity(FVector::ZeroVector);
@@ -541,6 +548,28 @@ void ASailboatPawn::Tick(float DeltaTime)
 		LastSafeLoc = GetActorLocation();
 		bHasSafeLoc = true;
 	}
+
+	// 4d. Lagringsposisjon + etterprøving av start. IsOpenWater er 17 strålespor, så den kjøres
+	// bare et par ganger i sekundet.
+	OpenWaterCheckTimer -= DeltaTime;
+	if (OpenWaterCheckTimer <= 0.0f)
+	{
+		OpenWaterCheckTimer = 0.5f;
+		const bool bOpen = IsOpenWater(GetActorLocation(), OpenWaterClearance);
+		if (bOpen)
+		{
+			LastOpenWaterLoc = GetActorLocation();
+			bHasOpenWaterLoc = true;
+		}
+		else if (StartCheckTimeLeft > 0.0f && !IsOpenWater(GetActorLocation(), 400.0f))
+		{
+			// Startet likevel på grunne/land: landkollisjonen finnes ikke ennå på frame 0 når
+			// PlaceAtStart kjører første gang (verifisert — den svarte «åpent vann» midt på en strand).
+			// Bare båtens eget fotavtrykk sjekkes her, så en båt som seiler FORBI en grunne får være.
+			PlaceAtStart(GetActorLocation());
+		}
+	}
+	StartCheckTimeLeft = FMath::Max(0.0f, StartCheckTimeLeft - DeltaTime);
 
 	const float Time = GetWorld()->GetTimeSeconds();
 
@@ -652,6 +681,106 @@ bool ASailboatPawn::IsOverLand(const FVector& Loc) const
 	// over vannet (over bølgetoppene, ~0,7 m) er «land». De hule prosedurale skallene har toppen
 	// på z≥190 og passerer også.
 	return Hit.ImpactPoint.Z > OverLandMinZ;
+}
+
+bool ASailboatPawn::IsOpenWater(const FVector& Loc, float ClearanceRadius) const
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return true;
+	}
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(BoatOpenWater), /*bTraceComplex=*/true, this);
+	const FCollisionObjectQueryParams LandOnly(ECC_FjordLand);
+	const float MaxBottomZ = WaterZ - OpenWaterMinDepth;
+	auto DeepEnough = [&](float X, float Y)
+	{
+		FHitResult Hit;
+		// Nedstrålen treffer toppen av terrenget (bakt sjøbunn/strand/land, eller lokket på de hule
+		// prosedurale skallene). Ingen treff = åpent hav uten bunn.
+		return !World->LineTraceSingleByObjectType(Hit, FVector(X, Y, 100000.0f), FVector(X, Y, -100000.0f), LandOnly, Params)
+			|| Hit.ImpactPoint.Z < MaxBottomZ;
+	};
+	if (!DeepEnough(Loc.X, Loc.Y))
+	{
+		return false;
+	}
+	// To ringer: båtens eget fotavtrykk + manøvreringsrom, så man ikke havner i en kulp bak en grunne.
+	for (const float R : { FMath::Min(400.0f, ClearanceRadius), ClearanceRadius })
+	{
+		for (int32 A = 0; A < 8; ++A)
+		{
+			const float Ang = A * (2.0f * PI / 8.0f) + (R == ClearanceRadius ? PI / 8.0f : 0.0f);
+			if (!DeepEnough(Loc.X + FMath::Cos(Ang) * R, Loc.Y + FMath::Sin(Ang) * R))
+			{
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+FVector ASailboatPawn::FindNearestOpenWater(const FVector& Loc, float ClearanceRadius) const
+{
+	const FVector Base(Loc.X, Loc.Y, WaterZ);
+	if (IsOpenWater(Base, ClearanceRadius))
+	{
+		return Base;
+	}
+	for (float R = 1000.0f; R <= 400000.0f; R += (R < 20000.0f ? 1000.0f : 4000.0f))
+	{
+		const int32 NumAngles = FMath::Clamp(FMath::RoundToInt(2.0f * PI * R / 1500.0f), 12, 48);
+		for (int32 A = 0; A < NumAngles; ++A)
+		{
+			const float Ang = A * (2.0f * PI / NumAngles);
+			const FVector Test(Base.X + FMath::Cos(Ang) * R, Base.Y + FMath::Sin(Ang) * R, WaterZ);
+			if (IsOpenWater(Test, ClearanceRadius))
+			{
+				return Test;
+			}
+		}
+	}
+	UE_LOG(LogTemp, Error, TEXT("[START] Fant ikke åpent vann innen 4 km fra (%.0f,%.0f)."), Base.X, Base.Y);
+	return Base;
+}
+
+void ASailboatPawn::PlaceAtStart(const FVector& Loc)
+{
+	// Dobbel klaring for selve startpunktet: båten seiler av gårde med en gang (auto-trim), og
+	// spilleren skal rekke å orientere seg før nærmeste grunne.
+	const FVector Target = FindNearestOpenWater(Loc, OpenWaterClearance * 2.0f);
+	const float Moved = FVector::Dist2D(Target, Loc);
+	if (Moved > 1.0f)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[START] (%.0f,%.0f) er land/grunne — flyttet %.0f m til åpent vann (%.0f,%.0f)."),
+			Loc.X, Loc.Y, Moved / 100.0f, Target.X, Target.Y);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Log, TEXT("[START] (%.0f,%.0f) er åpent vann."), Target.X, Target.Y);
+	}
+	FRotator Rot = GetActorRotation();
+	if (Moved > 1.0f)
+	{
+		// Flyttet ut fra land: vend baugen videre utover, ellers seiler den rett inn igjen.
+		Rot = FRotator(0.0f, (Target - Loc).GetSafeNormal2D().Rotation().Yaw, 0.0f);
+	}
+	SetActorLocationAndRotation(Target, Rot, /*bSweep=*/false, nullptr, ETeleportType::TeleportPhysics);
+	if (CapsuleComp)
+	{
+		CapsuleComp->SetPhysicsLinearVelocity(FVector::ZeroVector);
+		CapsuleComp->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
+	}
+	CurrentSpeed = 0.0f;
+	LastSafeLoc = LastOpenWaterLoc = Target;
+	bHasSafeLoc = bHasOpenWaterLoc = true;
+	StartCheckTimeLeft = 3.0f;
+	OpenWaterCheckTimer = 0.5f;
+}
+
+FVector ASailboatPawn::GetSaveLocation() const
+{
+	return bHasOpenWaterLoc ? LastOpenWaterLoc : GetActorLocation();
 }
 
 AWindActor* ASailboatPawn::FindWind() const

@@ -17,6 +17,7 @@
 #   scripts/run_fullscreen.sh --bench     fps per stasjon som [FPSBENCH]-linjer (skrives ut til slutt)
 #   scripts/run_fullscreen.sh --boat-shot   ett bilde fra spillerkameraet med båten → renders/landscape/<label>/boat.png
 #   scripts/run_fullscreen.sh --ground-test   skyver båten mot Hovedøya; [GROUNDTEST]/[GRUNNSTOT]/[REDNING] vises
+#   scripts/run_fullscreen.sh --water-check   vannsjekk: [VANNSJEKK] land over sjø / utenfor havmesh + bilder fra sonens ytterkanter
 #   scripts/run_fullscreen.sh --label fase2   merkelapp for --shots/--bench (standard «baseline»)
 #   scripts/run_fullscreen.sh --spike-mesh /Game/Sti/Mesh   testmesh foran første stasjon (med --shots/--bench)
 #   scripts/run_fullscreen.sh --arg -FjordTreeShadow=0   vilkårlig kommandolinjeflagg til spillet (A/B)
@@ -62,6 +63,7 @@ while [[ $# -gt 0 ]]; do
 		--bench)    MEASURE_ARGS+=(-FjordBench) ;;
 		--ground-test) MEASURE_ARGS+=(-FjordGroundTest) ;;
 		--boat-shot) MEASURE_ARGS+=(-FjordBoatShot) ;;
+		--water-check) MEASURE_ARGS+=(-FjordWaterCheck) ;;
 		--arg)      MEASURE_EXTRA+=("${2:-}"); shift ;;
 		--spike-mesh) MEASURE_EXTRA+=(-FjordSpikeMesh="${2:-}"); shift ;;
 		--label)
@@ -116,8 +118,8 @@ if [[ ${#MEASURE_ARGS[@]} -gt 0 ]]; then
 	[[ -n "$LABEL" ]] && ARGS+=(-FjordLabel="$LABEL")
 	echo "Starter målekjøring (logg: $LOG). Spillet avslutter seg selv."
 	"$EDITOR_BIN" "${ARGS[@]}" || true
-	grep -aE "\[(FPSBENCH|GROUNDTEST|GRUNNSTOT|REDNING)\]" "$LOG" \
-		| sed -E 's/^.*\[(FPSBENCH|GROUNDTEST|GRUNNSTOT|REDNING)\]/[\1]/'
+	grep -aE "\[(FPSBENCH|GROUNDTEST|GRUNNSTOT|REDNING|VANNSJEKK|VANN)\]" "$LOG" \
+		| sed -E 's/^.*\[(FPSBENCH|GROUNDTEST|GRUNNSTOT|REDNING|VANNSJEKK|VANN)\]/[\1]/'
 	exit 0
 fi
 

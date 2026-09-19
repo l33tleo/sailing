@@ -1,4 +1,6 @@
 #include "OceanWaterSetupActor.h"
+#include "FjordWaveGenerator.h"
+#include "WaterBodyComponent.h"
 #include "WindActor.h"
 #include "WaterZoneActor.h"
 #include "WaterBodyOceanActor.h"
@@ -11,6 +13,15 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Components/PrimitiveComponent.h"
 #include "UObject/UnrealType.h"
+#include "HAL/IConsoleManager.h"
+#include "GameFramework/PlayerController.h"
+#include "GameFramework/Pawn.h"
+
+// Testkrok for overtoningen (scripts/run_fullscreen.sh --boat-shot --arg -FjordBoatShotDelay=40
+// --exec "sailing.WaveTestTurnDeg 90"): legger grader til bølgeretningen etter 10 s spilltid.
+static TAutoConsoleVariable<float> CVarWaveTestTurnDeg(
+	TEXT("sailing.WaveTestTurnDeg"), 0.0f,
+	TEXT("Dreier bølgenes målretning så mange grader etter 10 s (test av overtoning). 0 = av."));
 
 AOceanWaterSetupActor::AOceanWaterSetupActor()
 {
@@ -42,6 +53,9 @@ void AOceanWaterSetupActor::ApplyWaterLook()
 	{
 		WaterMID->SetVectorParameterValue(TEXT("Absorption"), WaterAbsorption);
 		WaterMID->SetVectorParameterValue(TEXT("Scattering"), WaterScattering);
+		WaterMID->SetScalarParameterValue(TEXT("Default Near Normal Strength"), NearDetailNormalStrength);
+		WaterMID->SetScalarParameterValue(TEXT("Default Distant Normal Strength"), DistantDetailNormalStrength);
+		WaterMID->SetScalarParameterValue(TEXT("Default Distant Normal StrengthB"), DistantDetailNormalStrength * 0.8f);
 	}
 }
 
@@ -61,6 +75,10 @@ void AOceanWaterSetupActor::SpawnWaterZone()
 	if (SpawnedZone)
 	{
 		SpawnedZone->SetZoneExtent(ZoneExtent);
+		// Water info-teksturen (vannhøyde/-dybde per texel, brukt av havmaterialet) er 512² som
+		// standard = ~47×78 m per texel over 24×40 km. r.Water.WaterInfo.RenderTargetResolutionMax i
+		// DefaultEngine.ini kan bare klampe NED, så oppløsningen må heves her.
+		SpawnedZone->SetRenderTargetResolution(FIntPoint(WaterInfoResolution, WaterInfoResolution));
 
 		// Nivåets Landscape er kun et lite dekorativt bakteppe (fjordterrenget er egne
 		// ProceduralMeshComponent-øyer, ikke Landscape-carvet). bAutoIncludeLandscapesAsTerrain
@@ -178,6 +196,26 @@ void AOceanWaterSetupActor::SpawnOceanBody()
 		FOnWaterBodyChangedParams ChangedParams;
 		ChangedParams.bShapeOrPositionChanged = true;
 		OceanComp->UpdateAll(ChangedParams);
+
+		// Vannmeshen (quadtree-flisene) bygges fra havets Bounds. Bygges den før bounds er riktige,
+		// tegnes vannflaten bare i en del av sonen resten av økten (se UFjordOceanBodyComponent-
+		// konstruktøren). Oppdater bounds og tving én ny bygging av mesh + water info.
+		OceanComp->UpdateBounds();
+		SpawnedZone->MarkForRebuild(EWaterZoneRebuildFlags::All, this);
+
+		const FBox2D OceanBox(FVector2D(OceanComp->Bounds.Origin - OceanComp->Bounds.BoxExtent),
+			FVector2D(OceanComp->Bounds.Origin + OceanComp->Bounds.BoxExtent));
+		const FBox2D ZoneBox = SpawnedZone->GetZoneBounds2D();
+		const bool bCovers = OceanBox.ExpandBy(100.0).IsInside(ZoneBox);
+		bOceanBoundsCoveredZoneAtSetup = bCovers;
+		UE_LOG(LogTemp, Log, TEXT("[VANN] havbounds X %.0f..%.0f Y %.0f..%.0f | sone X %.0f..%.0f Y %.0f..%.0f | %s"),
+			OceanBox.Min.X, OceanBox.Max.X, OceanBox.Min.Y, OceanBox.Max.Y,
+			ZoneBox.Min.X, ZoneBox.Max.X, ZoneBox.Min.Y, ZoneBox.Max.Y,
+			bCovers ? TEXT("dekker sonen") : TEXT("DEKKER IKKE SONEN — vannflaten mangler utenfor havbounds"));
+		if (!bCovers)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[VANN] Havets bounds dekker ikke vannsonen."));
+		}
 	}
 }
 
@@ -189,15 +227,17 @@ void AOceanWaterSetupActor::BuildAndAssignWaves()
 	}
 
 	RuntimeWaves = NewObject<UGerstnerWaterWaves>(this, TEXT("FjordGerstnerWaves"));
-	UGerstnerWaterWaveGeneratorSimple* Generator = NewObject<UGerstnerWaterWaveGeneratorSimple>(RuntimeWaves, TEXT("FjordGerstnerWaveGenerator"));
-	Generator->NumWaves = NumWaves;
-	Generator->MinWavelength = MinWavelength;
-	Generator->MaxWavelength = MaxWavelength;
-	Generator->MinAmplitude = MinAmplitude;
-	Generator->MaxAmplitude = MaxAmplitude;
-	Generator->SmallWaveSteepness = SmallWaveSteepness;
-	Generator->LargeWaveSteepness = LargeWaveSteepness;
-	RuntimeWaves->GerstnerWaveGenerator = Generator;
+	WaveGenerator = NewObject<UFjordWaveGenerator>(RuntimeWaves, TEXT("FjordWaveGenerator"));
+	WaveGenerator->NumWaves = NumWaves;
+	WaveGenerator->MinWavelength = MinWavelength;
+	WaveGenerator->MaxWavelength = MaxWavelength;
+	WaveGenerator->MinAmplitude = MinAmplitude;
+	WaveGenerator->MaxAmplitude = MaxAmplitude;
+	WaveGenerator->SmallWaveSteepness = SmallWaveSteepness;
+	WaveGenerator->LargeWaveSteepness = LargeWaveSteepness;
+	WaveGenerator->DirectionSpreadDeg = WaveDirectionSpreadDeg;
+	WaveGenerator->Sets = { UFjordWaveGenerator::FWaveSet{ 0.0f, 1.0f } };   // retning settes ved første synk
+	RuntimeWaves->GerstnerWaveGenerator = WaveGenerator;
 	RuntimeWaves->RecomputeWaves(/*bAllowBPScript=*/false);
 
 	SpawnedOcean->SetWaterWaves(RuntimeWaves);
@@ -214,67 +254,125 @@ void AOceanWaterSetupActor::Tick(float DeltaTime)
 		SyncWavesWithWind();
 		ApplyWaterLook();
 	}
+	TickWaveCrossfade(DeltaTime);
 }
 
 void AOceanWaterSetupActor::SyncWavesWithWind()
 {
 	AWindActor* Wind = FindWind();
-	if (!Wind || !RuntimeWaves)
+	if (!Wind || !RuntimeWaves || !WaveGenerator || WaveGenerator->Sets.Num() == 0)
 	{
 		return;
 	}
 
-	UGerstnerWaterWaveGeneratorSimple* Generator = Cast<UGerstnerWaterWaveGeneratorSimple>(RuntimeWaves->GerstnerWaveGenerator);
-	if (!Generator)
+	// Bølgene går MED vinden: AWindActor sine vektorer peker MOT vindkilden (se CLAUDE.md,
+	// vindkonvensjon), og en Gerstner-bølge forplanter seg langs +Direction — så retningen er
+	// −vindvektoren. Tidligere ble +vindvektoren brukt, og sjøen gikk mot vinden. Middelvinden
+	// (uten de korte vriene) brukes: sjøen følger ikke hvert vindkast.
+	const FVector WindDir = Wind->GetMeanWindDirection();
+	float TargetAngleDeg = FMath::RadiansToDegrees(FMath::Atan2(-WindDir.Y, -WindDir.X));
+	if (GetWorld()->GetTimeSeconds() > 10.0)
 	{
-		return;
+		TargetAngleDeg = FMath::UnwindDegrees(TargetAngleDeg + CVarWaveTestTurnDeg.GetValueOnGameThread());
 	}
-
-	// Oppdater havets dominerende bølgeretning og -styrke fra global vind. Kastenes lokale
-	// "cat's paw"-mørkning (tidligere GustDarkening) er en materialeffekt, ikke en asset-endring,
-	// og migreres separat siden Gerstner-asset-nivået kun støtter global retning/styrke.
-	const FVector WindDir = Wind->GetWindDirection();
-	const float NewAngleDeg = FMath::RadiansToDegrees(FMath::Atan2(WindDir.Y, WindDir.X));
 	const float WindStrengthNorm = FMath::Clamp(Wind->GetWindStrength() / FMath::Max(1.0f, Wind->BaseWindStrength), 0.2f, 1.5f);
 
-	// VIKTIG: bølgefrontenes fase er forankret i verdens origo. En ny WindAngleDeg flytter derfor
-	// hele bølgemønsteret flere meter der båten seiler (~2 km fra origo): sjøen HOPPER momentant,
-	// og spilleren opplever det som at båten «hopper litt tilbake». Målt i fullskjerm 2026-09-17:
-	// 157 sprang på 20–65 cm i vannflaten under båten på 41 min (~4/min) med den gamle terskelen
-	// (15° / 0.25 styrke) — spilltråden var ellers helt jevn (60 fps, ingen posisjonshopp).
-	// Derfor: retningen settes én gang (ev. på nytt først ved WaveDirectionResyncDeg), mens
-	// amplituden — som IKKE endrer fase (samme Seed/retning/bølgelengder) — følger vinden i små steg.
 	const bool bFirst = AppliedWindStrengthNorm < 0.0f;
-	const float AngleDelta = FMath::Abs(FMath::FindDeltaAngleDegrees(AppliedWindAngleDeg, NewAngleDeg));
-	const bool bResyncDirection = bFirst || (WaveDirectionResyncDeg > 0.0f && AngleDelta >= WaveDirectionResyncDeg);
-
-	float NewStrengthNorm = WindStrengthNorm;
-	if (!bFirst)
+	bool bChanged = false;
+	if (bFirst)
 	{
+		WaveGenerator->Sets = { UFjordWaveGenerator::FWaveSet{ TargetAngleDeg, 1.0f } };
+		AppliedWindStrengthNorm = WindStrengthNorm;
+		bChanged = true;
+	}
+	else
+	{
+		// Amplituden følger vindstyrken i små steg (amplitude alene endrer ikke fasen).
 		const float Step = FMath::Clamp(WindStrengthNorm - AppliedWindStrengthNorm, -MaxAmplitudeStepPerSync, MaxAmplitudeStepPerSync);
-		NewStrengthNorm = AppliedWindStrengthNorm + Step;
-		if (!bResyncDirection && FMath::Abs(Step) < 0.005f)
+		if (FMath::Abs(Step) >= 0.005f)
 		{
-			return;
+			AppliedWindStrengthNorm += Step;
+			bChanged = true;
+		}
+
+		// Ny retning: IKKE drei det eksisterende settet (det flytter hele sjøen), men ton inn et nytt
+		// sett i vindretningen. Én overtoning om gangen; neste vurderes når denne er ferdig.
+		const float CurrentAngleDeg = WaveGenerator->Sets.Last().AngleDeg;
+		const float Delta = FMath::Abs(FMath::FindDeltaAngleDegrees(CurrentAngleDeg, TargetAngleDeg));
+		if (!bWaveCrossfading && Delta >= WaveDirectionChangeDeg)
+		{
+			CrossfadeMaxJumpCm = 0.0f;
+			UE_LOG(LogTemp, Log, TEXT("[BOLGER] Vinden har dreid %.0f° — toner inn ny bølgeretning %.0f° over %.0f s."),
+				Delta, TargetAngleDeg, WaveCrossfadeSeconds);
+			WaveGenerator->Sets = { WaveGenerator->Sets.Last(), UFjordWaveGenerator::FWaveSet{ TargetAngleDeg, 0.0f } };
+			bWaveCrossfading = true;
+			WaveCrossfadeAlpha = 0.0f;
+			TimeSinceCrossfadeUpdate = 0.0f;
 		}
 	}
 
-	if (bResyncDirection)
+	if (bChanged)
 	{
-		if (!bFirst)
-		{
-			UE_LOG(LogTemp, Warning, TEXT("[BOLGER] Bølgeretning synket på nytt (%.0f° -> %.0f°) — sjøen hopper én gang."),
-				AppliedWindAngleDeg, NewAngleDeg);
-		}
-		AppliedWindAngleDeg = NewAngleDeg;
-		Generator->WindAngleDeg = NewAngleDeg;
+		WaveGenerator->AmplitudeScale = AppliedWindStrengthNorm * WindAmplitudeScale;
+		RuntimeWaves->RecomputeWaves(/*bAllowBPScript=*/false);
 	}
-	AppliedWindStrengthNorm = NewStrengthNorm;
+}
 
-	Generator->MinAmplitude = MinAmplitude * NewStrengthNorm * WindAmplitudeScale;
-	Generator->MaxAmplitude = MaxAmplitude * NewStrengthNorm * WindAmplitudeScale;
+void AOceanWaterSetupActor::TickWaveCrossfade(float DeltaTime)
+{
+	if (!bWaveCrossfading || !WaveGenerator || !RuntimeWaves || WaveGenerator->Sets.Num() != 2)
+	{
+		return;
+	}
+	WaveCrossfadeAlpha = FMath::Min(1.0f, WaveCrossfadeAlpha + DeltaTime / WaveCrossfadeSeconds);
+	TimeSinceCrossfadeUpdate += DeltaTime;
+	if (TimeSinceCrossfadeUpdate < WaveCrossfadeUpdateInterval && WaveCrossfadeAlpha < 1.0f)
+	{
+		return;
+	}
+	TimeSinceCrossfadeUpdate = 0.0f;
 
+	// Glatt S-kurve: ingen brå start/slutt i hvor fort sjøen skifter karakter.
+	const float W = FMath::SmoothStep(0.0f, 1.0f, WaveCrossfadeAlpha);
+	WaveGenerator->Sets[0].Weight = 1.0f - W;
+	WaveGenerator->Sets[1].Weight = W;
+	const bool bDone = WaveCrossfadeAlpha >= 1.0f;
+	if (bDone)
+	{
+		// Det gamle settet har vekt 0 (null amplitude og krapphet) og fjernes usynlig.
+		WaveGenerator->Sets = { WaveGenerator->Sets[1] };
+		bWaveCrossfading = false;
+	}
+
+	// Mål hvor mye vannflaten ved båten flytter seg i SELVE oppdateringen (samme tidspunkt, før og
+	// etter): det er «hoppet» spilleren ville sett. Ren overtoning skal gi millimeter per steg.
+	const float Before = SampleWaterHeightAtPlayer();
 	RuntimeWaves->RecomputeWaves(/*bAllowBPScript=*/false);
+	const float After = SampleWaterHeightAtPlayer();
+	if (Before > -1e5f && After > -1e5f)
+	{
+		CrossfadeMaxJumpCm = FMath::Max(CrossfadeMaxJumpCm, FMath::Abs(After - Before));
+	}
+	if (bDone)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[BOLGER] Ny bølgeretning %.0f° ferdig tonet inn. Største sprang i vannflaten ved båten per steg: %.1f cm."),
+			WaveGenerator->Sets[0].AngleDeg, CrossfadeMaxJumpCm);
+		CrossfadeMaxJumpCm = 0.0f;
+	}
+}
+
+float AOceanWaterSetupActor::SampleWaterHeightAtPlayer() const
+{
+	const APlayerController* PC = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr;
+	const APawn* Pawn = PC ? PC->GetPawn() : nullptr;
+	UWaterBodyComponent* Ocean = SpawnedOcean ? SpawnedOcean->GetWaterBodyComponent() : nullptr;
+	if (!Pawn || !Ocean)
+	{
+		return -1e6f;
+	}
+	const auto Q = Ocean->TryQueryWaterInfoClosestToWorldLocation(Pawn->GetActorLocation(),
+		EWaterBodyQueryFlags::ComputeLocation | EWaterBodyQueryFlags::IncludeWaves);
+	return Q.HasValue() ? static_cast<float>(Q.GetValue().GetWaterSurfaceLocation().Z) : -1e6f;
 }
 
 AWindActor* AOceanWaterSetupActor::FindWind()

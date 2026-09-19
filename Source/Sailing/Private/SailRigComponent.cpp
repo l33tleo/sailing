@@ -73,6 +73,7 @@ void USailRigComponent::UpdateRig(float ApparentWindAngleDeg, float ApparentWind
 	const float LuffFactor = FMath::SmoothStep(LuffAoADeg, OptimalAoADeg, AngleOfAttackDeg);
 	const float OverSheet = FMath::Clamp((SheetAuto - BoomMag) / OverSheetRangeDeg, 0.0f, 1.0f);
 	const float OverFactor = 1.0f - OverSheetPenalty * OverSheet;
+	OverSheetAmount = OverSheet;
 	TrimEfficiency = LuffFactor * OverFactor;
 
 	// Shader-parametre.

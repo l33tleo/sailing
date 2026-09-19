@@ -16,6 +16,9 @@ class ACameraActor;
  *   -FjordBoatShot         ett skjermbilde fra spillerkameraet (båten i bildet) etter oppvarming
  *   -FjordGroundTest       skyver båten fra åpent vann mot Hovedøya og logger «[GROUNDTEST]»:
  *                          verifiserer kollisjon/grunnstøting mot bakt terreng uten manuell seiling
+ *   -FjordWaterCheck       vannsjekk: et rutenett over hele DTM-en der alle sjøpunkter testes for
+ *                          land over sjø og for å ligge utenfor havets render-bounds («[VANNSJEKK]»),
+ *                          pluss skjermbilder fra stasjoner i vannsonens ytterkanter
  *   -FjordLabel=<navn>     undermappe/merkelapp (standard «baseline»)
  *
  * Vinden er allerede deterministisk (AWindActor::WindSeed), så samme stasjon gir sammenlignbare
@@ -65,9 +68,13 @@ private:
 	void FinishBench();
 	void TickGroundTest(float DeltaTime);
 	void TickBoatShot(float DeltaTime);
+	/** Rutenettet i -FjordWaterCheck: logger avvik og en oppsummering. */
+	void RunWaterCheck();
 
 	bool bGroundTest = false;
 	bool bBoatShot = false;
+	bool bWaterCheck = false;
+	bool bWaterCheckDone = false;
 	float BoatShotTime = 0.0f;
 	bool bGroundTestPlaced = false;
 	float GroundTestTime = 0.0f;
